@@ -110,6 +110,24 @@ To verify in the Phase 0 spike (not documented):
 
 Launch settings for both apps are in [README.md](README.md).
 
+### Deploying through the Cloudways MCP
+
+Checked on 2026-11-20. The Cloudways MCP server has a `velocity_tools` toolset that can create
+the server and apps, attach PostgreSQL, set env variables, add a domain and read deployments.
+Nothing is created without the owner's confirmation.
+
+- Repository: `VadimNotJustDev/AppDashboardPOC` (private), branch `main`.
+- Account state: no servers yet, and no version-control provider linked. GitHub has to be
+  connected in the Cloudways console first; the OAuth step cannot be done through the MCP.
+- Ids for the create calls: Starter plan `1` ($20/month, trial-eligible, 5 apps, 2 GB, 2 vCPU);
+  cloud `do`; frameworks Fastify `2`, TanStack SSR `11`, Other `13`; Node v24 runtime `1`,
+  v22 `2`. Regions: nyc3, ams3, blr1, atl1, fra1, lon1, sfo3, sgp1, syd1, tor1.
+- The Fastify preset exposes only a package manager and a start command, no build command.
+  The API needs a build (`tsc`), so use the Other preset or confirm the build runs another way.
+- The create calls show no root directory field. Run `velocity_vcs_repo_inspect` once GitHub is
+  linked to see how the two apps in `apps/` are detected before creating anything.
+- No tool for Velocity cron entries was found in `velocity_tools`; that may be a console step.
+
 Sources: [launch](https://support.cloudways.com/en/articles/15550368-how-to-launch-a-velocity-application-on-cloudways),
 [deployments](https://support.cloudways.com/en/articles/16187473-how-to-manage-deployments-for-your-cloudways-velocity-application),
 [cron jobs](https://support.cloudways.com/en/articles/16187620-how-to-manage-cron-jobs-for-your-application-on-cloudways-velocity),
