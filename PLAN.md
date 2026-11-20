@@ -1,7 +1,8 @@
 # AppDashboard — project plan
 
-Last updated: 2026-11-20. Status: Phase 0 steps 4 to 8 are built and verified locally. The three
-spikes and the first real deployment (steps 1 to 3 and 9) need accounts that do not exist yet.
+Last updated: 2026-11-20. Status: Phase 0 is built and both apps are deployed on Velocity. Still
+open from Phase 0: the dashboard password, a cron entry, custom domains, and the TikTok and Meta
+spikes.
 
 ## 1. Goal
 
@@ -95,18 +96,39 @@ Verified in Cloudways' own support docs on 2026-11-20:
   and has its own outbound IP.
 - No SSH or command-line access.
 
-To verify in the Phase 0 spike (not documented):
+Found by deploying on 2026-11-20:
 
-1. The names of the auto-added database env variables, and the host/port to connect to.
-2. Whether a cron command runs in the app's built directory with the app's env variables.
-3. Whether `web` can reach `api` over localhost. Assume not: default `API_URL` is the public
-   `https://api.<domain>`.
-4. Two applications from one repository with different root directories.
-5. Whether a build of `web` on the 2 GB server disturbs the running `api`.
-6. Whether a deploy causes a visible interruption.
-7. Whether Postgres can be reached from a laptop (for local debugging against real data).
-8. Whether Velocity's npm runs dependency install scripts. Locally npm 11 skips them by default
-   and both apps still build and run.
+- Attaching PostgreSQL injects `PGUSER`, `PGPASSWORD` (private), `PGHOST=localhost`,
+  `PGPORT=5432` and `PGDATABASE` into that app. There is no `DATABASE_URL`.
+- The build runs on the server with Node 24 and npm 11: `npm install` (dev dependencies
+  included), then the build command, then the start command under PM2.
+- npm skips dependency install scripts there too, as it does locally; both apps build anyway.
+- The Fastify preset has no build step. The API uses the Other preset with an explicit build
+  command; the TanStack SSR preset builds and starts the dashboard as is.
+- A root directory per app works: two apps from one repository, `apps/api` and `apps/web`.
+- Every app listens on port 3000; two apps on one server do not collide.
+- The storage size is required when creating a server; 25 GB was accepted for Starter.
+- A push to the deployed branch triggers a deploy through a webhook.
+
+Still to verify:
+
+1. Whether a cron command runs in the app's built directory with the app's env variables.
+2. Whether `web` can reach `api` over localhost. Today `API_URL` is the API's public address.
+3. Whether a build of `web` on the 2 GB server disturbs the running `api`.
+4. Whether a deploy causes a visible interruption.
+5. Whether Postgres can be reached from a laptop (for local debugging against real data).
+
+### What exists on Cloudways
+
+| Resource | Id | Address |
+|---|---|---|
+| Velocity server `appdashboard` (Starter, $20/month, Frankfurt, 25 GB) | `1690499` | |
+| App `api` (PostgreSQL attached) | `6797147` | https://nodejs-1690499-6797147.cloudwaysnodeapps.com |
+| App `web` | `6797158` | https://nodejs-1690499-6797158.cloudwaysnodeapps.com |
+
+Env variables set: `INTERNAL_API_TOKEN` on both apps and `SESSION_SECRET` on `web`, as private
+random values; `API_URL` on `web`. `DASHBOARD_PASSWORD` on `web` is for the owner to set in the
+console.
 
 Launch settings for both apps are in [README.md](README.md).
 
@@ -117,16 +139,15 @@ the server and apps, attach PostgreSQL, set env variables, add a domain and read
 Nothing is created without the owner's confirmation.
 
 - Repository: `VadimNotJustDev/AppDashboardPOC` (private), branch `main`.
-- Account state: no servers yet, and no version-control provider linked. GitHub has to be
-  connected in the Cloudways console first; the OAuth step cannot be done through the MCP.
+- GitHub is linked to the Cloudways account. That OAuth step has to be done in the Cloudways
+  console; it cannot be done through the MCP.
 - Ids for the create calls: Starter plan `1` ($20/month, trial-eligible, 5 apps, 2 GB, 2 vCPU);
   cloud `do`; frameworks Fastify `2`, TanStack SSR `11`, Other `13`; Node v24 runtime `1`,
   v22 `2`. Regions: nyc3, ams3, blr1, atl1, fra1, lon1, sfo3, sgp1, syd1, tor1.
-- The Fastify preset exposes only a package manager and a start command, no build command.
-  The API needs a build (`tsc`), so use the Other preset or confirm the build runs another way.
-- The create calls show no root directory field. Run `velocity_vcs_repo_inspect` once GitHub is
-  linked to see how the two apps in `apps/` are detected before creating anything.
 - No tool for Velocity cron entries was found in `velocity_tools`; that may be a console step.
+- `velocity_plan_activate` and `velocity_app_create` accept `root_directory` inside
+  `build_config`. With the Fastify preset they drop `build_command`; switch the app to the Other
+  preset with `velocity_build_config_update` to keep it.
 
 Sources: [launch](https://support.cloudways.com/en/articles/15550368-how-to-launch-a-velocity-application-on-cloudways),
 [deployments](https://support.cloudways.com/en/articles/16187473-how-to-manage-deployments-for-your-cloudways-velocity-application),
@@ -276,7 +297,9 @@ Differences from the list above:
 - `cli.ts` has `ping`, `sync`, `migrate` and `seed`. `snapshot` and `report` arrive with
   Phases 2 and 5.
 - The overview page (Phase 1 step 6) exists in a first version, fed by seed data, without charts.
-- Still open: git commit and a GitHub repository, the three spikes, the real deployment.
+- Steps 1 and 9 are done: both apps run on Velocity (see section 4).
+- Still open: the dashboard password, a cron entry running `node dist/cli.js ping`, custom
+  domains, and the TikTok and Meta spikes (steps 2 and 3).
 
 ### Phase 1 — Downloads and revenue
 

@@ -54,12 +54,16 @@ function RootError({ error }: ErrorComponentProps) {
       <main className="mx-auto max-w-xl px-6 py-24">
         <h1 className="font-display text-2xl font-semibold">The dashboard could not load</h1>
         <p className="mt-3 text-ink-soft">
-          The dashboard server could not get data from the API. Check that the API is running and
-          that both apps share the same internal token, then reload.
+          Something on the server is not set up or not reachable. Check the dashboard's
+          environment variables and that the API is running, then reload.
         </p>
-        <pre className="mt-6 overflow-x-auto rounded-md border border-line bg-surface p-4 text-sm">
-          {error instanceof Error ? error.message : String(error)}
-        </pre>
+        {/* The detail can name configuration, so it is shown in development only. In production
+            it is in the server log. */}
+        {import.meta.env.DEV && (
+          <pre className="mt-6 overflow-x-auto rounded-md border border-line bg-surface p-4 text-sm">
+            {error instanceof Error ? error.message : String(error)}
+          </pre>
+        )}
       </main>
     </RootDocument>
   )
