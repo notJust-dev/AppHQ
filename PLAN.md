@@ -328,7 +328,7 @@ Differences from the list above:
   Phase 1 first needs one.
 - `cli.ts` has `ping`, `sync`, `migrate` and `seed`. `snapshot` and `report` arrive with
   Phases 2 and 5.
-- The overview page (Phase 1 step 6) exists in a first version, fed by seed data, without charts.
+- The overview page (Phase 1 step 6) exists, with charts on the per-app page.
 - Steps 1 and 9 are done: both apps run on Velocity (see section 4).
 - Still open: a cron entry running `node dist/cli.js ping`, custom domains, and the TikTok and
   Meta spikes (steps 2 and 3).
@@ -359,7 +359,7 @@ Status on 2026-11-20 (merged to `main` and deployed):
 - Step 3 (App Store downloads, plus the analytics report requests) is merged and deployed, with
   a form in Settings. Not yet run against a real key.
 - RevenueCat has run against a real key: one app connected, 2,400 rows, no errors.
-- Step 6 (per-app page) is built on branch `phase-1-app-charts`: `/apps/<id>` shows one row per
+- Step 6 (per-app page) is merged and deployed: `/apps/<id>` shows one row per
   funnel step (social views, store page views, downloads, trials started, revenue, MRR) on a
   shared date axis, each on its own scale, with one crosshair that reads a day across every
   row. Days no source reported are gaps, not zeros. It covers Phase 2 step 5's timeline too; the
