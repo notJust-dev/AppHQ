@@ -146,6 +146,15 @@ export function generateDemoData(options: DemoOptions): { apps: NewApp[]; metric
   }
 }
 
+/** Removes the demo apps and, through ON DELETE CASCADE, everything recorded for them. */
+export async function clearDemo(db: Db) {
+  const removed = await db
+    .delete(apps)
+    .where(like(apps.id, `${DEMO_PREFIX}%`))
+    .returning({ id: apps.id })
+  return { apps: removed.length }
+}
+
 /** Replaces the demo apps and their metrics. Real apps (ids without the prefix) are untouched. */
 export async function seedDemo(db: Db, options: DemoOptions) {
   const data = generateDemoData(options)

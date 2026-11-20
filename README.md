@@ -86,4 +86,7 @@ Things to know:
 - **A push to `main` redeploys both apps,** whichever folder changed. Each app restarts briefly.
 - **Both apps answer `GET /health`.** The dashboard's also says whether it is fully configured
   and can reach the API, so a deployment can be checked without signing in.
+- **Demo data without a shell.** `POST /trpc/demo.seed` and `POST /trpc/demo.clear` on the API,
+  sent with the internal token, load and remove the generated demo apps. They only touch apps
+  whose id starts with `demo-`.
 - Both apps listen on `PORT` when it is set and on 3000 otherwise, over IPv4.

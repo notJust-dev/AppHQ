@@ -1,8 +1,10 @@
 import { initTRPC } from '@trpc/server'
+import { z } from 'zod'
 import type { QueryContext } from '../queries/define.js'
 import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
 import { listApps } from '../queries/list-apps.js'
+import { clearDemo, seedDemo } from '../seed/demo.js'
 
 const t = initTRPC.context<QueryContext>().create()
 
@@ -21,6 +23,14 @@ export const appRouter = t.router({
   }),
   sync: t.router({
     status: t.procedure.query(({ ctx }) => getSyncStatus.handler(ctx)),
+  }),
+  // Velocity has no shell, so the generated demo data is loaded and removed through the API.
+  // Both only ever touch apps whose id starts with `demo-`.
+  demo: t.router({
+    seed: t.procedure
+      .input(z.object({ days: z.number().int().min(1).max(400).default(200) }))
+      .mutation(({ ctx, input }) => seedDemo(ctx.db, { days: input.days })),
+    clear: t.procedure.mutation(({ ctx }) => clearDemo(ctx.db)),
   }),
 })
 
