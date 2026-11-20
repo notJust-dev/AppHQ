@@ -129,8 +129,8 @@ Still to verify:
 | App `api` (PostgreSQL attached) | `6797147` | https://nodejs-1690499-6797147.cloudwaysnodeapps.com |
 | App `web` | `6797158` | https://nodejs-1690499-6797158.cloudwaysnodeapps.com |
 
-Env variables set: `INTERNAL_API_TOKEN` on both apps, and `SESSION_SECRET` and
-`DASHBOARD_PASSWORD` on `web`, as private random values; `API_URL` on `web`. The dashboard
+Env variables set: `INTERNAL_API_TOKEN` on both apps, `ENCRYPTION_KEY` on `api`, and
+`SESSION_SECRET` and `DASHBOARD_PASSWORD` on `web`, as private random values; `API_URL` on `web`. The dashboard
 password is also recorded locally in the git-ignored `apps/web/.env.velocity`.
 
 Both apps answer `GET /health`. The dashboard's reports `configured` (all its variables are
@@ -333,14 +333,15 @@ Differences from the list above:
 Done when: the overview shows real downloads and revenue for every app for the last 90 days and
 updates without you touching it.
 
-Status on 2026-11-20, on branch `phase-1-revenuecat` (not merged, so not deployed):
+Status on 2026-11-20 (merged to `main` and deployed):
 
 - Done: step 2 (RevenueCat connector with a 400-day backfill) and step 7 (Settings page: apps,
   connect RevenueCat, sync status, "Sync now", load and remove demo data). Step 1 happens
   through step 7: connecting a key creates the app from its RevenueCat project.
 - Verified with tests and in a browser against a stand-in RevenueCat server. Not yet run against
   a real key.
-- Needed before it works on the server: an `ENCRYPTION_KEY` variable on the `api` app.
+- `ENCRYPTION_KEY` is set on the `api` app as a private variable, with a copy in the git-ignored
+  `apps/api/.env.velocity`. Losing it makes the stored credentials unreadable.
 - Not started: steps 3 to 6 and 8.
 
 ### Phase 2 — Social and the funnel chart
