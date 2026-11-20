@@ -1,14 +1,25 @@
 import { z } from 'zod'
 
-const schema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  // Velocity's Nginx forwards to the app over IPv4 loopback, so never bind to `localhost`
-  // (which Node may resolve to ::1).
-  HOST: z.string().default('127.0.0.1'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  DATABASE_URL: z.url(),
-  INTERNAL_API_TOKEN: z.string().min(32, 'must be at least 32 characters'),
-})
+const schema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    // Velocity's Nginx forwards to the app over IPv4 loopback, so never bind to `localhost`
+    // (which Node may resolve to ::1).
+    HOST: z.string().default('127.0.0.1'),
+    PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    // Local development sets DATABASE_URL. On Velocity, attaching PostgreSQL to the app injects
+    // the standard PGHOST, PGPORT, PGDATABASE, PGUSER and PGPASSWORD variables instead, which
+    // the Postgres driver reads on its own.
+    DATABASE_URL: z.url().optional(),
+    PGHOST: z.string().optional(),
+    PGDATABASE: z.string().optional(),
+    PGUSER: z.string().optional(),
+    INTERNAL_API_TOKEN: z.string().min(32, 'must be at least 32 characters'),
+  })
+  .refine((env) => env.DATABASE_URL || (env.PGHOST && env.PGDATABASE && env.PGUSER), {
+    path: ['DATABASE_URL'],
+    message: 'set DATABASE_URL, or the PGHOST, PGDATABASE and PGUSER variables',
+  })
 
 export type Env = z.infer<typeof schema>
 
