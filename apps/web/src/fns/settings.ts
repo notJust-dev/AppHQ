@@ -36,6 +36,28 @@ export const connectRevenueCatFn = createServerFn({ method: 'POST' })
     }
   })
 
+export const listAccountsFn = createServerFn({ method: 'GET' })
+  .middleware([requireSession])
+  .handler(() => api().accounts.list.query())
+
+export const connectAppStoreFn = createServerFn({ method: 'POST' })
+  .middleware([requireSession])
+  .validator(
+    z.object({
+      issuerId: z.string().trim().min(8).max(100),
+      keyId: z.string().trim().min(4).max(40),
+      vendorNumber: z.string().trim().regex(/^\d{4,15}$/),
+      privateKey: z.string().trim().min(100).max(5000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      return { ok: true as const, ...(await api().accounts.connectAppStore.mutate(data)) }
+    } catch (err) {
+      return { ok: false as const, message: messageFrom(err, 'Could not reach the API.') }
+    }
+  })
+
 export const runSyncFn = createServerFn({ method: 'POST' })
   .middleware([requireSession])
   .handler(() => api().sync.run.mutate({}))

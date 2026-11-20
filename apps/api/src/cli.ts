@@ -78,7 +78,7 @@ try {
       break
     }
     case 'migrate': {
-      await runMigrations(db)
+      await runMigrations({ db, sql })
       log.info('migrations applied')
       break
     }

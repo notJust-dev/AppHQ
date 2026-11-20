@@ -43,11 +43,16 @@ export async function connectRevenueCat(
 
     connected.push(
       await deps.db.transaction(async (tx) => {
-        const [existing] = await tx
-          .select()
-          .from(apps)
-          .where(eq(apps.revenuecatProjectId, project.id))
-          .limit(1)
+        // The project may already be known, or its app may have arrived from a store account.
+        const known = await tx.select().from(apps)
+        const existing =
+          known.find((app) => app.revenuecatProjectId === project.id) ??
+          known.find(
+            (app) =>
+              app.revenuecatProjectId === null &&
+              ((iosBundleId !== null && app.iosBundleId === iosBundleId) ||
+                (androidPackage !== null && app.androidPackage === androidPackage)),
+          )
 
         let appId: string
         if (existing) {
@@ -55,14 +60,14 @@ export async function connectRevenueCat(
           await tx
             .update(apps)
             .set({
+              revenuecatProjectId: project.id,
               iosBundleId: existing.iosBundleId ?? iosBundleId,
               androidPackage: existing.androidPackage ?? androidPackage,
               isActive: true,
             })
             .where(eq(apps.id, appId))
         } else {
-          const taken = new Set((await tx.select({ id: apps.id }).from(apps)).map((row) => row.id))
-          appId = uniqueSlug(project.name, taken)
+          appId = uniqueSlug(project.name, new Set(known.map((app) => app.id)))
           await tx.insert(apps).values({
             id: appId,
             name: project.name,

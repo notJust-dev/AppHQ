@@ -24,7 +24,7 @@ export function FunnelBand({
   return (
     <section
       aria-label="Funnel totals"
-      className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface md:flex-row"
+      className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface lg:flex-row"
     >
       <Stage
         label="Social views"
@@ -93,7 +93,7 @@ function Stage(props: {
 
 function Seam({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex items-center gap-3 border-y border-line bg-paper px-6 py-3 md:w-36 md:flex-col md:justify-center md:gap-1 md:border-x md:border-y-0 md:px-3 md:text-center">
+    <div className="flex items-center gap-3 border-y border-line bg-paper px-6 py-3 lg:w-36 lg:flex-col lg:justify-center lg:gap-1 lg:border-x lg:border-y-0 lg:px-3 lg:text-center">
       <span className="figures font-display text-xl font-semibold">{value}</span>
       <span className="text-xs leading-snug text-ink-soft">{label}</span>
     </div>

@@ -4,19 +4,28 @@ import { useServerFn } from '@tanstack/react-start'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Button } from '../../components/Button'
 import {
+  connectAppStoreFn,
   connectRevenueCatFn,
   loadDemoDataFn,
   removeDemoDataFn,
   runSyncFn,
 } from '../../fns/settings'
 import { formatCount, formatMoment } from '../../lib/format'
-import { appsQuery, syncStatusQuery, type AppSummary, type SyncRun } from '../../lib/queries'
+import {
+  accountsQuery,
+  appsQuery,
+  syncStatusQuery,
+  type Account,
+  type AppSummary,
+  type SyncRun,
+} from '../../lib/queries'
 import { sourceLabel } from '../../lib/sources'
 
 export const Route = createFileRoute('/_app/settings')({
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(appsQuery()),
+      context.queryClient.ensureQueryData(accountsQuery()),
       context.queryClient.ensureQueryData(syncStatusQuery()),
     ]),
   component: SettingsPage,
@@ -40,6 +49,7 @@ function SettingsPage() {
   const refetchInterval = watching ? WATCH_INTERVAL_MS : false
 
   const { data: apps } = useSuspenseQuery({ ...appsQuery(), refetchInterval })
+  const { data: accounts } = useSuspenseQuery({ ...accountsQuery(), refetchInterval })
   const { data: runs } = useSuspenseQuery({ ...syncStatusQuery(), refetchInterval })
 
   const dataChanged = () => {
@@ -61,6 +71,16 @@ function SettingsPage() {
         intro="Paste a v2 secret key from a RevenueCat project. The app is added from that project and about a year of its revenue history is fetched. The key needs read access to charts and metrics, and to project configuration."
       >
         <ConnectRevenueCat onConnected={dataChanged} />
+      </Section>
+
+      <Section
+        title="Connect App Store Connect"
+        intro="Downloads come from Apple's daily sales report. Create a team API key in App Store Connect under Users and Access, Integrations. The Sales and Reports role is enough for downloads. With an Admin key the dashboard also asks Apple to start analytics reports, which bring impressions and page views later."
+      >
+        <ConnectAppStore
+          account={accounts.find((account) => account.provider === 'app_store')}
+          onConnected={dataChanged}
+        />
       </Section>
 
       <Section
@@ -210,6 +230,150 @@ function ConnectRevenueCat({ onConnected }: { onConnected: () => void }) {
           `Connected ${result.apps.map((app) => app.name).join(', ')}. Its history is being fetched; the numbers appear within a minute.`}
       </div>
     </form>
+  )
+}
+
+function ConnectAppStore(props: { account: Account | undefined; onConnected: () => void }) {
+  const connect = useServerFn(connectAppStoreFn)
+  const empty = { issuerId: '', keyId: '', vendorNumber: '', privateKey: '' }
+  const [fields, setFields] = useState(empty)
+  const set = (name: keyof typeof empty) => (event: { target: { value: string } }) =>
+    setFields((current) => ({ ...current, [name]: event.target.value }))
+
+  const mutation = useMutation({
+    mutationFn: () => connect({ data: fields }),
+    onSuccess: (result) => {
+      if (!result.ok) return
+      setFields(empty)
+      props.onConnected()
+    },
+  })
+  const result = mutation.data
+  const inputClass = 'mt-2 block w-full rounded-md border border-line bg-surface px-3 py-2'
+
+  return (
+    <>
+      {props.account && (
+        <p className="mb-5 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+          {props.account.displayName}: {CONNECTION_STATUS[props.account.status] ?? props.account.status}
+          {props.account.lastSyncedAt && (
+            <span className="block text-xs text-ink-soft">
+              Synced {formatMoment(props.account.lastSyncedAt)}
+            </span>
+          )}
+        </p>
+      )}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label htmlFor="app-store-issuerId" className="text-sm font-medium">
+              Issuer ID
+            </label>
+            <input
+              id="app-store-issuerId"
+              type="text"
+              autoComplete="off"
+              required
+              minLength={8}
+              value={fields.issuerId}
+              onChange={set('issuerId')}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="app-store-keyId" className="text-sm font-medium">
+              Key ID
+            </label>
+            <input
+              id="app-store-keyId"
+              type="text"
+              autoComplete="off"
+              required
+              minLength={4}
+              value={fields.keyId}
+              onChange={set('keyId')}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="app-store-vendorNumber" className="text-sm font-medium">
+              Vendor number
+            </label>
+            <input
+              id="app-store-vendorNumber"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              required
+              pattern="[0-9]{4,15}"
+              title="Digits only. It is shown in Payments and Financial Reports."
+              value={fields.vendorNumber}
+              onChange={set('vendorNumber')}
+              className={inputClass}
+            />
+          </div>
+        </div>
+        <label htmlFor="app-store-privateKey" className="mt-4 block text-sm font-medium">
+          Private key
+        </label>
+        <textarea
+          id="app-store-privateKey"
+          rows={5}
+          autoComplete="off"
+          spellCheck={false}
+          required
+          minLength={100}
+          placeholder="Paste the contents of the .p8 file, including the BEGIN and END lines"
+          value={fields.privateKey}
+          onChange={set('privateKey')}
+          className={`${inputClass} text-xs`}
+        />
+        <p className="mt-2 text-xs text-ink-soft">
+          Stored encrypted on the API. It is not shown again and never reaches the browser after this.
+        </p>
+        <div className="mt-4">
+          <Button type="submit" variant="primary" disabled={mutation.isPending}>
+            {mutation.isPending ? 'Connecting…' : 'Connect App Store Connect'}
+          </Button>
+        </div>
+        <div role="status" className="mt-3 text-sm">
+          {mutation.isError && 'Check the four fields, then try again.'}
+          {result && !result.ok && result.message}
+          {result?.ok && <AppStoreConnected result={result} />}
+        </div>
+      </form>
+    </>
+  )
+}
+
+function AppStoreConnected(props: {
+  result: {
+    apps: number
+    created: number
+    analytics: { requested: number; existing: number; problem: string | null }
+  }
+}) {
+  const { apps, created, analytics } = props.result
+  return (
+    <>
+      <p>
+        Connected. {apps} {apps === 1 ? 'app' : 'apps'} found
+        {created > 0 && `, ${created} new to the dashboard`}. A year of downloads is being fetched;
+        the numbers appear within a few minutes.
+      </p>
+      <p className="mt-2">
+        {analytics.problem
+          ? `Analytics reports were not requested. ${analytics.problem} Downloads are not affected.`
+          : analytics.requested > 0
+            ? `Analytics reports were requested for ${analytics.requested} ${analytics.requested === 1 ? 'app' : 'apps'}. Apple starts delivering them in one to two days.`
+            : 'Analytics reports were already requested for every app.'}
+      </p>
+    </>
   )
 }
 

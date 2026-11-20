@@ -51,11 +51,16 @@ key needs read access to charts and metrics, and to project configuration. The a
 from the project, about a year of history is fetched in the background, and later syncs re-read
 the last seven days.
 
+For downloads, connect App Store Connect in the same place with a team API key (Issuer ID, Key
+ID, the `.p8` file) and your vendor number. The Sales and Reports role is enough. The account's
+apps are added, matched to existing ones by bundle id, and a year of daily downloads is fetched.
+With an Admin key the dashboard also asks Apple to start analytics reports for each app.
+
 ## Commands
 
 | Where | Command | What it does |
 |---|---|---|
-| `apps/api` | `npm test` | Unit tests. Set `TEST_DATABASE_URL` to also run the tests that need Postgres |
+| `apps/api` | `npm test` | Unit tests. With `TEST_DATABASE_URL` set, also the tests that need Postgres; the database name must end in `_test` |
 | `apps/api` | `npm run typecheck` | Type check |
 | `apps/api` | `npm run db:generate` | Create a migration after changing `src/db/schema.ts` |
 | `apps/api` | `npm run cli -- ping` | Write a heartbeat row to `sync_runs` (checks a cron entry) |

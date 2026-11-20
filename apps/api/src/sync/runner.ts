@@ -77,8 +77,9 @@ export interface SyncSummary {
 }
 
 /**
- * Runs every selected connector for every selected app. One failing source or app never stops
- * the others: each run is recorded on its own. Cron entries can overlap safely because a second
+ * Runs every selected connector: once per app, or once in all for a connector that covers a
+ * whole account. One failing source or app never stops the others: each run is recorded on its
+ * own. Cron entries can overlap safely because a second
  * invocation exits immediately while the first holds the advisory lock.
  */
 export async function runSync(
@@ -113,21 +114,35 @@ export async function runSync(
           ),
         )
 
+      const run = async (label: string, record: RunRecord, work: () => Promise<{ rowsWritten: number }>) => {
+        try {
+          const { rowsWritten } = await recordRun(db, record, work)
+          summary.ok++
+          log.info(`${label}: ${rowsWritten} rows`)
+        } catch (err) {
+          summary.failed++
+          log.error(`${label}: ${err instanceof Error ? err.message : err}`)
+        }
+      }
+
       for (const connector of selected) {
+        const context = { db, range: options.range, log, secrets }
+
+        if (connector.scope === 'account') {
+          if (!(await connector.isConfigured(db))) continue
+          await run(connector.source, { source: connector.source, range: options.range }, () =>
+            connector.sync({ ...context, apps: activeApps }),
+          )
+          continue
+        }
+
         for (const app of activeApps) {
           if (!(await connector.isConfigured(app, db))) continue
-          try {
-            const { rowsWritten } = await recordRun(
-              db,
-              { source: connector.source, appId: app.id, range: options.range },
-              () => connector.sync({ db, app, range: options.range, log, secrets }),
-            )
-            summary.ok++
-            log.info(`${connector.source} ${app.id}: ${rowsWritten} rows`)
-          } catch (err) {
-            summary.failed++
-            log.error(`${connector.source} ${app.id}: ${err instanceof Error ? err.message : err}`)
-          }
+          await run(
+            `${connector.source} ${app.id}`,
+            { source: connector.source, appId: app.id, range: options.range },
+            () => connector.sync({ ...context, app }),
+          )
         }
       }
     } finally {

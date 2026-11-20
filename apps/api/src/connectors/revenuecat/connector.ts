@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import type { Db } from '../../db/client.js'
 import { connections, type App, type NewMetric } from '../../db/schema.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
-import type { Connector } from '../types.js'
+import type { AppConnector } from '../types.js'
 import { RevenueCatError, createRevenueCatClient } from './client.js'
 import { toDailySeries } from './parse.js'
 
@@ -30,9 +30,10 @@ const findConnection = (db: Db, app: App) =>
     .then((rows) => rows[0])
 
 /** Revenue and subscription metrics, one RevenueCat project per app. Six requests per run. */
-export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}): Connector {
+export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}): AppConnector {
   return {
     source: REVENUECAT,
+    scope: 'app',
 
     async isConfigured(app, db) {
       return app.revenuecatProjectId !== null && (await findConnection(db, app)) !== undefined

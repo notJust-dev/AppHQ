@@ -6,10 +6,11 @@ import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
 import { apps, connections, metricDaily } from '../db/schema.js'
 import { createSecrets } from '../lib/crypto.js'
+import { testDatabaseUrl } from '../test/database.js'
 import { connectRevenueCat } from './connect-revenuecat.js'
 
-// Runs only when a database is provided: TEST_DATABASE_URL=postgres://... npm test
-const url = process.env.TEST_DATABASE_URL
+// Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
+const url = testDatabaseUrl()
 
 describe.skipIf(!url)('RevenueCat, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
@@ -57,7 +58,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
   let appId = ''
 
   beforeAll(async () => {
-    await runMigrations(db)
+    await runMigrations({ db, sql })
   })
 
   afterAll(async () => {

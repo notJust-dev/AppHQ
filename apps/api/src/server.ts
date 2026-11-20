@@ -7,7 +7,7 @@ import { createSecrets } from './lib/crypto.js'
 const env = loadEnv()
 const { db, sql } = createDb(env.DATABASE_URL)
 
-await runMigrations(db)
+await runMigrations({ db, sql })
 
 const app = await buildApp({
   db,

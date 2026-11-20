@@ -214,14 +214,28 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - To confirm with the first real key: that values are in dollars, not cents; the measure names
   the charts actually use (a mismatch is logged as a warning and the first measure is used).
 
-### App Store Connect (from prior knowledge; verify at implementation)
+### App Store Connect (downloads built; verified against Apple's docs and a stand-in server, not yet against a real key)
 
-- Auth: API key (issuer id, key id, `.p8`) signed as an ES256 JWT. Env variables.
-- Downloads: Sales and Trends daily summary report, one gzipped TSV per day for the whole
-  account; count first-time download product types only.
-- Impressions and product page views: Analytics Reports API. It needs a one-time report request
-  per app, then daily instances appear after a day or two. Create the requests in Phase 1 day one.
-- Reviews: `customerReviews` per app, full history, paginated.
+- Auth: a team API key (Issuer ID, Key ID, `.p8`) signed as an ES256 JWT with a 15-minute life,
+  plus the vendor number. Entered in Settings and stored encrypted as one account-level
+  connection. Individual keys cannot read sales reports.
+- Roles: Sales and Reports (or Finance, Admin) reads sales reports. Only Admin can create
+  analytics report requests; Sales and Reports can read the resulting reports.
+- Downloads: `GET /v1/salesReports` with `frequency=DAILY`, `reportType=SALES`,
+  `reportSubType=SUMMARY`, `version=1_0`, one gzipped TSV per day for the whole account. Columns
+  are read by name. First downloads are product types 1, 1F, 1T, F1, 1E, 1EP, 1EU; re-downloads
+  3x and updates 7x are stored separately. Refunds are negative units.
+- A day without a report (not ready yet, or no activity) answers 404 and is skipped. When a
+  report exists, an app of the account that is missing from it gets zero for that day.
+- Reports arrive the next day by about 8 a.m. Pacific and are kept for a year, so the backfill
+  is 364 days, four requests at a time.
+- Apps: `GET /v1/apps` runs on connect and on every sync. Apps are matched by Apple ID or bundle
+  id and created when new, so connecting RevenueCat and App Store in either order gives one app.
+- Analytics (impressions, page views): on connect, an ONGOING analytics report request is
+  created per app when the key allows it. Apple delivers the first reports in one to two days.
+  Reading and parsing those reports is not built yet.
+- To confirm with the first real key: the 404 behaviour for days without a report, and that
+  `version=1_0` is accepted.
 
 ### Google Play (from prior knowledge; verify at implementation)
 
@@ -342,7 +356,10 @@ Status on 2026-11-20 (merged to `main` and deployed):
   a real key.
 - `ENCRYPTION_KEY` is set on the `api` app as a private variable, with a copy in the git-ignored
   `apps/api/.env.velocity`. Losing it makes the stored credentials unreadable.
-- Not started: steps 3 to 6 and 8.
+- Step 3 (App Store downloads, plus the analytics report requests) is built on branch
+  `phase-1-app-store`, with a form in Settings. Not merged, not run against a real key.
+- Not started: step 4 (Google Play), step 5 (reading the analytics reports), step 6 (per-app
+  charts) and step 8 (cron).
 
 ### Phase 2 — Social and the funnel chart
 

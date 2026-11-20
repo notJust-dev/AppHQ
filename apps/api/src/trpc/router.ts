@@ -1,5 +1,7 @@
 import { TRPCError, initTRPC } from '@trpc/server'
 import { z } from 'zod'
+import { AppStoreError } from '../connectors/app-store/client.js'
+import { APP_STORE, APP_STORE_HISTORY_DAYS } from '../connectors/app-store/connector.js'
 import { connectors } from '../connectors/registry.js'
 import { RevenueCatError } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
@@ -10,8 +12,10 @@ import type { Logger } from '../lib/logger.js'
 import type { QueryContext } from '../queries/define.js'
 import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
+import { listAccounts } from '../queries/list-accounts.js'
 import { listApps } from '../queries/list-apps.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
+import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
 import { startSync } from '../sync/background.js'
 
@@ -27,10 +31,35 @@ const BACKFILL_DAYS = 400
 
 const t = initTRPC.context<ApiContext>().create()
 
-/** Turns a failure to connect RevenueCat into a message that is safe and useful to show. */
+/** Turns a failure to connect a source into a message that is safe and useful to show. */
 function connectError(err: unknown): TRPCError {
   if (err instanceof MissingEncryptionKeyError) {
     return new TRPCError({ code: 'PRECONDITION_FAILED', message: err.message })
+  }
+  if (err instanceof ConnectInputError) {
+    return new TRPCError({ code: 'BAD_REQUEST', message: err.message })
+  }
+  if (err instanceof AppStoreError) {
+    if (err.status === 401) {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'App Store Connect did not accept this key. Check the Issuer ID, the Key ID and ' +
+          'that the private key belongs to them.',
+      })
+    }
+    if (err.status === 403) {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'App Store Connect refused the request. Sales reports need a team key with the ' +
+          'Sales and Reports, Finance or Admin role.',
+      })
+    }
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `App Store Connect rejected the request (${err.status}): ${err.message}`,
+    })
   }
   if (err instanceof RevenueCatError) {
     if (err.status === 401) {
@@ -54,7 +83,7 @@ function connectError(err: unknown): TRPCError {
   }
   return new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
-    message: 'Could not connect RevenueCat.',
+    message: 'Could not connect the source.',
     cause: err,
   })
 }
@@ -88,6 +117,35 @@ export const appRouter = t.router({
           range: trailingRange(BACKFILL_DAYS),
         })
         return { apps: connected }
+      }),
+  }),
+  accounts: t.router({
+    list: t.procedure.query(({ ctx }) => listAccounts.handler(ctx)),
+
+    /**
+     * Connects the App Store Connect account, adds its apps and starts fetching a year of
+     * downloads. Also asks Apple to start analytics reports, when the key is allowed to.
+     */
+    connectAppStore: t.procedure
+      .input(
+        z.object({
+          issuerId: z.string().trim().min(8).max(100),
+          keyId: z.string().trim().min(4).max(40),
+          vendorNumber: z.string().trim().regex(/^\d{4,15}$/, 'The vendor number is digits only'),
+          privateKey: z.string().trim().min(100).max(5000),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await connectAppStore(ctx, input).catch((err: unknown) => {
+          ctx.log.error(`connect App Store failed: ${err instanceof Error ? err.message : err}`)
+          throw connectError(err)
+        })
+        startSync(ctx, {
+          connectors,
+          sources: [APP_STORE],
+          range: trailingRange(APP_STORE_HISTORY_DAYS),
+        })
+        return result
       }),
   }),
   overview: t.router({
