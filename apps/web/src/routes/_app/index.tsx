@@ -1,20 +1,14 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
 import { AppsTable } from '../../components/AppsTable'
 import { FunnelBand } from '../../components/FunnelBand'
 import { RangeSwitch } from '../../components/RangeSwitch'
 import { formatDay } from '../../lib/format'
 import { overviewQuery } from '../../lib/queries'
-import { RANGE_DAYS, RANGE_KEYS, rangeToDates } from '../../lib/range'
-
-const searchSchema = z.object({
-  // An unknown or missing value falls back to the default instead of erroring.
-  range: z.enum(RANGE_KEYS).default('28d').catch('28d'),
-})
+import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '../../lib/range'
 
 export const Route = createFileRoute('/_app/')({
-  validateSearch: searchSchema,
+  validateSearch: rangeSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(overviewQuery(rangeToDates(deps.range))),
@@ -58,7 +52,7 @@ function PortfolioPage() {
             />
           </div>
           <h2 className="mt-12 mb-4 font-display text-xl font-semibold tracking-tight">Apps</h2>
-          <AppsTable apps={data.apps} />
+          <AppsTable apps={data.apps} range={range} />
         </>
       )}
     </>

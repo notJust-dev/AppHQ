@@ -10,6 +10,7 @@ import { MissingEncryptionKeyError, type Secrets } from '../lib/crypto.js'
 import { trailingRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
 import type { QueryContext } from '../queries/define.js'
+import { getAppTimeline } from '../queries/get-app-timeline.js'
 import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
 import { listAccounts } from '../queries/list-accounts.js'
@@ -95,6 +96,12 @@ function connectError(err: unknown): TRPCError {
 export const appRouter = t.router({
   apps: t.router({
     list: t.procedure.query(({ ctx }) => listApps.handler(ctx)),
+
+    timeline: t.procedure.input(getAppTimeline.input).query(async ({ ctx, input }) => {
+      const timeline = await getAppTimeline.handler(ctx, input)
+      if (!timeline) throw new TRPCError({ code: 'NOT_FOUND', message: 'There is no such app.' })
+      return timeline
+    }),
 
     /** Registers the app behind a RevenueCat secret key and starts fetching its history. */
     connectRevenueCat: t.procedure

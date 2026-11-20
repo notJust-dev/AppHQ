@@ -10,8 +10,9 @@ export function RangeSwitch({ current }: { current: RangeKey }) {
         return (
           <Link
             key={key}
-            to="/"
-            search={{ range: key }}
+            // The current page, with only the range changed.
+            to="."
+            search={(previous) => ({ ...previous, range: key })}
             aria-current={active ? 'true' : undefined}
             className={`rounded px-3 py-1.5 text-sm font-medium ${
               active ? 'bg-ink text-surface' : 'text-ink-soft hover:text-ink'

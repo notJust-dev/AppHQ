@@ -358,8 +358,14 @@ Status on 2026-11-20 (merged to `main` and deployed):
   `apps/api/.env.velocity`. Losing it makes the stored credentials unreadable.
 - Step 3 (App Store downloads, plus the analytics report requests) is merged and deployed, with
   a form in Settings. Not yet run against a real key.
-- Not started: step 4 (Google Play), step 5 (reading the analytics reports), step 6 (per-app
-  charts) and step 8 (cron).
+- RevenueCat has run against a real key: one app connected, 2,400 rows, no errors.
+- Step 6 (per-app page) is built on branch `phase-1-app-charts`: `/apps/<id>` shows one row per
+  funnel step (social views, store page views, downloads, trials started, revenue, MRR) on a
+  shared date axis, each on its own scale, with one crosshair that reads a day across every
+  row. Days no source reported are gaps, not zeros. It covers Phase 2 step 5's timeline too; the
+  post markers come with the social connectors. Query: `get_app_timeline`.
+- Not started: step 4 (Google Play), step 5 (reading the analytics reports) and step 8 (cron,
+  which needs a Velocity console entry: `node dist/cli.js sync` every six hours).
 
 ### Phase 2 — Social and the funnel chart
 

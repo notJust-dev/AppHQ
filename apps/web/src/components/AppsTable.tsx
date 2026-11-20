@@ -1,8 +1,10 @@
+import { Link } from '@tanstack/react-router'
 import { change, formatCount, formatMoney, formatRatio, per } from '../lib/format'
 import type { Overview } from '../lib/queries'
+import type { RangeKey } from '../lib/range'
 import { Delta } from './Delta'
 
-export function AppsTable({ apps }: { apps: Overview['apps'] }) {
+export function AppsTable({ apps, range }: { apps: Overview['apps']; range: RangeKey }) {
   const rows = [...apps].sort((a, b) => b.totals.revenue - a.totals.revenue)
 
   return (
@@ -38,7 +40,14 @@ export function AppsTable({ apps }: { apps: Overview['apps'] }) {
                     >
                       {app.name.charAt(0)}
                     </span>
-                    {app.name}
+                    <Link
+                      to="/apps/$appId"
+                      params={{ appId: app.id }}
+                      search={{ range }}
+                      className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                    >
+                      {app.name}
+                    </Link>
                   </span>
                 </th>
                 <Metric

@@ -46,5 +46,17 @@ export function change(current: number, previous: number): Change | null {
   return { direction: percent > 0 ? 'up' : 'down', label: `${Math.abs(percent)}%` }
 }
 
+export type Unit = 'count' | 'usd'
+
+/** A value in full, as read in a header or a table. */
+export const formatValue = (n: number, unit: Unit) =>
+  unit === 'usd' ? formatMoney(n) : formatCount(n)
+
+/** A y-axis tick: in full under 10,000, compact above. */
+export function formatTick(n: number, unit: Unit) {
+  const text = n < 10_000 ? whole.format(n) : compact.format(n)
+  return unit === 'usd' ? `$${text}` : text
+}
+
 /** a per b, or null when b is zero. */
 export const per = (a: number, b: number) => (b === 0 ? null : a / b)

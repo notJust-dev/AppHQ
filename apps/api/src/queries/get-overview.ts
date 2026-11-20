@@ -1,23 +1,14 @@
 import { and, asc, eq, gte, inArray, lte, min, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { apps, metricDaily } from '../db/schema.js'
-import { eachDay, previousPeriod, rangeLength, type DateRange } from '../lib/dates.js'
+import { eachDay, previousPeriod, type DateRange } from '../lib/dates.js'
 import { HEADLINE, type HeadlineKey } from '../metrics/catalog.js'
 import { defineQuery } from './define.js'
+import { checkRange, rangeFields } from './range.js'
 
 export type HeadlineTotals = Record<HeadlineKey, number>
 
-const MAX_RANGE_DAYS = 366
-
-export const overviewInput = z
-  .object({
-    from: z.iso.date().describe('First day, inclusive, as YYYY-MM-DD (UTC).'),
-    to: z.iso.date().describe('Last day, inclusive, as YYYY-MM-DD (UTC).'),
-  })
-  .refine((r) => r.from <= r.to, { message: '`from` must not be after `to`' })
-  .refine((r) => rangeLength(r) <= MAX_RANGE_DAYS, {
-    message: `range must be at most ${MAX_RANGE_DAYS} days`,
-  })
+export const overviewInput = z.object(rangeFields).superRefine(checkRange)
 
 const zeroTotals = (): HeadlineTotals => ({ downloads: 0, revenue: 0, socialViews: 0 })
 

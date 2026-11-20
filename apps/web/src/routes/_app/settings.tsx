@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Button } from '../../components/Button'
@@ -145,7 +145,13 @@ function AppsList({ apps }: { apps: AppSummary[] }) {
           {apps.map((app) => (
             <tr key={app.id} className="border-b border-line align-top last:border-b-0">
               <th scope="row" className="px-6 py-4 text-left font-medium">
-                {app.name}
+                <Link
+                  to="/apps/$appId"
+                  params={{ appId: app.id }}
+                  className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                >
+                  {app.name}
+                </Link>
                 <span className="block text-xs font-normal text-ink-soft">{app.id}</span>
               </th>
               <td className="px-6 py-4">

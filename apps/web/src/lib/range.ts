@@ -1,8 +1,15 @@
+import { z } from 'zod'
+
 export const RANGE_DAYS = { '7d': 7, '28d': 28, '90d': 90 } as const
 
 export type RangeKey = keyof typeof RANGE_DAYS
 
 export const RANGE_KEYS = Object.keys(RANGE_DAYS) as [RangeKey, ...RangeKey[]]
+
+/** The `?range=` search param shared by every dated page. Unknown values fall back to 28 days. */
+export const rangeSearchSchema = z.object({
+  range: z.enum(RANGE_KEYS).default('28d').catch('28d'),
+})
 
 export const RANGE_LABELS: Record<RangeKey, string> = {
   '7d': '7 days',
