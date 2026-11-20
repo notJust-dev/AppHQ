@@ -214,7 +214,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - To confirm with the first real key: that values are in dollars, not cents; the measure names
   the charts actually use (a mismatch is logged as a warning and the first measure is used).
 
-### App Store Connect (downloads built; verified against Apple's docs and a stand-in server, not yet against a real key)
+### App Store Connect (downloads built and run against a real key)
 
 - Auth: a team API key (Issuer ID, Key ID, `.p8`) signed as an ES256 JWT with a 15-minute life,
   plus the vendor number. Entered in Settings and stored encrypted as one account-level
@@ -234,8 +234,12 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - Analytics (impressions, page views): on connect, an ONGOING analytics report request is
   created per app when the key allows it. Apple delivers the first reports in one to two days.
   Reading and parsing those reports is not built yet.
-- To confirm with the first real key: the 404 behaviour for days without a report, and that
-  `version=1_0` is accepted.
+- Confirmed with a real key on 2026-11-20: `version=1_0` is accepted, and days before the
+  account's first sale answer 404 and are stored as gaps. First sync: 10 apps, 7,020 rows, daily
+  reports from 2026-03-31 to the day before, no missing days in between. Not yet seen: a 404 for
+  a day with no sales after the first one (it would show as a gap, not a zero).
+- The outcome of the analytics report requests is shown once in Settings and not stored; the
+  analytics connector will list the requests itself.
 
 ### Google Play (from prior knowledge; verify at implementation)
 
@@ -357,7 +361,8 @@ Status on 2026-11-20 (merged to `main` and deployed):
 - `ENCRYPTION_KEY` is set on the `api` app as a private variable, with a copy in the git-ignored
   `apps/api/.env.velocity`. Losing it makes the stored credentials unreadable.
 - Step 3 (App Store downloads, plus the analytics report requests) is merged and deployed, with
-  a form in Settings. Not yet run against a real key.
+  a form in Settings. It has run against a real key: 10 apps (9 new, TinyKicks matched to its
+  RevenueCat app), 7,020 rows, no errors.
 - RevenueCat has run against a real key: one app connected, 2,400 rows, no errors.
 - Step 6 (per-app page) is merged and deployed: `/apps/<id>` shows one row per
   funnel step (social views, store page views, downloads, trials started, revenue, MRR) on a
