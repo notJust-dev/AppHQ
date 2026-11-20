@@ -106,17 +106,19 @@ Found by deploying on 2026-11-20:
 - The Fastify preset has no build step. The API uses the Other preset with an explicit build
   command; the TanStack SSR preset builds and starts the dashboard as is.
 - A root directory per app works: two apps from one repository, `apps/api` and `apps/web`.
-- Every app listens on port 3000; two apps on one server do not collide.
+- The deploy log reports port 3000 for `api` ("default") and 3001 for `web` ("detected"), so
+  apps on one server do not share a port.
 - The storage size is required when creating a server; 25 GB was accepted for Starter.
-- A push to the deployed branch triggers a deploy through a webhook.
+- A push to the deployed branch redeploys both apps through a webhook, whichever folder changed.
+- A deploy restarts the app: during one API redeploy, 1 of 40 health checks taken 6 seconds
+  apart returned 502.
 
 Still to verify:
 
 1. Whether a cron command runs in the app's built directory with the app's env variables.
 2. Whether `web` can reach `api` over localhost. Today `API_URL` is the API's public address.
 3. Whether a build of `web` on the 2 GB server disturbs the running `api`.
-4. Whether a deploy causes a visible interruption.
-5. Whether Postgres can be reached from a laptop (for local debugging against real data).
+4. Whether Postgres can be reached from a laptop (for local debugging against real data).
 
 ### What exists on Cloudways
 
@@ -129,6 +131,9 @@ Still to verify:
 Env variables set: `INTERNAL_API_TOKEN` on both apps and `SESSION_SECRET` on `web`, as private
 random values; `API_URL` on `web`. `DASHBOARD_PASSWORD` on `web` is for the owner to set in the
 console.
+
+Both apps answer `GET /health`. The dashboard's reports `configured` (all its variables are
+valid) and `api` (it can reach the API), so a deployment can be checked without signing in.
 
 Launch settings for both apps are in [README.md](README.md).
 

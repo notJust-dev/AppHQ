@@ -8,6 +8,7 @@ import {
   type ErrorComponentProps,
 } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { ErrorPage } from '../components/ErrorPage'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -22,6 +23,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [{ rel: 'stylesheet', href: appCss }],
   }),
   component: RootComponent,
+  // An error in the root route itself replaces the whole document, so it brings its own shell.
   errorComponent: RootError,
   notFoundComponent: NotFound,
 })
@@ -48,23 +50,10 @@ function RootComponent() {
   )
 }
 
-function RootError({ error }: ErrorComponentProps) {
+function RootError(props: ErrorComponentProps) {
   return (
     <RootDocument>
-      <main className="mx-auto max-w-xl px-6 py-24">
-        <h1 className="font-display text-2xl font-semibold">The dashboard could not load</h1>
-        <p className="mt-3 text-ink-soft">
-          Something on the server is not set up or not reachable. Check the dashboard's
-          environment variables and that the API is running, then reload.
-        </p>
-        {/* The detail can name configuration, so it is shown in development only. In production
-            it is in the server log. */}
-        {import.meta.env.DEV && (
-          <pre className="mt-6 overflow-x-auto rounded-md border border-line bg-surface p-4 text-sm">
-            {error instanceof Error ? error.message : String(error)}
-          </pre>
-        )}
-      </main>
+      <ErrorPage {...props} />
     </RootDocument>
   )
 }
