@@ -1,8 +1,8 @@
 # AppDashboard — project plan
 
 Last updated: 2026-11-20. Status: Phase 0 is built and both apps are deployed on Velocity. Still
-open from Phase 0: the dashboard password, a cron entry, custom domains, and the TikTok and Meta
-spikes.
+open from Phase 0: a cron entry, custom domains, and the TikTok and Meta spikes. The production
+database is empty.
 
 ## 1. Goal
 
@@ -128,9 +128,9 @@ Still to verify:
 | App `api` (PostgreSQL attached) | `6797147` | https://nodejs-1690499-6797147.cloudwaysnodeapps.com |
 | App `web` | `6797158` | https://nodejs-1690499-6797158.cloudwaysnodeapps.com |
 
-Env variables set: `INTERNAL_API_TOKEN` on both apps and `SESSION_SECRET` on `web`, as private
-random values; `API_URL` on `web`. `DASHBOARD_PASSWORD` on `web` is for the owner to set in the
-console.
+Env variables set: `INTERNAL_API_TOKEN` on both apps, and `SESSION_SECRET` and
+`DASHBOARD_PASSWORD` on `web`, as private random values; `API_URL` on `web`. The dashboard
+password is also recorded locally in the git-ignored `apps/web/.env.velocity`.
 
 Both apps answer `GET /health`. The dashboard's reports `configured` (all its variables are
 valid) and `api` (it can reach the API), so a deployment can be checked without signing in.
@@ -303,8 +303,8 @@ Differences from the list above:
   Phases 2 and 5.
 - The overview page (Phase 1 step 6) exists in a first version, fed by seed data, without charts.
 - Steps 1 and 9 are done: both apps run on Velocity (see section 4).
-- Still open: the dashboard password, a cron entry running `node dist/cli.js ping`, custom
-  domains, and the TikTok and Meta spikes (steps 2 and 3).
+- Still open: a cron entry running `node dist/cli.js ping`, custom domains, and the TikTok and
+  Meta spikes (steps 2 and 3).
 
 ### Phase 1 — Downloads and revenue
 
