@@ -44,11 +44,18 @@ Start the dashboard and open http://127.0.0.1:3000:
 cd apps/web && npm install && npm run dev
 ```
 
+## Connecting real data
+
+Sign in and open Settings. To add an app, paste a RevenueCat v2 secret key from its project. The
+key needs read access to charts and metrics, and to project configuration. The app is created
+from the project, about a year of history is fetched in the background, and later syncs re-read
+the last seven days.
+
 ## Commands
 
 | Where | Command | What it does |
 |---|---|---|
-| `apps/api` | `npm test` | Unit tests |
+| `apps/api` | `npm test` | Unit tests. Set `TEST_DATABASE_URL` to also run the tests that need Postgres |
 | `apps/api` | `npm run typecheck` | Type check |
 | `apps/api` | `npm run db:generate` | Create a migration after changing `src/db/schema.ts` |
 | `apps/api` | `npm run cli -- ping` | Write a heartbeat row to `sync_runs` (checks a cron entry) |
@@ -69,7 +76,7 @@ Both apps deploy from this repository to the same server. Settings that work:
 | Build command | `npm run build` | `npm run build` |
 | Start command | `npm run start` | `npm run start` |
 | Database | Attach PostgreSQL here | None |
-| Env variables | `INTERNAL_API_TOKEN` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD` |
+| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD` |
 | Cron | `node dist/cli.js sync` | None |
 
 Things to know:
@@ -86,6 +93,9 @@ Things to know:
 - **A push to `main` redeploys both apps,** whichever folder changed. Each app restarts briefly.
 - **Both apps answer `GET /health`.** The dashboard's also says whether it is fully configured
   and can reach the API, so a deployment can be checked without signing in.
+- **`ENCRYPTION_KEY` protects stored credentials.** API keys pasted in Settings are encrypted
+  with it before they reach the database. The API starts without it, but connecting a source
+  then fails with a message saying so. Changing it means reconnecting every source.
 - **Demo data without a shell.** `POST /trpc/demo.seed` and `POST /trpc/demo.clear` on the API,
   sent with the internal token, load and remove the generated demo apps. They only touch apps
   whose id starts with `demo-`.

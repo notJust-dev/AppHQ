@@ -18,7 +18,9 @@ export const apps = pgTable('apps', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   iconUrl: text('icon_url'),
+  /** Numeric App Store id, used by App Store Connect reports. */
   iosAppId: text('ios_app_id'),
+  iosBundleId: text('ios_bundle_id'),
   androidPackage: text('android_package'),
   revenuecatProjectId: text('revenuecat_project_id'),
   isActive: boolean('is_active').notNull().default(true),

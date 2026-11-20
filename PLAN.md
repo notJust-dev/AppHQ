@@ -192,15 +192,27 @@ OAuth tokens and pasted API keys are encrypted with AES-256-GCM using a key from
 Every connector implements `sync(app, range)`, is idempotent (upserts), and re-fetches a trailing
 7-day window so late data and corrections are absorbed.
 
-### RevenueCat (verified against the API v2 docs)
+### RevenueCat (built; verified against the API spec and RevenueCat's agent toolkit, not yet against a real key)
 
-- `GET https://api.revenuecat.com/v2/projects/{project_id}/charts/{chart_name}` with `start_date`,
-  `end_date`, `resolution`, `currency`. `/options` lists resolutions, segments and filters.
-- Charts to pull: `revenue`, `mrr`, `actives`, `trials`, `customers_new`, `conversion_to_paying`.
-- Auth: v2 secret key with `charts_metrics:charts:read`; v1 keys do not work. One key per project,
-  pasted into Settings and stored in `connections`.
-- Rate limit: 25 requests per minute for the Charts & Metrics domain, so the connector throttles.
-- Daily buckets are UTC. Recent periods can be flagged incomplete.
+- `GET https://api.revenuecat.com/v2/projects/{project_id}/charts/{chart_name}` with
+  `realtime=true`, `resolution=0` (daily), `start_date`, `end_date`, `currency=USD`.
+- The response has `measures` (each with a `display_name`) and `values`, a flat list of points
+  `{cohort, measure, value, incomplete}`. `cohort` is the period start in Unix seconds and
+  `measure` indexes `measures`. A chart can carry several measures (revenue has Revenue and
+  Transactions), so the connector picks one by name and falls back to the first.
+- Charts stored: `revenue` → `revenue`, `mrr` → `mrr`, `actives` → `active_subs`, `trials` →
+  `active_trials`, `trials_new` → `trials`, `customers_new` → `new_customers`. Six requests per
+  app per sync.
+- Auth: a v2 secret key per project, pasted in Settings and stored encrypted in `connections`.
+  It needs `charts_metrics:charts:read`, plus `project_configuration:projects:read` and
+  `project_configuration:apps:read` so the app can be created from the project (name, iOS bundle
+  id, Android package).
+- Rate limit: 25 requests per minute for Charts & Metrics; a 429 is retried after the wait
+  RevenueCat asks for.
+- Daily buckets are UTC. Recent periods can be flagged incomplete; they are stored and corrected
+  by the next sync.
+- To confirm with the first real key: that values are in dollars, not cents; the measure names
+  the charts actually use (a mismatch is logged as a warning and the first measure is used).
 
 ### App Store Connect (from prior knowledge; verify at implementation)
 
@@ -320,6 +332,16 @@ Differences from the list above:
 
 Done when: the overview shows real downloads and revenue for every app for the last 90 days and
 updates without you touching it.
+
+Status on 2026-11-20, on branch `phase-1-revenuecat` (not merged, so not deployed):
+
+- Done: step 2 (RevenueCat connector with a 400-day backfill) and step 7 (Settings page: apps,
+  connect RevenueCat, sync status, "Sync now", load and remove demo data). Step 1 happens
+  through step 7: connecting a key creates the app from its RevenueCat project.
+- Verified with tests and in a browser against a stand-in RevenueCat server. Not yet run against
+  a real key.
+- Needed before it works on the server: an `ENCRYPTION_KEY` variable on the `api` app.
+- Not started: steps 3 to 6 and 8.
 
 ### Phase 2 — Social and the funnel chart
 

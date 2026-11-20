@@ -20,22 +20,30 @@ function AppShell() {
   return (
     <>
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-6 sm:gap-8">
           <Link to="/" className="font-display text-lg font-semibold tracking-tight">
             AppDashboard
           </Link>
-          <nav aria-label="Sections" className="flex gap-6 text-sm font-medium">
+          <nav aria-label="Sections" className="flex gap-4 text-sm font-medium sm:gap-6">
             <Link
               to="/"
               className="text-ink-soft hover:text-ink"
               activeProps={{ className: 'text-ink' }}
+              activeOptions={{ exact: true }}
             >
               Portfolio
+            </Link>
+            <Link
+              to="/settings"
+              className="text-ink-soft hover:text-ink"
+              activeProps={{ className: 'text-ink' }}
+            >
+              Settings
             </Link>
           </nav>
           <button
             type="button"
-            className="ml-auto cursor-pointer text-sm font-medium text-ink-soft hover:text-ink"
+            className="ml-auto cursor-pointer text-sm font-medium whitespace-nowrap text-ink-soft hover:text-ink"
             onClick={async () => {
               await signOut()
               queryClient.clear()

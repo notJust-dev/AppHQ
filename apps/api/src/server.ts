@@ -2,6 +2,7 @@ import { buildApp } from './app.js'
 import { createDb } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { loadEnv } from './env.js'
+import { createSecrets } from './lib/crypto.js'
 
 const env = loadEnv()
 const { db, sql } = createDb(env.DATABASE_URL)
@@ -10,6 +11,8 @@ await runMigrations(db)
 
 const app = await buildApp({
   db,
+  sql,
+  secrets: createSecrets(env.ENCRYPTION_KEY),
   pingDb: () => sql`select 1`,
   internalApiToken: env.INTERNAL_API_TOKEN,
 })

@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import type { Connector } from '../connectors/types.js'
 import type { Db, Sql } from '../db/client.js'
 import { apps, syncRuns } from '../db/schema.js'
+import type { Secrets } from '../lib/crypto.js'
 import type { DateRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
 
@@ -61,6 +62,13 @@ export interface SyncOptions {
   appIds?: string[]
 }
 
+export interface SyncDeps {
+  db: Db
+  sql: Sql
+  log: Logger
+  secrets: Secrets
+}
+
 export interface SyncSummary {
   /** True when another sync held the lock and this one did nothing. */
   skipped: boolean
@@ -74,10 +82,10 @@ export interface SyncSummary {
  * invocation exits immediately while the first holds the advisory lock.
  */
 export async function runSync(
-  deps: { db: Db; sql: Sql; log: Logger },
+  deps: SyncDeps,
   options: SyncOptions,
 ): Promise<SyncSummary> {
-  const { db, sql, log } = deps
+  const { db, sql, log, secrets } = deps
   const summary: SyncSummary = { skipped: false, ok: 0, failed: 0 }
 
   // Advisory locks belong to a session, so the lock and unlock must use the same connection.
@@ -112,7 +120,7 @@ export async function runSync(
             const { rowsWritten } = await recordRun(
               db,
               { source: connector.source, appId: app.id, range: options.range },
-              () => connector.sync({ db, app, range: options.range, log }),
+              () => connector.sync({ db, app, range: options.range, log, secrets }),
             )
             summary.ok++
             log.info(`${connector.source} ${app.id}: ${rowsWritten} rows`)

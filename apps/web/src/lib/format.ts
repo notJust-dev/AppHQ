@@ -14,6 +14,14 @@ const dollars = new Intl.NumberFormat('en-US', {
 })
 const cents = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+const moment = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'UTC',
+})
 
 export const formatCount = (n: number) => whole.format(n)
 /** 1,284,300 → 1.3M. For headline numbers, where the exact figure is in the table below. */
@@ -21,6 +29,8 @@ export const formatCompact = (n: number) => (n < 10_000 ? whole.format(n) : comp
 export const formatMoney = (n: number) => (Math.abs(n) < 100 ? cents.format(n) : dollars.format(n))
 export const formatRatio = (n: number) => oneDecimal.format(n)
 export const formatDay = (iso: string) => day.format(new Date(`${iso}T00:00:00Z`))
+/** A moment in UTC, e.g. "Nov 20, 19:45 UTC". Always UTC so server and browser agree. */
+export const formatMoment = (iso: string) => `${moment.format(new Date(iso))} UTC`
 
 export interface Change {
   direction: 'up' | 'down' | 'flat'

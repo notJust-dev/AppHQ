@@ -1,11 +1,14 @@
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from '@trpc/server/adapters/fastify'
 import Fastify from 'fastify'
 import { requireBearerToken } from './auth/bearer.js'
-import type { Db } from './db/client.js'
+import type { Db, Sql } from './db/client.js'
+import type { Secrets } from './lib/crypto.js'
 import { appRouter, type AppRouter } from './trpc/router.js'
 
 export interface AppDeps {
   db: Db
+  sql: Sql
+  secrets: Secrets
   /** Resolves when the database answers; used by /health. */
   pingDb: () => Promise<unknown>
   internalApiToken: string
@@ -36,7 +39,7 @@ export async function buildApp(deps: AppDeps) {
       prefix: '/trpc',
       trpcOptions: {
         router: appRouter,
-        createContext: () => ({ db: deps.db }),
+        createContext: () => ({ db: deps.db, sql: deps.sql, secrets: deps.secrets, log: app.log }),
         onError({ path, error }) {
           app.log.error({ path, code: error.code }, error.message)
         },

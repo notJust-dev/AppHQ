@@ -1,12 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
-import type { Db } from './db/client.js'
+import type { Db, Sql } from './db/client.js'
+import { createSecrets } from './lib/crypto.js'
 
 const TOKEN = 'test-token-that-is-at-least-32-characters'
 
 // These tests stop before any query runs, so no database is needed.
 const build = (pingDb: () => Promise<unknown> = async () => 1) =>
-  buildApp({ db: {} as Db, pingDb, internalApiToken: TOKEN, logLevel: 'silent' })
+  buildApp({
+    db: {} as Db,
+    sql: {} as Sql,
+    secrets: createSecrets(undefined),
+    pingDb,
+    internalApiToken: TOKEN,
+    logLevel: 'silent',
+  })
 
 let app: Awaited<ReturnType<typeof build>> | undefined
 afterEach(async () => {

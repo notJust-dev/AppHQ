@@ -1,4 +1,4 @@
-import { change, formatCompact, formatMoney, formatRatio, per } from '../lib/format'
+import { change, formatCompact, formatMoney, formatRatio, per, type Change } from '../lib/format'
 import type { Overview } from '../lib/queries'
 import { Delta } from './Delta'
 
@@ -30,7 +30,7 @@ export function FunnelBand({
         label="Social views"
         swatch="bg-views"
         value={formatCompact(totals.socialViews)}
-        delta={previous && <Delta change={change(totals.socialViews, previous.socialViews)} />}
+        change={previous ? change(totals.socialViews, previous.socialViews) : 'incomparable'}
         comparedWith={comparedWith}
       />
       <Seam
@@ -41,7 +41,7 @@ export function FunnelBand({
         label="Downloads"
         swatch="bg-downloads"
         value={formatCompact(totals.downloads)}
-        delta={previous && <Delta change={change(totals.downloads, previous.downloads)} />}
+        change={previous ? change(totals.downloads, previous.downloads) : 'incomparable'}
         comparedWith={comparedWith}
       />
       <Seam
@@ -52,7 +52,7 @@ export function FunnelBand({
         label="Revenue"
         swatch="bg-revenue"
         value={formatMoney(totals.revenue)}
-        delta={previous && <Delta change={change(totals.revenue, previous.revenue)} />}
+        change={previous ? change(totals.revenue, previous.revenue) : 'incomparable'}
         comparedWith={comparedWith}
       />
     </section>
@@ -63,7 +63,8 @@ function Stage(props: {
   label: string
   swatch: string
   value: string
-  delta: React.ReactNode
+  /** Null when there is nothing in either period; 'incomparable' when history is too short. */
+  change: Change | null | 'incomparable'
   comparedWith: string
 }) {
   return (
@@ -76,12 +77,14 @@ function Stage(props: {
         {props.value}
       </p>
       <p className="mt-1 text-sm text-ink-soft">
-        {props.delta ? (
-          <>
-            {props.delta} <span>{props.comparedWith}</span>
-          </>
-        ) : (
+        {props.change === 'incomparable' ? (
           'Not enough history to compare'
+        ) : props.change === null ? (
+          'No data yet'
+        ) : (
+          <>
+            <Delta change={props.change} /> <span>{props.comparedWith}</span>
+          </>
         )}
       </p>
     </div>

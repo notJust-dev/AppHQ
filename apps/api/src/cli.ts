@@ -3,6 +3,7 @@ import { connectors } from './connectors/registry.js'
 import { createDb } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { loadEnv } from './env.js'
+import { createSecrets } from './lib/crypto.js'
 import { trailingRange } from './lib/dates.js'
 import { consoleLogger as log } from './lib/logger.js'
 import { seedDemo } from './seed/demo.js'
@@ -60,7 +61,7 @@ try {
     }
     case 'sync': {
       const summary = await runSync(
-        { db, sql, log },
+        { db, sql, log, secrets: createSecrets(env.ENCRYPTION_KEY) },
         {
           connectors,
           range: trailingRange(parseDays(7)),

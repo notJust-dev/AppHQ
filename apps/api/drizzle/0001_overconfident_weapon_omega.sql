@@ -1,0 +1,1 @@
+ALTER TABLE "apps" ADD COLUMN "ios_bundle_id" text;

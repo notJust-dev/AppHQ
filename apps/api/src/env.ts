@@ -15,6 +15,13 @@ const schema = z
     PGDATABASE: z.string().optional(),
     PGUSER: z.string().optional(),
     INTERNAL_API_TOKEN: z.string().min(32, 'must be at least 32 characters'),
+    // Encrypts API keys and OAuth tokens stored in the database. Optional so that the API still
+    // boots without it; connecting a source then fails with a clear message.
+    // Generate with: openssl rand -hex 32
+    ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/i, 'must be 64 hex characters')
+      .optional(),
   })
   .refine((env) => env.DATABASE_URL || (env.PGHOST && env.PGDATABASE && env.PGUSER), {
     path: ['DATABASE_URL'],

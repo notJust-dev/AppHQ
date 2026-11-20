@@ -1,5 +1,6 @@
 import type { Db } from '../db/client.js'
 import type { App } from '../db/schema.js'
+import type { Secrets } from '../lib/crypto.js'
 import type { DateRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
 import type { Source } from '../metrics/catalog.js'
@@ -10,6 +11,8 @@ export interface SyncContext {
   /** Inclusive UTC days to fetch. Connectors must be safe to re-run over the same range. */
   range: DateRange
   log: Logger
+  /** Decrypts credentials stored in `connections`. */
+  secrets: Secrets
 }
 
 /**

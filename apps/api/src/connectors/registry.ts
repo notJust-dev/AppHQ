@@ -1,4 +1,5 @@
+import { createRevenueCatConnector } from './revenuecat/connector.js'
 import type { Connector } from './types.js'
 
-/** Connectors run by `cli sync`, in order. Phase 1 adds RevenueCat, App Store and Google Play. */
-export const connectors: Connector[] = []
+/** Connectors run by a sync, in order. App Store and Google Play come next. */
+export const connectors: Connector[] = [createRevenueCatConnector()]
