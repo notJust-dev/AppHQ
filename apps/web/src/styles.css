@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/ibm-plex-sans';
+
+/*
+ * Design tokens. The chrome stays in ink and paper; colour is reserved for the three funnel
+ * stages, so a coloured mark always means "this is views / downloads / revenue".
+ * The stage colours are the first three slots of a palette validated for colour-vision
+ * deficiency; they mark identity next to a text label and are never used for text itself.
+ */
+@theme {
+  --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'IBM Plex Sans Variable', sans-serif;
+
+  --color-paper: #f2f5f9;
+  --color-surface: #ffffff;
+  --color-ink: #101b33;
+  --color-ink-soft: #4b5876;
+  --color-line: #d9e0ea;
+
+  --color-views: #2a78d6;
+  --color-downloads: #1baf7a;
+  --color-revenue: #eb6834;
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-views);
+    outline-offset: 2px;
+  }
+}
+
+@utility figures {
+  font-variant-numeric: tabular-nums;
+}

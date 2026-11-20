@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.output/
+.nitro/
+.tanstack/
+.vite/
+*.log
+.DS_Store
+
+# Secrets stay local; commit the .env.example files instead.
+.env
+.env.*
+!.env.example

@@ -1,0 +1,21 @@
+# Local development database only. Production uses the PostgreSQL attached to the
+# `api` application on Cloudways Velocity.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: appdashboard
+      POSTGRES_PASSWORD: appdashboard
+      POSTGRES_DB: appdashboard
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appdashboard -d appdashboard"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
