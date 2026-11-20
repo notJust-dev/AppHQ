@@ -356,8 +356,8 @@ Status on 2026-11-20 (merged to `main` and deployed):
   a real key.
 - `ENCRYPTION_KEY` is set on the `api` app as a private variable, with a copy in the git-ignored
   `apps/api/.env.velocity`. Losing it makes the stored credentials unreadable.
-- Step 3 (App Store downloads, plus the analytics report requests) is built on branch
-  `phase-1-app-store`, with a form in Settings. Not merged, not run against a real key.
+- Step 3 (App Store downloads, plus the analytics report requests) is merged and deployed, with
+  a form in Settings. Not yet run against a real key.
 - Not started: step 4 (Google Play), step 5 (reading the analytics reports), step 6 (per-app
   charts) and step 8 (cron).
 
