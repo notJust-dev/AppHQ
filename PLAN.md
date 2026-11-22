@@ -245,12 +245,35 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - The outcome of the analytics report requests is shown once in Settings and not stored; the
   analytics connector will list the requests itself.
 
-### Google Play (from prior knowledge; verify at implementation)
+### Google Play (built; Google's docs checked 2026-11-22; tested against a stand-in)
 
-- Auth: one service account with Play Console access. Env variable.
-- Installs and store listing visitors: monthly CSV files in the developer's Cloud Storage bucket,
-  updated daily, UTF-16 encoded, a few days behind.
-- Reviews: the Android Publisher reviews endpoint only returns reviews from the last week, so
+- No API has installs or store visitors (the Play Developer Reporting API is vitals only), so
+  they come from the monthly CSVs in the account's Cloud Storage bucket
+  (`pubsite_prod_rev_<id>`, from Play Console, Download reports, Copy Cloud Storage URI).
+- Auth: a Google Cloud service account, pasted in Settings as its JSON key and stored encrypted
+  (not an env variable). RS256 JWT → `oauth2.googleapis.com/token`, scope
+  `devstorage.read_only` (plus `playdeveloperreporting` for titles). In Play Console the account
+  needs "View app information and download bulk reports" at account level; Google gives no
+  delay, the community reports up to about 36 hours. Organizations created since May 2024 may
+  block key creation (`iam.disableServiceAccountKeyCreation`).
+- Files: `stats/installs/installs_<pkg>_<YYYYMM>_<dimension>.csv` (`overview` exists in practice
+  though undocumented; otherwise `country` sums to the same) and
+  `stats/store_performance/store_performance_<pkg>_<YYYYMM>_country.csv`. Package names can hold
+  `_`, so names are parsed anchored on the month and a known dimension. UTF-16 (byte order read
+  from the mark), quoted CSV, columns looked up by header.
+- Metrics: `downloads` = "Daily User Installs" (Google maps it to "New users"; falls back to
+  device installs or install events in older files); `page_views` = "Store listing visitors"
+  summed over countries (the traffic-source file double counts); `store_acquisitions`. Installs
+  are in Pacific days. Posted 3 to 7 days late; the current month keeps changing, so each sync
+  re-reads every month its range touches. A first sync takes a year.
+- Since June/July 2026 Play Console leads with click-based store metrics; the CSVs keep the
+  acquisition metrics (Google's page contradicts itself on whether clicks are in the CSVs too).
+- App titles from the Reporting API's `apps:search` when that API is enabled in the service
+  account's project; otherwise packages show by name.
+- Packages map to apps through `apps.android_package`: matched automatically when a package
+  equals an app's iOS bundle id; otherwise chosen in Settings, including "New app" for
+  Android-only apps. The packages found are kept in `connections.details`.
+- Reviews (Phase 3): the Android Publisher reviews endpoint only returns the last week, so
   syncing must start early; older reviews come from the bucket's review CSVs.
 
 ### TikTok (built and running against a real sandbox account since 2026-11-22)
@@ -416,8 +439,12 @@ Status on 2026-11-20 (merged to `main` and deployed):
   shared date axis, each on its own scale, with one crosshair that reads a day across every
   row. Days no source reported are gaps, not zeros. It covers Phase 2 step 5's timeline too; the
   post markers come with the social connectors. Query: `get_app_timeline`.
-- Not started: step 4 (Google Play), step 5 (reading the analytics reports) and step 8 (cron,
-  which needs a Velocity console entry: `node dist/cli.js sync` every six hours).
+- Step 4 (Google Play) is built on branch `phase-1-google-play`: "Connect Google Play" in
+  Settings (service account key and Cloud Storage URI), package-to-app matching, and daily new
+  users and store listing visitors from the monthly report files. Tested with unit tests,
+  database tests and a browser run against a stand-in Google; not yet run against Play.
+- Not started: step 5 (reading the analytics reports) and step 8 (cron, which needs a Velocity
+  console entry: `node dist/cli.js sync` every six hours).
 
 ### Phase 2 — Social and the funnel chart
 

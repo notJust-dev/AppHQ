@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAppTimelineFn, getOverviewFn, listPostsFn } from '../fns/portfolio'
 import { getSyncStatusFn, listAccountsFn, listAppsFn } from '../fns/settings'
+import { playPackagesFn } from '../fns/google-play'
 import { metaAccountsFn, metaSetupFn } from '../fns/meta'
 import { tiktokSetupFn } from '../fns/tiktok'
 
@@ -28,6 +29,9 @@ export const tiktokSetupQuery = () =>
 export const metaSetupQuery = () =>
   queryOptions({ queryKey: ['meta-setup'], queryFn: () => metaSetupFn() })
 
+export const playPackagesQuery = () =>
+  queryOptions({ queryKey: ['play-packages'], queryFn: () => playPackagesFn() })
+
 export const metaAccountsQuery = () =>
   queryOptions({ queryKey: ['meta-accounts'], queryFn: () => metaAccountsFn() })
 
@@ -48,3 +52,4 @@ export type Post = Awaited<ReturnType<typeof listPostsFn>>[number]
 export type TikTokSetup = Awaited<ReturnType<typeof tiktokSetupFn>>
 export type MetaSetup = Awaited<ReturnType<typeof metaSetupFn>>
 export type MetaAccount = Awaited<ReturnType<typeof metaAccountsFn>>[number]
+export type PlayAccount = Awaited<ReturnType<typeof playPackagesFn>>

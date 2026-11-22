@@ -56,6 +56,16 @@ ID, the `.p8` file) and your vendor number. The Sales and Reports role is enough
 apps are added, matched to existing ones by bundle id, and a year of daily downloads is fetched.
 With an Admin key the dashboard also asks Apple to start analytics reports for each app.
 
+For Google Play, create a service account in Google Cloud with a JSON key, and invite its email
+in Play Console (Users and permissions) with "View app information and download bulk reports"
+for all apps; access can take up to a day. In Settings, paste the key and the Cloud Storage URI
+from Play Console (Download reports, Statistics, Copy Cloud Storage URI). Packages whose name
+equals an iOS bundle id are matched to that app; pick the app for the others, or make a new one.
+Downloads are new users per day and store page views are store listing visitors, both from
+Google's monthly report files, which arrive 3 to 7 days late. Enabling the Play Developer
+Reporting API in the service account's project adds app titles. `GOOGLE_STORAGE_URL` and
+`GOOGLE_PLAY_REPORTING_URL` point the API at a stand-in.
+
 For TikTok, create an app (or a sandbox of one) at developers.tiktok.com with Login Kit for web
 and the scopes `user.info.basic`, `user.info.profile`, `user.info.stats` and `video.list`.
 Register the redirect URI that Settings shows under "Connect TikTok", exactly as written, and

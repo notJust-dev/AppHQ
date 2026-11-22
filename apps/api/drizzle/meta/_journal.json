@@ -22,6 +22,13 @@
       "when": 1795334691362,
       "tag": "0002_tiktok_posts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795346602330,
+      "tag": "0003_connection_details",
+      "breakpoints": true
     }
   ]
 }

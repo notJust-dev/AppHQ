@@ -11,6 +11,7 @@ import {
   removeDemoDataFn,
   runSyncFn,
 } from '../../fns/settings'
+import { assignPlayPackageFn, connectGooglePlayFn } from '../../fns/google-play'
 import { assignMetaAccountFn, startMetaConnectFn } from '../../fns/meta'
 import { startTikTokConnectFn, takeConnectResultFn } from '../../fns/tiktok'
 import { formatCount, formatDay, formatMoment } from '../../lib/format'
@@ -19,12 +20,14 @@ import {
   appsQuery,
   metaAccountsQuery,
   metaSetupQuery,
+  playPackagesQuery,
   syncStatusQuery,
   tiktokSetupQuery,
   type Account,
   type AppSummary,
   type MetaAccount,
   type MetaSetup,
+  type PlayAccount,
   type SyncRun,
   type TikTokSetup,
 } from '../../lib/queries'
@@ -44,6 +47,7 @@ export const Route = createFileRoute('/_app/settings')({
       context.queryClient.ensureQueryData(tiktokSetupQuery()),
       context.queryClient.ensureQueryData(metaSetupQuery()),
       context.queryClient.ensureQueryData(metaAccountsQuery()),
+      context.queryClient.ensureQueryData(playPackagesQuery()),
     ]),
   component: SettingsPage,
 })
@@ -71,6 +75,7 @@ function SettingsPage() {
   const { data: tiktokSetup } = useSuspenseQuery(tiktokSetupQuery())
   const { data: metaSetup } = useSuspenseQuery(metaSetupQuery())
   const { data: metaAccounts } = useSuspenseQuery({ ...metaAccountsQuery(), refetchInterval })
+  const { data: playAccount } = useSuspenseQuery({ ...playPackagesQuery(), refetchInterval })
 
   const dataChanged = () => {
     setWatching(true)
@@ -102,6 +107,13 @@ function SettingsPage() {
           account={accounts.find((account) => account.provider === 'app_store')}
           onConnected={dataChanged}
         />
+      </Section>
+
+      <Section
+        title="Connect Google Play"
+        intro="Installs and store listing visitors come from the monthly reports Google Play keeps in a Cloud Storage bucket. Create a service account in Google Cloud and a JSON key for it. In Play Console, invite the service account's email under Users and permissions with &quot;View app information and download bulk reports&quot; for all apps. Then copy the Cloud Storage URI from Download reports, Statistics. Google posts the numbers 3 to 7 days late."
+      >
+        <ConnectGooglePlay apps={apps} account={playAccount} onChanged={dataChanged} />
       </Section>
 
       <Section
@@ -354,6 +366,171 @@ function ConnectMeta(props: {
         Valid OAuth Redirect URI to add in the Meta app, exactly as written:{' '}
         <code className="break-all text-ink">{props.setup.redirectUri}</code>
       </p>
+    </>
+  )
+}
+
+function ConnectGooglePlay(props: { apps: AppSummary[]; account: PlayAccount; onChanged: () => void }) {
+  const connect = useServerFn(connectGooglePlayFn)
+  const assign = useServerFn(assignPlayPackageFn)
+  const empty = { serviceAccountJson: '', storageUri: '' }
+  const [fields, setFields] = useState(empty)
+  const [replacing, setReplacing] = useState(false)
+  const mutation = useMutation({
+    mutationFn: () => connect({ data: fields }),
+    onSuccess: (result) => {
+      if (!result.ok) return
+      setFields(empty)
+      setReplacing(false)
+      props.onChanged()
+    },
+  })
+  const choose = useMutation({
+    mutationFn: (input: { packageName: string; appId: string | null }) => assign({ data: input }),
+    onSuccess: (result) => {
+      if (result.ok) props.onChanged()
+    },
+  })
+  const result = mutation.data
+  const account = props.account
+  const inputClass = 'mt-2 block w-full rounded-md border border-line bg-surface px-3 py-2'
+
+  const form = (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        mutation.mutate()
+      }}
+    >
+      <label htmlFor="play-storage-uri" className="text-sm font-medium">
+        Cloud Storage URI
+      </label>
+      <input
+        id="play-storage-uri"
+        type="text"
+        autoComplete="off"
+        spellCheck={false}
+        required
+        placeholder="gs://pubsite_prod_rev_01234567890987654321/stats/installs/"
+        value={fields.storageUri}
+        onChange={(event) => setFields((current) => ({ ...current, storageUri: event.target.value }))}
+        className={inputClass}
+      />
+      <label htmlFor="play-service-account" className="mt-4 block text-sm font-medium">
+        Service account key
+      </label>
+      <textarea
+        id="play-service-account"
+        rows={5}
+        autoComplete="off"
+        spellCheck={false}
+        required
+        minLength={100}
+        placeholder="Paste the whole JSON key file"
+        value={fields.serviceAccountJson}
+        onChange={(event) => setFields((current) => ({ ...current, serviceAccountJson: event.target.value }))}
+        className={`${inputClass} text-xs`}
+      />
+      <p className="mt-2 text-xs text-ink-soft">
+        Stored encrypted on the API. It is not shown again and never reaches the browser after this.
+      </p>
+      <div className="mt-4">
+        <Button type="submit" variant="primary" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Checking the reports…' : 'Connect Google Play'}
+        </Button>
+      </div>
+      <div role="status" className="mt-3 text-sm">
+        {mutation.isError && 'Could not reach the dashboard server. Try again.'}
+        {result && !result.ok && result.message}
+      </div>
+    </form>
+  )
+
+  if (!account) return form
+
+  return (
+    <>
+      <p className="mb-5 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+        {account.serviceAccount}: {CONNECTION_STATUS[account.status] ?? account.status}
+        <span className="block text-xs text-ink-soft">
+          {account.bucket}
+          {account.lastSyncedAt && `, synced ${formatMoment(account.lastSyncedAt)}`}
+        </span>
+      </p>
+
+      {result?.ok && (
+        <p role="status" className="mb-4 text-sm">
+          Connected. {result.packages} {result.packages === 1 ? 'package' : 'packages'} found
+          {result.matched > 0 && `, ${result.matched} matched to an app by bundle id`}. A year of
+          installs is being fetched for every package that has an app.
+        </p>
+      )}
+
+      {account.packages.length > 0 && (
+        <div className="mb-5 overflow-x-auto rounded-lg border border-line bg-surface">
+          <table className="w-full min-w-[560px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-ink-soft">
+                <th scope="col" className="px-6 py-3 font-medium">
+                  Package
+                </th>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  App
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {account.packages.map((item) => {
+                const selectId = `play-app-${item.packageName}`
+                return (
+                  <tr key={item.packageName} className="border-b border-line align-top last:border-b-0">
+                    <th scope="row" className="px-6 py-4 text-left font-medium">
+                      <label htmlFor={selectId}>{item.title ?? item.packageName}</label>
+                      {item.title && (
+                        <span className="block text-xs font-normal break-all text-ink-soft">{item.packageName}</span>
+                      )}
+                    </th>
+                    <td className="px-6 py-4">
+                      <select
+                        id={selectId}
+                        value={item.appId ?? ''}
+                        disabled={choose.isPending}
+                        onChange={(event) =>
+                          choose.mutate({
+                            packageName: item.packageName,
+                            appId: event.target.value === '' ? null : event.target.value,
+                          })
+                        }
+                        className="w-full max-w-64 rounded-md border border-line bg-surface px-3 py-2"
+                      >
+                        <option value="">Not tracked</option>
+                        {props.apps.map((app) => (
+                          <option key={app.id} value={app.id}>
+                            {app.name}
+                          </option>
+                        ))}
+                        <option value="new">New app: {item.title ?? item.packageName}</option>
+                      </select>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {choose.data && !choose.data.ok && (
+        <p role="status" className="mb-4 text-sm">
+          {choose.data.message}
+        </p>
+      )}
+
+      {replacing ? (
+        form
+      ) : (
+        <Button onClick={() => setReplacing(true)}>Use a different key</Button>
+      )}
     </>
   )
 }

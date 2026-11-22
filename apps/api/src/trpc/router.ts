@@ -24,6 +24,15 @@ import { listPosts } from '../queries/list-posts.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
+import {
+  GOOGLE_PLAY,
+  GOOGLE_PLAY_HISTORY_DAYS,
+} from '../connectors/google-play/connector.js'
+import {
+  assignPlayPackage,
+  connectGooglePlay,
+  listPlayPackages,
+} from '../services/connect-google-play.js'
 import { assignMetaAccount, connectMeta } from '../services/connect-meta.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
@@ -241,6 +250,47 @@ export const appRouter = t.router({
           appIds: [result.appId],
           range: trailingRange(7),
         })
+        return result
+      }),
+  }),
+  /**
+   * The Google Play developer account: a service account key that can read the monthly report
+   * files in the account's Cloud Storage bucket, and which app each package belongs to.
+   */
+  googlePlay: t.router({
+    connect: t.procedure
+      .input(
+        z.object({
+          serviceAccountJson: z.string().trim().min(100).max(10_000),
+          storageUri: z.string().trim().min(3).max(500),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await connectGooglePlay(ctx, input).catch((err: unknown) => {
+          ctx.log.error(`connect Google Play failed: ${err instanceof Error ? err.message : err}`)
+          throw connectError(err)
+        })
+        startSync(ctx, { connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
+        return result
+      }),
+
+    packages: t.procedure.query(({ ctx }) => listPlayPackages(ctx.db)),
+
+    /** Says which app a package belongs to ('new' makes one), and fetches its history. */
+    assign: t.procedure
+      .input(
+        z.object({
+          packageName: z.string().min(1).max(200),
+          appId: z.union([z.string().min(1).max(64), z.null()]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await assignPlayPackage(ctx.db, input).catch((err: unknown) => {
+          throw connectError(err)
+        })
+        if (result.appId) {
+          startSync(ctx, { connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
+        }
         return result
       }),
   }),

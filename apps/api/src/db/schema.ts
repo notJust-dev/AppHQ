@@ -5,6 +5,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -47,6 +48,8 @@ export const connections = pgTable(
     /** When the refresh token stops working, so the account has to be connected again. */
     refreshExpiresAt: timestamp('refresh_expires_at', { withTimezone: true }),
     scopes: text('scopes'),
+    /** What the source told us that is not secret, e.g. the Google Play packages it found. */
+    details: jsonb('details'),
     /** 'ok' | 'needs_reauth' | 'error' */
     status: text('status').notNull().default('ok'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
