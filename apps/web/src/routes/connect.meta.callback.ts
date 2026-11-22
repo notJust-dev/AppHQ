@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { api } from '../server/api'
-import { finishOAuth, metaRedirectUri } from '../server/oauth'
-import { callbackError, providerErrorMessage, redirectTo } from '../server/oauth-callback'
-import { getAppSession } from '../server/session'
+import { api } from '@/server/api'
+import { finishOAuth, metaRedirectUri } from '@/server/oauth'
+import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
+import { getAppSession } from '@/server/session'
 
 /**
  * Where Facebook sends the browser after sign-in. Same checks as TikTok's; the difference is

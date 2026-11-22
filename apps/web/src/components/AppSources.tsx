@@ -2,18 +2,23 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useId, useState } from 'react'
-import { connectRevenueCatFn } from '../fns/settings'
+import { toast } from 'sonner'
+import { Panel } from '@/components/Panel'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
+import { useAssetActions, type AssetActions } from '@/components/useAssetActions'
+import { connectRevenueCatFn } from '@/fns/settings'
 import {
   ATTENTION,
   KIND_LABEL,
   PLATFORM_OF_KIND,
   SOURCE_OF_KIND,
   assetDetail,
-} from '../lib/assets'
-import type { AppSummary, Asset } from '../lib/queries'
-import { Button } from './Button'
-import { Panel } from './ui/Panel'
-import { useAssetActions, type AssetActions } from './useAssetActions'
+} from '@/lib/assets'
+import type { AppSummary, Asset } from '@/lib/queries'
 
 /**
  * What feeds one app: its iOS app, Android app and RevenueCat project, one of each, and any
@@ -37,9 +42,8 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
           : 'What feeds this app. Linking one fetches its history, so the charts fill in a few minutes later.'
       }
       bodyClassName=""
-      footer={actions.notice ? <span role="status" className={actions.notice.ok ? '' : 'text-danger'}>{actions.notice.message}</span> : undefined}
     >
-      <ul className="divide-y divide-line">
+      <ul className="divide-y">
         {!portfolio &&
           STORE_KINDS.map((kind) => (
             <SlotRow
@@ -84,6 +88,13 @@ const SETUP_PAGE = {
   android_app: '/accounts/google-play',
 } as const
 
+/** A select's value for "nothing chosen"; Radix keeps the empty string for its placeholder. */
+const NONE = 'none'
+
+const ROW = 'flex flex-wrap gap-x-8 gap-y-3 px-5 py-4'
+const ROW_LABEL = 'w-full pt-1.5 text-sm font-medium sm:w-56 sm:shrink-0'
+const ROW_BODY = 'w-full min-w-0 space-y-3 sm:w-auto sm:flex-1'
+
 /** Where an asset belongs now, said next to it in a list of choices. */
 function whereNow(asset: Asset, appName: (appId: string) => string) {
   if (asset.appId === null) return ''
@@ -103,56 +114,60 @@ function SlotRow(props: {
   const label = KIND_LABEL[kind] ?? kind
 
   return (
-    <li className="flex flex-wrap items-center gap-x-8 gap-y-2 px-5 py-4">
-      <label htmlFor={selectId} className="w-full text-[13px] font-medium sm:w-60 sm:shrink-0">
+    <li className={ROW}>
+      <Label htmlFor={selectId} className={ROW_LABEL}>
         {label}
-      </label>
-      {candidates.length === 0 ? (
-        <span className="w-full min-w-0 text-ink-soft sm:w-auto sm:flex-1">
-          None found.{' '}
-          <Link to={SETUP_PAGE[kind]} className="font-medium text-ink underline underline-offset-4">
-            Connect {SOURCE_OF_KIND[kind]}
-          </Link>{' '}
-          to find one.
-        </span>
-      ) : (
-        <span className="w-full min-w-0 sm:w-auto sm:flex-1">
-          <select
-            id={selectId}
-            value={current?.id ?? ''}
-            disabled={actions.pending}
-            onChange={(event) => {
-              const chosen = event.target.value
-              if (chosen === '') {
-                if (current) actions.assign(current.id, null)
-              } else {
-                actions.assign(chosen, appId)
-              }
-            }}
-            className="w-full max-w-md field"
-          >
-            <option value="">None</option>
-            {candidates.map((asset) => {
-              const detail = assetDetail(asset)
-              return (
-                <option key={asset.id} value={asset.id}>
-                  {asset.name}
-                  {detail ? ` · ${detail}` : ''}
-                  {asset.appId === appId ? '' : whereNow(asset, appName)}
-                </option>
-              )
-            })}
-          </select>
-          {current && ATTENTION[current.status] && (
-            <span className="mt-1 block text-xs font-medium">
-              The account behind it {ATTENTION[current.status]}.{' '}
-              <Link to={SETUP_PAGE[kind]} className="underline underline-offset-4">
-                Connect it again
-              </Link>
-            </span>
-          )}
-        </span>
-      )}
+      </Label>
+      <div className={ROW_BODY}>
+        {candidates.length === 0 ? (
+          <p className="pt-1.5 text-muted-foreground">
+            None found.{' '}
+            <Link to={SETUP_PAGE[kind]} className="font-medium text-foreground underline underline-offset-4">
+              Connect {SOURCE_OF_KIND[kind]}
+            </Link>{' '}
+            to find one.
+          </p>
+        ) : (
+          <>
+            <Select
+              value={current?.id ?? NONE}
+              disabled={actions.pending}
+              onValueChange={(chosen) => {
+                if (chosen === NONE) {
+                  if (current) actions.assign(current.id, null)
+                } else {
+                  actions.assign(chosen, appId)
+                }
+              }}
+            >
+              <SelectTrigger id={selectId} className="w-full max-w-md">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>None</SelectItem>
+                {candidates.map((asset) => {
+                  const detail = assetDetail(asset)
+                  return (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.name}
+                      {detail ? ` · ${detail}` : ''}
+                      {asset.appId === appId ? '' : whereNow(asset, appName)}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            {current && ATTENTION[current.status] && (
+              <p className="text-xs font-medium text-warning">
+                The account behind it {ATTENTION[current.status]}.{' '}
+                <Link to={SETUP_PAGE[kind]} className="underline underline-offset-4">
+                  Connect it again
+                </Link>
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </li>
   )
 }
@@ -169,21 +184,22 @@ function SocialRow(props: {
   const selectId = useId()
 
   return (
-    <li className="flex flex-wrap gap-x-8 gap-y-3 px-5 py-4">
-      <span className="w-full text-[13px] font-medium sm:w-60 sm:shrink-0">Social accounts</span>
-      <div className="w-full min-w-0 space-y-3 sm:w-auto sm:flex-1">
+    <li className={ROW}>
+      <span className={ROW_LABEL}>Social accounts</span>
+      <div className={ROW_BODY}>
         {linked.length > 0 ? (
-          <ul className="space-y-2">
+          <ul className="divide-y rounded-lg border">
             {linked.map((asset) => (
-              <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2">
                 <span className="min-w-0 break-words">
-                  <span className="text-ink-soft">{PLATFORM_OF_KIND[asset.kind]}</span> {asset.name}
+                  <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span> {asset.name}
                   {ATTENTION[asset.status] && (
-                    <span className="block text-xs font-medium">The account {ATTENTION[asset.status]}.</span>
+                    <span className="block text-xs font-medium text-warning">The account {ATTENTION[asset.status]}.</span>
                   )}
                 </span>
                 <Button
-                  className="px-3 py-1"
+                  variant="ghost"
+                  size="sm"
                   disabled={actions.pending}
                   onClick={() => actions.assign(asset.id, null)}
                   aria-label={`Remove ${asset.name}`}
@@ -194,7 +210,7 @@ function SocialRow(props: {
             ))}
           </ul>
         ) : (
-          <p className="text-ink-soft">None yet.</p>
+          <p className="pt-1.5 text-muted-foreground">None yet.</p>
         )}
         {candidates.length > 0 ? (
           <form
@@ -206,33 +222,30 @@ function SocialRow(props: {
               setAdding('')
             }}
           >
-            <label htmlFor={selectId} className="sr-only">
+            <Label htmlFor={selectId} className="sr-only">
               Social account to add
-            </label>
-            <select
-              id={selectId}
-              value={adding}
-              onChange={(event) => setAdding(event.target.value)}
-              className="min-w-0 flex-1 field"
-            >
-              <option value="" disabled>
-                Add a social account
-              </option>
-              {candidates.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {PLATFORM_OF_KIND[asset.kind]} {asset.name}
-                  {whereNow(asset, appName)}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" disabled={!adding || actions.pending}>
+            </Label>
+            <Select value={adding} onValueChange={setAdding}>
+              <SelectTrigger id={selectId} className="min-w-0 flex-1">
+                <SelectValue placeholder="Add a social account" />
+              </SelectTrigger>
+              <SelectContent>
+                {candidates.map((asset) => (
+                  <SelectItem key={asset.id} value={asset.id}>
+                    {PLATFORM_OF_KIND[asset.kind]} {asset.name}
+                    {whereNow(asset, appName)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="submit" variant="outline" disabled={!adding || actions.pending}>
               Add
             </Button>
           </form>
         ) : (
-          <p className="text-xs text-ink-soft">
+          <p className="text-xs text-muted-foreground">
             To add more,{' '}
-            <Link to="/accounts" className="font-medium text-ink underline underline-offset-4">
+            <Link to="/accounts" className="font-medium text-foreground underline underline-offset-4">
               connect Facebook, Instagram or TikTok
             </Link>
             .
@@ -257,32 +270,31 @@ function RevenueCatRow(props: {
   const { app, current, others, appName, actions } = props
   const [replacing, setReplacing] = useState(false)
   const [choice, setChoice] = useState('')
-  // Said after a key connects, outside the form, which closes once the project shows here.
-  const [connected, setConnected] = useState<string | null>(null)
   const selectId = useId()
 
   return (
-    <li className="flex flex-wrap gap-x-8 gap-y-3 px-5 py-4">
-      <span className="w-full text-[13px] font-medium sm:w-60 sm:shrink-0">RevenueCat project</span>
-      <div className="w-full min-w-0 space-y-3 sm:w-auto sm:flex-1">
+    <li className={ROW}>
+      <span className={ROW_LABEL}>RevenueCat project</span>
+      <div className={ROW_BODY}>
         {current && (
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border px-3 py-2">
             <span className="min-w-0 break-words">
               {current.name}
-              <span className="block text-xs text-ink-soft">
+              <span className="block text-xs text-muted-foreground">
                 {current.bundleId ?? current.externalId}
                 {ATTENTION[current.status] && (
-                  <span className="font-medium text-ink"> · The key {ATTENTION[current.status]}; replace it.</span>
+                  <span className="font-medium text-warning"> · The key {ATTENTION[current.status]}; replace it.</span>
                 )}
               </span>
             </span>
             {!replacing && (
-              <span className="flex gap-2">
-                <Button className="px-3 py-1" onClick={() => setReplacing(true)}>
+              <span className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => setReplacing(true)}>
                   Replace key
                 </Button>
                 <Button
-                  className="px-3 py-1"
+                  variant="ghost"
+                  size="sm"
                   disabled={actions.pending}
                   onClick={() => actions.assign(current.id, null)}
                   aria-label={`Unlink ${current.name}`}
@@ -298,39 +310,28 @@ function RevenueCatRow(props: {
             app={app}
             replacing={current !== undefined}
             onCancel={() => setReplacing(false)}
-            onConnected={(message) => {
-              setConnected(message)
-              setReplacing(false)
-            }}
+            onConnected={() => setReplacing(false)}
           />
         )}
-        {connected && (
-          <p role="status" className="text-sm text-ink-soft">
-            {connected}
-          </p>
-        )}
         {!current && others.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-            <label htmlFor={selectId} className="w-full text-xs text-ink-soft">
+          <div className="flex flex-wrap gap-2 border-t pt-3">
+            <Label htmlFor={selectId} className="w-full text-xs font-normal text-muted-foreground">
               Or use a project that is already connected
-            </label>
-            <select
-              id={selectId}
-              value={choice}
-              onChange={(event) => setChoice(event.target.value)}
-              className="min-w-0 flex-1 field"
-            >
-              <option value="" disabled>
-                Choose a project
-              </option>
-              {others.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.name}
-                  {whereNow(asset, appName)}
-                </option>
-              ))}
-            </select>
-            <Button disabled={!choice || actions.pending} onClick={() => actions.assign(choice, app.id)}>
+            </Label>
+            <Select value={choice} onValueChange={setChoice}>
+              <SelectTrigger id={selectId} className="min-w-0 flex-1">
+                <SelectValue placeholder="Choose a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {others.map((asset) => (
+                  <SelectItem key={asset.id} value={asset.id}>
+                    {asset.name}
+                    {whereNow(asset, appName)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" disabled={!choice || actions.pending} onClick={() => actions.assign(choice, app.id)}>
               Link
             </Button>
           </div>
@@ -344,7 +345,7 @@ function RevenueCatKeyForm(props: {
   app: AppSummary
   replacing: boolean
   onCancel: () => void
-  onConnected: (message: string) => void
+  onConnected: () => void
 }) {
   const connect = useServerFn(connectRevenueCatFn)
   const queryClient = useQueryClient()
@@ -356,7 +357,7 @@ function RevenueCatKeyForm(props: {
       if (!result.ok) return
       setApiKey('')
       const project = result.projects[0]
-      props.onConnected(
+      toast.success(
         project
           ? [
               `Connected ${project.name}.`,
@@ -367,7 +368,9 @@ function RevenueCatKeyForm(props: {
               .filter(Boolean)
               .join(' ')
           : 'Connected.',
+        { duration: 8000 },
       )
+      props.onConnected()
       await queryClient.invalidateQueries()
     },
   })
@@ -375,21 +378,22 @@ function RevenueCatKeyForm(props: {
 
   return (
     <form
+      className="space-y-2"
       onSubmit={(event) => {
         event.preventDefault()
         mutation.mutate()
       }}
     >
-      <p className="text-xs text-ink-soft">
+      <p className="text-xs text-muted-foreground">
         In RevenueCat, open the project for {props.app.name}, then Project settings, API keys.
         Create a secret API key, version 2, with read access to Charts &amp; metrics and to Project
         configuration, and paste it here. It is stored encrypted and never shown again.
       </p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <label htmlFor={inputId} className="sr-only">
+      <div className="flex flex-wrap gap-2">
+        <Label htmlFor={inputId} className="sr-only">
           RevenueCat secret key for {props.app.name}
-        </label>
-        <input
+        </Label>
+        <Input
           id={inputId}
           type="password"
           autoComplete="off"
@@ -398,21 +402,22 @@ function RevenueCatKeyForm(props: {
           placeholder="sk_…"
           value={apiKey}
           onChange={(event) => setApiKey(event.target.value)}
-          className="min-w-0 flex-1 field"
+          className="min-w-0 flex-1 basis-48"
         />
-        <Button type="submit" variant="primary" disabled={mutation.isPending}>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Connecting…' : props.replacing ? 'Replace key' : 'Connect'}
         </Button>
         {props.replacing && (
-          <Button disabled={mutation.isPending} onClick={props.onCancel}>
+          <Button variant="outline" disabled={mutation.isPending} onClick={props.onCancel}>
             Cancel
           </Button>
         )}
       </div>
-      <div role="status" className="mt-2 text-sm">
+      <p role="status" className="text-sm text-destructive empty:hidden">
         {mutation.isError && 'Could not reach the dashboard server. Try again.'}
         {result && !result.ok && result.message}
-      </div>
+      </p>
     </form>
   )
 }

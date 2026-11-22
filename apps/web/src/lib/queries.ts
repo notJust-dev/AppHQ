@@ -1,9 +1,9 @@
 import { queryOptions } from '@tanstack/react-query'
-import { getAppTimelineFn, getOverviewFn, listPostsFn } from '../fns/portfolio'
-import { getSyncStatusFn, listAccountsFn, listAppsFn } from '../fns/settings'
-import { listAssetsFn } from '../fns/assets'
-import { metaSetupFn } from '../fns/meta'
-import { tiktokSetupFn } from '../fns/tiktok'
+import { getAppTimelineFn, getOverviewFn, listPostsFn } from '@/fns/portfolio'
+import { getSyncStatusFn, listAccountsFn, listAppsFn } from '@/fns/settings'
+import { listAssetsFn } from '@/fns/assets'
+import { metaSetupFn } from '@/fns/meta'
+import { tiktokSetupFn } from '@/fns/tiktok'
 
 export const overviewQuery = (dates: { from: string; to: string }) =>
   queryOptions({

@@ -2,8 +2,11 @@ import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { z } from 'zod'
-import { Button } from '../../components/Button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import {
   AccountList,
   ConnectResult,
@@ -14,11 +17,11 @@ import {
   emptyFamily,
   useWatch,
   type ConnectedAccount,
-} from '../../components/accounts/shared'
-import { startMetaConnectFn } from '../../fns/meta'
-import { formatDay } from '../../lib/format'
-import { metaHealth } from '../../lib/meta'
-import { accountsQuery, metaSetupQuery, type MetaSetup } from '../../lib/queries'
+} from '@/components/accounts/shared'
+import { startMetaConnectFn } from '@/fns/meta'
+import { formatDay } from '@/lib/format'
+import { metaHealth } from '@/lib/meta'
+import { accountsQuery, metaSetupQuery, type MetaSetup } from '@/lib/queries'
 
 export const Route = createFileRoute('/_app/accounts/meta')({
   // Set by the Facebook sign-in when it sends the browser back here.
@@ -76,7 +79,7 @@ function MetaPage() {
         </p>
         <p>
           Valid OAuth Redirect URI, exactly as written:{' '}
-          <code className="break-all text-ink">{setup.redirectUri}</code>
+          <code className="break-all">{setup.redirectUri}</code>
         </p>
       </DeveloperSetup>
     </SourcePage>
@@ -97,41 +100,45 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
   return (
     <>
       {missing.length > 0 && (
-        <p className="mb-4 rounded-md bg-warn-soft px-4 py-3 text-[13px] text-warn [&_code]:font-mono [&_code]:text-xs">
-          <span className="font-medium">Missing permissions. </span>
-          The sign-in was not granted {missing.map((scope) => <code key={scope}>{scope} </code>)}
-          so some numbers cannot be read. Add them to the login configuration in the Meta app
-          (Facebook Login for Business, Configurations), then sign in again.
-        </p>
+        <Alert variant="warning" className="mb-4">
+          <AlertTriangle aria-hidden="true" />
+          <AlertTitle>Missing permissions</AlertTitle>
+          <AlertDescription className="[&_code]:font-mono [&_code]:text-xs">
+            The sign-in was not granted {missing.map((scope) => <code key={scope}>{scope} </code>)}
+            so some numbers cannot be read. Add them to the login configuration in the Meta app
+            (Facebook Login for Business, Configurations), then sign in again.
+          </AlertDescription>
+        </Alert>
       )}
 
       {renewBy && (
-        <p className={`mb-4 text-sm ${renewSoon ? 'font-medium' : 'text-ink-soft'}`}>
+        <p className={`mb-4 text-sm ${renewSoon ? 'font-medium' : 'text-muted-foreground'}`}>
           Meta lets the sign-in last about 60 days. Sign in again by {formatDay(renewBy.slice(0, 10))}{' '}
           so Instagram keeps syncing; Facebook Pages keep working either way.
         </p>
       )}
 
       {!props.setup.configured ? (
-        <p className="text-[13px]">
+        <p className="text-sm">
           Facebook and Instagram are not set up on the API yet. See &quot;Setting up the Meta
           app&quot; below, then reload this page.
         </p>
       ) : (
         <>
-          <p className="mb-4 text-sm text-ink-soft">
+          <p className="mb-4 text-sm text-muted-foreground">
             You sign in on Facebook and choose which Pages and Instagram accounts to share. Signing
             in again keeps the apps you linked them to.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={() => connect.mutate()} disabled={leaving}>
+            <Button onClick={() => connect.mutate()} disabled={leaving}>
+              {leaving && <Spinner />}
               {leaving
                 ? 'Opening Facebook…'
                 : props.accounts.length > 0
                   ? 'Sign in again'
                   : 'Connect Facebook and Instagram'}
             </Button>
-            <span role="status" className="text-sm">
+            <span role="status" className="text-sm text-destructive">
               {connect.isError && 'Could not reach the dashboard server. Try again.'}
               {connect.data && !connect.data.ok && connect.data.message}
             </span>

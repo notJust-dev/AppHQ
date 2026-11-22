@@ -1,7 +1,7 @@
-import { change, formatCompact, formatMoney, formatRatio, per, type Change } from '../lib/format'
-import type { Overview } from '../lib/queries'
+import { change, formatCompact, formatMoney, formatRatio, per, type Change } from '@/lib/format'
+import type { Overview } from '@/lib/queries'
 import { Delta } from './Delta'
-import { NoData } from './ui/NoData'
+import { NoData } from '@/components/NoData'
 
 type Totals = Overview['totals']
 type Reporting = Overview['reporting']
@@ -29,10 +29,9 @@ export function FunnelBand({
   const revenuePerDownload = reporting.revenue && reporting.downloads ? per(totals.revenue, totals.downloads) : null
 
   return (
-    <section
-      aria-label="Funnel totals"
-      className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface md:flex-row"
-    >
+    // Laid out by the room it has, not the window, since the sidebar takes part of the window.
+    <section aria-label="Funnel totals" className="@container">
+      <div className="flex flex-col overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 @2xl:flex-row">
       <Stage
         label="Social views"
         swatch="bg-views"
@@ -62,6 +61,7 @@ export function FunnelBand({
         change={previous ? change(totals.revenue, previous.revenue) : 'incomparable'}
         comparedWith={comparedWith}
       />
+      </div>
     </section>
   )
 }
@@ -79,18 +79,18 @@ function Stage(props: {
     <div className="relative flex-1 px-5 pt-5 pb-4">
       {/* The stage's colour along its top edge: which part of the funnel this is. */}
       <span className={`absolute inset-x-0 top-0 h-0.5 ${props.swatch}`} aria-hidden="true" />
-      <p className="flex items-center gap-2 text-[13px] font-medium text-ink-soft">
+      <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
         <span className={`size-2 rounded-full ${props.swatch}`} aria-hidden="true" />
         {props.label}
       </p>
       <p
         className={`figures mt-2 text-[32px] leading-none font-semibold tracking-tight ${
-          props.value === null ? 'text-ink-faint' : ''
+          props.value === null ? 'text-faint' : ''
         }`}
       >
         {props.value ?? <NoData />}
       </p>
-      <p className="mt-2 text-xs text-ink-soft">
+      <p className="mt-2 text-xs text-muted-foreground">
         {props.value === null ? (
           'No data in this range'
         ) : props.change === 'incomparable' ? (
@@ -109,9 +109,9 @@ function Stage(props: {
 
 function Seam({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex items-center gap-3 border-y border-line bg-paper/60 px-5 py-2.5 md:w-32 md:flex-col md:justify-center md:gap-1 md:border-x md:border-y-0 md:px-3 md:text-center">
+    <div className="flex items-center gap-3 border-y bg-muted/50 px-5 py-2.5 @2xl:w-28 @2xl:flex-col @2xl:justify-center @2xl:gap-1 @2xl:border-x @2xl:border-y-0 @2xl:px-3 @2xl:text-center">
       <span className="figures text-[15px] font-semibold">{value}</span>
-      <span className="text-[11px] leading-snug text-ink-soft">{label}</span>
+      <span className="text-[11px] leading-snug text-muted-foreground">{label}</span>
     </div>
   )
 }

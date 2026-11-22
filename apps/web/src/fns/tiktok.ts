@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
 import { TRPCClientError } from '@trpc/client'
 import { z } from 'zod'
-import { api } from '../server/api'
-import { beginOAuth, getOAuthSession, tiktokRedirectUri } from '../server/oauth'
+import { api } from '@/server/api'
+import { beginOAuth, getOAuthSession, tiktokRedirectUri } from '@/server/oauth'
 import { requireSession } from './auth'
 
 /** Whether the API has TikTok credentials, and the redirect URI to register with TikTok. */

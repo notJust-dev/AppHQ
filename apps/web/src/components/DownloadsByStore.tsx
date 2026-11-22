@@ -4,9 +4,9 @@ import { scaleBand } from '@tanstack/charts/scales/band'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
-import { formatCount, formatDay } from '../lib/format'
-import type { Timeline } from '../lib/queries'
-import { Panel } from './ui/Panel'
+import { formatCount, formatDay } from '@/lib/format'
+import type { Timeline } from '@/lib/queries'
+import { Panel } from '@/components/Panel'
 
 /** The stores, in stack order from the baseline up; the order also fixes their colours. */
 const STORES = [
@@ -64,7 +64,7 @@ export function DownloadsByStore({ timeline }: { timeline: Timeline }) {
             // more than a month of days the bars are too thin for it; the two greens, checked
             // against each other, still tell the stores apart.
             ...(tickDays.length > 0 && new Set(rows.map((row) => row.day)).size <= 31
-              ? { stroke: 'var(--color-surface)', strokeWidth: 1 }
+              ? { stroke: 'var(--card)', strokeWidth: 1 }
               : {}),
             radius: { end: 2 },
           }),

@@ -1,5 +1,9 @@
+import { FileKey } from 'lucide-react'
 import { useId, useState, type DragEvent, type ReactNode } from 'react'
-import { inputClass } from './shared'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 
 /** Key files are a few kilobytes; anything much larger is the wrong file. */
 const MAX_BYTES = 64 * 1024
@@ -24,6 +28,7 @@ export function KeyFileField(props: {
   describe?: (text: string) => ReactNode
 }) {
   const inputId = useId()
+  const textId = useId()
   const errorId = useId()
   const [fileName, setFileName] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
@@ -60,11 +65,15 @@ export function KeyFileField(props: {
 
   return (
     <div>
-      <span className="text-sm font-medium">{props.label}</span>
+      {pasting ? (
+        <Label htmlFor={textId}>{props.label}</Label>
+      ) : (
+        <span className="text-sm font-medium">{props.label}</span>
+      )}
       {pasting ? (
         <>
-          <textarea
-            aria-label={props.label}
+          <Textarea
+            id={textId}
             rows={5}
             autoComplete="off"
             spellCheck={false}
@@ -77,32 +86,29 @@ export function KeyFileField(props: {
               props.onChange(text, null)
             }}
             aria-describedby={problem ? errorId : undefined}
-            className={`${inputClass} text-xs`}
+            className="mt-2 font-mono text-xs md:text-xs"
           />
-          <button
-            type="button"
-            className="mt-2 cursor-pointer text-xs font-medium text-ink-soft underline underline-offset-4 hover:text-ink"
+          <QuietLink
             onClick={() => {
               setPasting(false)
               clear()
             }}
           >
             Choose the file instead
-          </button>
+          </QuietLink>
         </>
       ) : loaded && fileName ? (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md border border-line bg-surface px-4 py-3 text-sm">
-          <span className="min-w-0 break-all">
-            <span className="font-medium">{fileName}</span>
-            {props.describe && <span className="block text-xs text-ink-soft">{props.describe(props.value)}</span>}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border px-3 py-2.5">
+          <span className="flex min-w-0 items-center gap-3">
+            <FileKey className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 break-all">
+              <span className="font-medium">{fileName}</span>
+              {props.describe && <span className="block text-xs text-muted-foreground">{props.describe(props.value)}</span>}
+            </span>
           </span>
-          <button
-            type="button"
-            className="cursor-pointer text-xs font-medium text-ink-soft underline underline-offset-4 hover:text-ink"
-            onClick={clear}
-          >
+          <Button variant="ghost" size="sm" onClick={clear}>
             Remove
-          </button>
+          </Button>
         </div>
       ) : (
         <>
@@ -126,31 +132,40 @@ export function KeyFileField(props: {
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            className={`mt-2 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed px-4 py-6 text-center text-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-views ${
-              dragging ? 'border-ink bg-paper' : 'border-line bg-surface hover:border-ink-soft'
-            }`}
+            className={cn(
+              'mt-2 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-input px-4 py-6 text-center transition-colors hover:bg-muted/50 peer-focus-visible:border-ring peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50',
+              dragging && 'border-foreground bg-muted',
+            )}
           >
+            <FileKey className="mb-1 size-5 text-muted-foreground" aria-hidden="true" />
             <span className="font-medium">Drop {props.fileHint} here, or choose it</span>
-            <span className="text-xs text-ink-soft">It is read in your browser and sent with the form.</span>
+            <span className="text-xs text-muted-foreground">It is read in your browser and sent with the form.</span>
           </label>
-          <button
-            type="button"
-            className="mt-2 cursor-pointer text-xs font-medium text-ink-soft underline underline-offset-4 hover:text-ink"
+          <QuietLink
             onClick={() => {
               setPasting(true)
               setProblem(null)
             }}
           >
             Paste its contents instead
-          </button>
+          </QuietLink>
         </>
       )}
       {problem && (
-        <p id={errorId} role="alert" className="mt-2 text-sm font-medium">
+        <p id={errorId} role="alert" className="mt-2 text-sm text-destructive">
           {problem}
         </p>
       )}
     </div>
+  )
+}
+
+/** A small text button under the field, for switching how the key is given. */
+function QuietLink(props: { onClick: () => void; children: ReactNode }) {
+  return (
+    <Button variant="link" size="xs" className="mt-1 px-0 text-muted-foreground hover:text-foreground" onClick={props.onClick}>
+      {props.children}
+    </Button>
   )
 }
 

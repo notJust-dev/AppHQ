@@ -446,8 +446,8 @@ portfolio overview, range switching and sign-out work in a browser against Postg
 without a session gets no data; the dashboard builds with the `apps/api` folder absent.
 Differences from the list above:
 
-- shadcn/ui is not installed. The skeleton uses Tailwind tokens only; add components when
-  Phase 1 first needs one.
+- shadcn/ui was not installed at first; the skeleton used Tailwind tokens only. It arrived with
+  the shadcn/ui move in Phase 2 (2026-11-22).
 - `cli.ts` has `ping`, `sync`, `migrate` and `seed`. `snapshot` and `report` arrive with
   Phases 2 and 5.
 - The overview page (Phase 1 step 6) exists, with charts on the per-app page.
@@ -581,6 +581,24 @@ Status on 2026-11-22 (merged to `main` and deployed):
   adds about 42 kB gzipped to the app Overview's chunk only. The hand-built Timeline stays: its
   shared cursor across rows, post markers and completeness cut-off are specific to this product.
   New charts start with the library.
+- Sortable Portfolio table (2026-11-22): `@tanstack/react-table` 9.3.1, pinned, sorts the Apps
+  table by any column. Apps with no data for a column stay at the bottom whichever way it is
+  sorted, and a dash replaces a zero nobody reported.
+- shadcn/ui (2026-11-22): the interface moved to shadcn/ui components (Radix base, "nova" style),
+  copied into `apps/web/src/components/ui` and owned like any other code. The tokens took
+  shadcn's names (`background`, `card`, `muted-foreground`, `border`…) with this palette and both
+  themes, plus `faint`, `warning`, the stage colours and the store greens; a `dark:` variant
+  matches the theme picked in the sidebar or the system's. Replaced by shadcn/ui: the sidebar
+  (collapses to icons, remembered in a cookie the server reads; a sheet on phones), buttons,
+  inputs, selects, labels and fields, cards, tables, badges, alerts, breadcrumbs, the theme menu,
+  the remove-app confirmation (an alert dialog), and the one-line notices after an action (toasts).
+  Kept as they were: the Timeline, the funnel band, the TanStack chart and table logic. Changes
+  to shadcn's code: buttons are `type="button"` unless they say otherwise (so none submits a form
+  by accident), outline buttons sit on cards, selects open below their trigger, tables run edge
+  to edge in cards, warning tones on badges and alerts, and the toaster follows the dashboard's
+  theme instead of next-themes. The table lives in `table-primitives.tsx` behind `table.ts`,
+  because Velocity keeps deleted files and an older `ui/table.ts` would otherwise win over a new
+  `ui/table.tsx`.
 
 ### Phase 3 — Reviews inbox
 

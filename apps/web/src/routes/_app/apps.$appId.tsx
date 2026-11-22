@@ -1,8 +1,8 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet, createFileRoute, notFound } from '@tanstack/react-router'
-import { PageBody, PageHeader, TAB_CLASS } from '../../components/ui/PageHeader'
-import { appsQuery } from '../../lib/queries'
-import { rangeSearchSchema } from '../../lib/range'
+import { PageBody, PageHeader, TAB_CLASS } from '@/components/PageHeader'
+import { appsQuery } from '@/lib/queries'
+import { rangeSearchSchema } from '@/lib/range'
 
 /**
  * One app: its name and two tabs, Overview (`apps.$appId.index.tsx`, the numbers) and Settings
@@ -59,14 +59,16 @@ function AppLayout() {
 
 function AppNotFound() {
   return (
-    <div className="mx-auto max-w-md px-6 py-24">
-      <h1 className="text-xl font-semibold tracking-tight">There is no such app</h1>
-      <p className="mt-2 text-ink-soft">
-        It may have been removed, or the address may be mistyped.{' '}
-        <Link to="/apps" className="font-medium text-ink underline underline-offset-4">
-          Go to the apps
-        </Link>
-      </p>
-    </div>
+    <>
+      <PageHeader crumbs={[{ label: 'Apps', to: '/apps' }]} title="There is no such app" />
+      <PageBody>
+        <p className="text-muted-foreground">
+          It may have been removed, or the address may be mistyped.{' '}
+          <Link to="/apps" className="font-medium text-foreground underline underline-offset-4">
+            Go to the apps
+          </Link>
+        </p>
+      </PageBody>
+    </>
   )
 }

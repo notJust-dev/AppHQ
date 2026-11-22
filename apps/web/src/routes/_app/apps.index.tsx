@@ -1,21 +1,32 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useEffect, useId, useState } from 'react'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { Button, buttonClass } from '../../components/Button'
-import { Notice } from '../../components/ui/Notice'
-import { PageBody, PageHeader } from '../../components/ui/PageHeader'
-import { Panel } from '../../components/ui/Panel'
-import { TABLE, TD, TH, THEAD_ROW, TR } from '../../components/ui/table'
-import { useAssetActions, type AssetActions } from '../../components/useAssetActions'
+import { useId, useState } from 'react'
+import { NoData } from '@/components/NoData'
+import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Panel } from '@/components/Panel'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableRowHead,
+} from '@/components/ui/table'
+import { useAssetActions, type AssetActions } from '@/components/useAssetActions'
 import {
   ATTENTION,
   KIND_LABEL,
   PLATFORM_OF_KIND,
   PORTFOLIO_APP_ID,
   assetDetail,
-} from '../../lib/assets'
-import { appsQuery, assetsQuery, type AppSummary, type Asset } from '../../lib/queries'
+} from '@/lib/assets'
+import { appsQuery, assetsQuery, type AppSummary, type Asset } from '@/lib/queries'
 
 export const Route = createFileRoute('/_app/apps/')({
   loader: ({ context }) =>
@@ -34,17 +45,6 @@ function AppsPage() {
   const { data: apps } = useSuspenseQuery(appsQuery())
   const { data: assets } = useSuspenseQuery(assetsQuery())
   const actions = useAssetActions()
-  // Set by the app page after removing an app; history state, so a link cannot set it. Read
-  // after hydration (the server never sees history state), then cleared so a reload does not
-  // repeat it.
-  const removedState = useRouterState({ select: (state) => state.location.state.removedApp })
-  const navigate = useNavigate()
-  const [removedApp, setRemovedApp] = useState<string | null>(null)
-  useEffect(() => {
-    if (!removedState) return
-    setRemovedApp(removedState)
-    void navigate({ to: '/apps', replace: true, state: {} })
-  }, [removedState, navigate])
 
   const waiting = assets.filter((asset) => asset.appId === null && !asset.ignored)
   const ignored = assets.filter((asset) => asset.ignored)
@@ -58,32 +58,35 @@ function AppsPage() {
           <>
             An app gathers its iOS and Android apps, its RevenueCat project and the social accounts
             that promote it. Your{' '}
-            <Link to="/accounts" className="font-medium text-ink underline underline-offset-4">
+            <Link to="/accounts" className="font-medium text-foreground underline underline-offset-4">
               accounts
             </Link>{' '}
             find these; nothing becomes an app until you add it.
           </>
         }
         actions={
-          <Link to="/apps/new" className={buttonClass('primary')}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add app
-          </Link>
+          <Button asChild>
+            <Link to="/apps/new">
+              <Plus aria-hidden="true" />
+              Add app
+            </Link>
+          </Button>
         }
       />
       <PageBody>
-        {removedApp && !actions.notice && (
-          <Notice>Removed {removedApp}. What fed it waits below, to add again or ignore.</Notice>
-        )}
-        {actions.notice && <Notice ok={actions.notice.ok}>{actions.notice.message}</Notice>}
-
         {waiting.length > 0 && (
           <Panel
-            title="Needs a decision"
+            title={
+              <span className="flex items-center gap-2">
+                Needs a decision
+                <Badge variant="warning">{waiting.length}</Badge>
+              </span>
+            }
             description="Found by your accounts, not tracked yet. Add the ones you want as apps, link them to an app, or ignore them. A suggestion comes from a matching name; check it before linking."
             actions={
               waiting.length > 1 && (
                 <Button
+                  variant="outline"
                   size="sm"
                   disabled={actions.pending}
                   onClick={() => actions.ignore(waiting.map((asset) => asset.id), true)}
@@ -94,7 +97,7 @@ function AppsPage() {
             }
             bodyClassName=""
           >
-            <ul className="divide-y divide-line">
+            <ul className="divide-y">
               {waiting.map((asset) => (
                 <Decision key={asset.id} asset={asset} apps={ownApps} actions={actions} />
               ))}
@@ -112,11 +115,11 @@ function AppsPage() {
             description="Found by an account, but not tracked: old apps, test projects, personal accounts."
             bodyClassName=""
           >
-            <ul className="divide-y divide-line">
+            <ul className="divide-y">
               {ignored.map((asset) => (
                 <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3">
                   <AssetName asset={asset} />
-                  <Button size="sm" disabled={actions.pending} onClick={() => actions.ignore([asset.id], false)}>
+                  <Button variant="outline" size="sm" disabled={actions.pending} onClick={() => actions.ignore([asset.id], false)}>
                     Restore
                   </Button>
                 </li>
@@ -135,7 +138,7 @@ function AssetName({ asset }: { asset: Asset }) {
   return (
     <span className="min-w-0">
       <span className="block font-medium break-words">{asset.name}</span>
-      <span className="block text-xs text-ink-soft">
+      <span className="block text-xs text-muted-foreground">
         {KIND_LABEL[asset.kind] ?? asset.label}
         {detail && <> · {detail}</>}
         {asset.account && asset.account !== asset.name && <> · via {asset.account}</>}
@@ -160,42 +163,34 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
     <li className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_16rem_auto] sm:items-center">
       <div className="min-w-0">
         <AssetName asset={asset} />
-        {suggested && <span className="mt-1 block text-xs text-ink">Looks like {suggested.name}</span>}
+        {suggested && <span className="mt-1 block text-xs text-foreground">Looks like {suggested.name}</span>}
       </div>
-      <label htmlFor={selectId} className="sr-only">
+      <Label htmlFor={selectId} className="sr-only">
         App for {asset.name}
-      </label>
-      <select
-        id={selectId}
-        value={choice}
-        onChange={(event) => setChoice(event.target.value)}
-        className="w-full min-w-0 field"
-      >
-        <option value="" disabled>
-          Choose an app
-        </option>
-        {!asset.social && <option value="new">Add as a new app</option>}
-        {apps.map((app) => {
-          const current = holder(app)
-          return (
-            <option key={app.id} value={app.id}>
-              {app.name}
-              {current ? ` (replaces its ${label})` : ''}
-            </option>
-          )
-        })}
-        {asset.social && <option value={PORTFOLIO_APP_ID}>Shared accounts (promotes several apps)</option>}
-      </select>
+      </Label>
+      <Select value={choice} onValueChange={setChoice}>
+        <SelectTrigger id={selectId} className="w-full min-w-0">
+          <SelectValue placeholder="Choose an app" />
+        </SelectTrigger>
+        <SelectContent>
+          {!asset.social && <SelectItem value="new">Add as a new app</SelectItem>}
+          {apps.map((app) => {
+            const current = holder(app)
+            return (
+              <SelectItem key={app.id} value={app.id}>
+                {app.name}
+                {current ? ` (replaces its ${label})` : ''}
+              </SelectItem>
+            )
+          })}
+          {asset.social && <SelectItem value={PORTFOLIO_APP_ID}>Shared accounts (promotes several apps)</SelectItem>}
+        </SelectContent>
+      </Select>
       <div className="flex gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!choice || actions.pending}
-          onClick={() => actions.assign(asset.id, choice)}
-        >
+        <Button size="sm" disabled={!choice || actions.pending} onClick={() => actions.assign(asset.id, choice)}>
           {choice === 'new' ? 'Add app' : 'Link'}
         </Button>
-        <Button size="sm" disabled={actions.pending} onClick={() => actions.ignore([asset.id], true)}>
+        <Button variant="outline" size="sm" disabled={actions.pending} onClick={() => actions.ignore([asset.id], true)}>
           Ignore
         </Button>
       </div>
@@ -211,7 +206,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
 
   if (rows.length === 0) {
     return (
-      <p className="px-5 py-6 text-ink-soft">
+      <p className="px-5 py-6 text-muted-foreground">
         No apps yet. Connect a source on the Accounts page, then add the apps you want to track
         from what it finds, or add one by name with Add app.
       </p>
@@ -219,102 +214,91 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className={`${TABLE} min-w-[680px]`}>
-        <thead>
-          <tr className={THEAD_ROW}>
-            <th scope="col" className={TH}>
-              App
-            </th>
-            <th scope="col" className={TH}>
-              iOS
-            </th>
-            <th scope="col" className={TH}>
-              Android
-            </th>
-            <th scope="col" className={TH}>
-              Revenue
-            </th>
-            <th scope="col" className={TH}>
-              Social
-            </th>
-            <th scope="col" className={TH}>
-              <span className="sr-only">Settings</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((app) => {
-            const mine = of(app.id)
-            const one = (kind: string) => mine.find((asset) => asset.kind === kind)
-            const social = mine.filter((asset) => asset.social)
-            const portfolio = app.kind === 'portfolio'
-            return (
-              <tr key={app.id} className={TR}>
-                <th scope="row" className={`${TD} text-left font-medium`}>
-                  <Link
-                    to="/apps/$appId"
-                    params={{ appId: app.id }}
-                    search={{ range: '28d' }}
-                    className="hover:underline hover:underline-offset-4"
-                  >
-                    {app.name}
-                  </Link>
-                  {portfolio && (
-                    <span className="mt-1 block text-xs font-normal text-ink-soft">
-                      Accounts that promote several apps
-                    </span>
-                  )}
-                </th>
-                {portfolio ? (
-                  <td colSpan={3} className={`${TD} text-ink-soft`}>
-                    Social accounts only
-                  </td>
-                ) : (
-                  <>
-                    <SlotCell asset={one('ios_app')} detail={(asset) => asset.bundleId ?? asset.name} mono />
-                    <SlotCell asset={one('android_app')} detail={(asset) => asset.externalId} mono />
-                    <SlotCell asset={one('revenuecat_project')} detail={(asset) => asset.name} />
-                  </>
+    <Table className="min-w-[680px]">
+      <TableHeader>
+        <TableRow>
+          <TableHead scope="col">App</TableHead>
+          <TableHead scope="col">iOS</TableHead>
+          <TableHead scope="col">Android</TableHead>
+          <TableHead scope="col">Revenue</TableHead>
+          <TableHead scope="col">Social</TableHead>
+          <TableHead scope="col">
+            <span className="sr-only">Settings</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((app) => {
+          const mine = of(app.id)
+          const one = (kind: string) => mine.find((asset) => asset.kind === kind)
+          const social = mine.filter((asset) => asset.social)
+          const portfolio = app.kind === 'portfolio'
+          return (
+            <TableRow key={app.id} className="align-top">
+              <TableRowHead className="align-top">
+                <Link
+                  to="/apps/$appId"
+                  params={{ appId: app.id }}
+                  search={{ range: '28d' }}
+                  className="hover:underline hover:underline-offset-4"
+                >
+                  {app.name}
+                </Link>
+                {portfolio && (
+                  <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                    Accounts that promote several apps
+                  </span>
                 )}
-                <td className={TD}>
-                  {social.length === 0 ? (
-                    <None />
-                  ) : (
-                    <ul className="space-y-1">
-                      {social.map((asset) => (
-                        <li key={asset.id}>
-                          <span className="text-ink-soft">{PLATFORM_OF_KIND[asset.kind]}</span>{' '}
-                          <span className="whitespace-nowrap">{asset.name}</span>
-                          <Attention status={asset.status} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </td>
-                <td className={`${TD} text-right`}>
+              </TableRowHead>
+              {portfolio ? (
+                <TableCell colSpan={3} className="align-top text-muted-foreground">
+                  Social accounts only
+                </TableCell>
+              ) : (
+                <>
+                  <SlotCell asset={one('ios_app')} detail={(asset) => asset.bundleId ?? asset.name} mono />
+                  <SlotCell asset={one('android_app')} detail={(asset) => asset.externalId} mono />
+                  <SlotCell asset={one('revenuecat_project')} detail={(asset) => asset.name} />
+                </>
+              )}
+              <TableCell className="align-top">
+                {social.length === 0 ? (
+                  <None />
+                ) : (
+                  <ul className="space-y-1">
+                    {social.map((asset) => (
+                      <li key={asset.id}>
+                        <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span>{' '}
+                        <span className="whitespace-nowrap">{asset.name}</span>
+                        <Attention status={asset.status} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </TableCell>
+              <TableCell className="text-right align-top">
+                <Button asChild variant="ghost" size="sm" className="-my-1">
                   <Link
                     to="/apps/$appId/settings"
                     params={{ appId: app.id }}
                     search={{ range: '28d' }}
                     aria-label={`Settings for ${app.name}`}
-                    className="font-medium text-ink-soft underline decoration-line underline-offset-4 hover:text-ink"
                   >
                     Settings
                   </Link>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+                </Button>
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
   )
 }
 
 function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => string; mono?: boolean }) {
   return (
-    <td className={`${TD} break-words`}>
+    <TableCell className="align-top break-words">
       {props.asset ? (
         <>
           <span className={props.mono ? 'font-mono text-xs' : undefined}>{props.detail(props.asset)}</span>
@@ -323,15 +307,14 @@ function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => s
       ) : (
         <None />
       )}
-    </td>
+    </TableCell>
   )
 }
 
 function None() {
   return (
-    <span className="text-ink-soft">
-      <span aria-hidden="true">–</span>
-      <span className="sr-only">None</span>
+    <span className="text-faint">
+      <NoData label="None" />
     </span>
   )
 }
@@ -340,5 +323,5 @@ function None() {
 function Attention({ status }: { status: string }) {
   const note = ATTENTION[status]
   if (!note) return null
-  return <span className="block text-xs font-medium">Account {note}</span>
+  return <span className="block text-xs font-medium text-warning">Account {note}</span>
 }

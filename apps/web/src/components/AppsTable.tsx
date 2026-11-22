@@ -1,12 +1,12 @@
 import { Link } from '@tanstack/react-router'
 import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { useMemo, type ReactNode } from 'react'
-import { change, formatCount, formatMoney, formatRatio, per } from '../lib/format'
-import { reportingOf, type Overview } from '../lib/queries'
-import type { RangeKey } from '../lib/range'
+import { change, formatCount, formatMoney, formatRatio, per } from '@/lib/format'
+import { reportingOf, type Overview } from '@/lib/queries'
+import type { RangeKey } from '@/lib/range'
 import { Delta } from './Delta'
-import { DataTable, sortableFeatures, type SortableFeatures } from './ui/DataTable'
-import { NoData } from './ui/NoData'
+import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
+import { NoData } from '@/components/NoData'
 
 type AppRow = Overview['apps'][number]
 /** The funnel stages the overview totals: social views, downloads, revenue. */
@@ -86,7 +86,7 @@ function stageColumn(key: HeadlineKey, label: string, swatch: string, format: (v
             {comparable ? (
               <Delta change={change(totals[key], previous[key])} />
             ) : (
-              <span className="text-ink-soft">not enough history</span>
+              <span className="text-muted-foreground">not enough history</span>
             )}
           </span>
         </>
@@ -118,7 +118,7 @@ function AppName({ app, range }: { app: AppRow['app']; range: RangeKey }) {
   return (
     <span className="flex items-center gap-3">
       <span
-        className="grid size-7 shrink-0 place-items-center rounded-md border border-line bg-paper text-xs font-semibold"
+        className="grid size-7 shrink-0 place-items-center rounded-md border bg-muted text-xs font-semibold"
         aria-hidden="true"
       >
         {app.name.charAt(0)}
@@ -147,7 +147,7 @@ function StageLabel({ swatch, children }: { swatch: string; children: ReactNode 
 /** No source reported this: a dash, and no comparison to make. */
 function Missing() {
   return (
-    <span className="text-ink-faint">
+    <span className="text-faint">
       <NoData />
     </span>
   )

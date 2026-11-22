@@ -1,9 +1,9 @@
 import { useState, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react'
-import { formatCount, formatDay, formatTick, formatValue } from '../lib/format'
-import { liftSentence } from '../lib/lift'
-import type { Post, Timeline as TimelineData } from '../lib/queries'
-import { niceScale, tickIndexes } from '../lib/scale'
-import { sourceLabel } from '../lib/sources'
+import { formatCount, formatDay, formatTick, formatValue } from '@/lib/format'
+import { liftSentence } from '@/lib/lift'
+import type { Post, Timeline as TimelineData } from '@/lib/queries'
+import { niceScale, tickIndexes } from '@/lib/scale'
+import { sourceLabel } from '@/lib/sources'
 
 type Series = TimelineData['series'][number]
 type Values = Series['values']
@@ -47,9 +47,9 @@ function groupByDay(posts: Post[], days: string[]): PostDay[] {
  */
 
 const STAGE = {
-  views: { stroke: 'var(--color-views)', swatch: 'bg-views' },
-  downloads: { stroke: 'var(--color-downloads)', swatch: 'bg-downloads' },
-  revenue: { stroke: 'var(--color-revenue)', swatch: 'bg-revenue' },
+  views: { stroke: 'var(--views)', swatch: 'bg-views' },
+  downloads: { stroke: 'var(--downloads)', swatch: 'bg-downloads' },
+  revenue: { stroke: 'var(--revenue)', swatch: 'bg-revenue' },
 } as const
 
 /** Where each row's numbers come from, for a row whose sources have sent nothing at all. */
@@ -171,7 +171,7 @@ export function Timeline({
         onFocus={() => setActive((current) => current ?? count - 1)}
         onBlur={() => setActive(null)}
         onPointerLeave={() => setActive(null)}
-        className="overflow-hidden rounded-lg border border-line bg-surface outline-offset-4"
+        className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 outline-offset-4"
       >
         {postDays.length > 0 && (
           <PostsLane
@@ -208,7 +208,7 @@ export function Timeline({
 
       {selected && <PostDetail group={selected} onClose={() => setSelectedDay(null)} />}
 
-      <figcaption className="mt-3 flex flex-wrap items-baseline justify-between gap-3 text-sm text-ink-soft">
+      <figcaption className="mt-3 flex flex-wrap items-baseline justify-between gap-3 text-sm text-muted-foreground">
         <span>
           Each row has its own scale. Point at a day, or focus the chart and use the arrow keys,
           to read that day across every row.
@@ -218,7 +218,7 @@ export function Timeline({
           type="button"
           onClick={() => setShowTable((shown) => !shown)}
           aria-expanded={showTable}
-          className="cursor-pointer font-medium text-ink underline underline-offset-4"
+          className="cursor-pointer font-medium text-foreground underline underline-offset-4"
         >
           {showTable ? 'Hide the numbers' : 'Show the numbers as a table'}
         </button>
@@ -281,13 +281,13 @@ function PostsLane(props: {
   const tipAlign = tipLeft < 20 ? '' : tipLeft > 80 ? '-translate-x-full' : '-translate-x-1/2'
 
   return (
-    <div className="border-b border-line md:grid md:grid-cols-[13rem_1fr]">
+    <div className="border-b border-border md:grid md:grid-cols-[13rem_1fr]">
       <div className="px-6 pt-4 md:py-4">
         <p className="flex items-center gap-2 text-sm font-medium">
           <span className="size-2.5 rounded-full bg-views" aria-hidden="true" />
           Posts
         </p>
-        <p className="mt-1 text-xs text-ink-soft">
+        <p className="mt-1 text-xs text-muted-foreground">
           {props.total} in this range. Dot size shows views.
         </p>
       </div>
@@ -304,7 +304,7 @@ function PostsLane(props: {
         <BandShade band={props.band} percent={percent} />
         {props.active !== null && (
           <span
-            className="pointer-events-none absolute inset-y-0 w-px bg-ink/40"
+            className="pointer-events-none absolute inset-y-0 w-px bg-foreground/40"
             style={{ left: `${percent(props.active)}%` }}
             aria-hidden="true"
           />
@@ -345,7 +345,7 @@ function PostsLane(props: {
             >
               <span
                 className={`block rounded-full bg-views ring-2 transition-transform ${
-                  isSelected ? 'ring-ink' : 'ring-surface'
+                  isSelected ? 'ring-foreground' : 'ring-card'
                 } ${tip?.day === group.day ? 'scale-110' : ''}`}
                 style={{ width: size, height: size }}
                 aria-hidden="true"
@@ -356,21 +356,21 @@ function PostsLane(props: {
 
         {tip && (
           <span
-            className={`pointer-events-none absolute top-full z-20 mt-1 w-60 rounded-md border border-line bg-surface px-3 py-2 text-xs shadow-sm ${tipAlign}`}
+            className={`pointer-events-none absolute top-full z-20 mt-1 w-60 rounded-lg bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10 ${tipAlign}`}
             style={{ left: `${tipLeft}%` }}
             aria-hidden="true"
           >
-            <span className="figures block font-semibold text-ink">
+            <span className="figures block font-semibold text-foreground">
               {formatCount(tip.views)} views
             </span>
-            <span className="block text-ink-soft">
+            <span className="block text-muted-foreground">
               {formatDay(tip.day)}
               {tip.posts.length > 1
                 ? `, ${tip.posts.length} posts`
                 : `, ${sourceLabel(tip.posts[0]?.platform ?? '')}`}
             </span>
             {tip.posts[0]?.caption && (
-              <span className="mt-1 line-clamp-2 block text-ink">{tip.posts[0].caption}</span>
+              <span className="mt-1 line-clamp-2 block text-foreground">{tip.posts[0].caption}</span>
             )}
           </span>
         )}
@@ -399,17 +399,17 @@ function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void })
     <section
       id="post-detail"
       aria-label={`Posts on ${formatDay(group.day)}`}
-      className="mt-4 rounded-lg border border-line bg-surface px-6 py-5"
+      className="mt-4 rounded-xl bg-card ring-1 ring-foreground/10 px-6 py-5"
     >
       <div className="flex items-start justify-between gap-4">
-        <p className="text-sm text-ink-soft">
+        <p className="text-sm text-muted-foreground">
           Posted {formatDay(group.day)}
           {group.posts.length > 1 && `, ${group.posts.length} posts`}
         </p>
         <button
           type="button"
           onClick={onClose}
-          className="cursor-pointer text-sm font-medium text-ink underline underline-offset-4"
+          className="cursor-pointer text-sm font-medium text-foreground underline underline-offset-4"
         >
           Close
         </button>
@@ -423,7 +423,7 @@ function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void })
                   href={post.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                  className="underline decoration-border underline-offset-4 hover:decoration-foreground"
                 >
                   {post.caption || 'Untitled post'}
                 </a>
@@ -431,7 +431,7 @@ function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void })
                 post.caption || 'Untitled post'
               )}
             </p>
-            <p className="figures mt-1 text-sm text-ink-soft">
+            <p className="figures mt-1 text-sm text-muted-foreground">
               {sourceLabel(post.platform)} · {formatCount(post.views)} views ·{' '}
               {formatCount(post.likes)} likes · {formatCount(post.comments)} comments ·{' '}
               {formatCount(post.shares)} shares
@@ -440,10 +440,10 @@ function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void })
         ))}
       </ul>
       {lift && (
-        <p className="mt-4 border-t border-line pt-4 text-sm">
+        <p className="mt-4 border-t border-border pt-4 text-sm">
           <span className="font-medium">Download lift. </span>
           {liftSentence(lift, group.day)}{' '}
-          <span className="text-ink-soft">
+          <span className="text-muted-foreground">
             Lift is measured against a baseline; it does not prove the post caused it.
           </span>
         </p>
@@ -498,27 +498,27 @@ function Track(props: {
           : `Total over ${days.length} days`
 
   return (
-    <div className="border-b border-line md:grid md:grid-cols-[13rem_1fr]">
+    <div className="border-b border-border md:grid md:grid-cols-[13rem_1fr]">
       <div className="px-6 pt-4 md:py-4">
         <p className="flex items-center gap-2 text-sm font-medium">
           <span className={`size-2.5 rounded-[3px] ${stage.swatch}`} aria-hidden="true" />
           {series.label}
         </p>
         {empty ? (
-          <p className="mt-1 text-sm text-ink-soft">No data yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">No data yet</p>
         ) : (
           <>
             <p className="figures mt-1 text-2xl font-semibold tracking-tight">
               {headline === null ? '–' : formatValue(headline, series.unit)}
             </p>
-            <p className="text-xs text-ink-soft">{caption}</p>
+            <p className="text-xs text-muted-foreground">{caption}</p>
             {series.sources.length > 1 && (
               <dl className="mt-2 grid grid-cols-[auto_auto] justify-start gap-x-4 text-xs">
                 {series.sources.map((source) => {
                   const value = active === null ? source.summary : source.values[active]
                   return (
                     <div key={source.source} className="contents">
-                      <dt className="text-ink-soft">{sourceLabel(source.source)}</dt>
+                      <dt className="text-muted-foreground">{sourceLabel(source.source)}</dt>
                       <dd className="figures text-right">
                         {value === null || value === undefined ? '–' : formatValue(value, series.unit)}
                       </dd>
@@ -532,7 +532,7 @@ function Track(props: {
       </div>
 
       {empty ? (
-        <p className="px-6 pt-1 pb-4 text-sm text-ink-soft md:self-center md:py-4">
+        <p className="px-6 pt-1 pb-4 text-sm text-muted-foreground md:self-center md:py-4">
           {emptyReason(series, props.reporting, props.connected)}
         </p>
       ) : (
@@ -555,7 +555,7 @@ function Track(props: {
                 x2={VIEW_W}
                 y1={y(tick)}
                 y2={y(tick)}
-                stroke="var(--color-line)"
+                stroke="var(--border)"
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
@@ -575,7 +575,7 @@ function Track(props: {
           {scale.ticks.map((tick) => (
             <span
               key={tick}
-              className="figures pointer-events-none absolute right-full mr-2 -translate-y-1/2 text-[11px] leading-none whitespace-nowrap text-ink-soft"
+              className="figures pointer-events-none absolute right-full mr-2 -translate-y-1/2 text-[11px] leading-none whitespace-nowrap text-muted-foreground"
               style={{ top: `${yPercent(tick)}%` }}
             >
               {formatTick(tick, series.unit)}
@@ -584,7 +584,7 @@ function Track(props: {
 
           {active !== null && (
             <span
-              className="pointer-events-none absolute inset-y-0 w-px bg-ink/40"
+              className="pointer-events-none absolute inset-y-0 w-px bg-foreground/40"
               style={{ left: `${percent(active)}%` }}
               aria-hidden="true"
             />
@@ -592,7 +592,7 @@ function Track(props: {
 
           {shownIndex !== null && shownValue !== null && (
             <span
-              className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface"
+              className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card"
               style={{
                 left: `${percent(shownIndex)}%`,
                 top: `${yPercent(shownValue)}%`,
@@ -617,7 +617,7 @@ function DateAxis({ days, percent }: { days: string[]; percent: (index: number) 
         {indexes.map((index) => (
           <span
             key={index}
-            className={`figures absolute top-2.5 text-xs whitespace-nowrap text-ink-soft ${
+            className={`figures absolute top-2.5 text-xs whitespace-nowrap text-muted-foreground ${
               index === 0 ? '' : index === last ? '-translate-x-full' : '-translate-x-1/2'
             }`}
             style={{ left: `${percent(index)}%` }}
@@ -634,11 +634,11 @@ function TimelineTable({ days, series }: { days: string[]; series: Series[] }) {
   // Newest first: the recent days are the ones people look up.
   const order = days.map((_, index) => index).reverse()
   return (
-    <div className="mt-4 max-h-[28rem] overflow-auto rounded-lg border border-line bg-surface">
+    <div className="mt-4 max-h-[28rem] overflow-auto rounded-xl bg-card ring-1 ring-foreground/10">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <caption className="sr-only">Daily values for every funnel step</caption>
-        <thead className="sticky top-0 bg-surface">
-          <tr className="border-b border-line text-ink-soft">
+        <thead className="sticky top-0 bg-card">
+          <tr className="border-b border-border text-muted-foreground">
             <th scope="col" className="px-6 py-3 text-left font-medium">
               Day
             </th>
@@ -651,7 +651,7 @@ function TimelineTable({ days, series }: { days: string[]; series: Series[] }) {
         </thead>
         <tbody>
           {order.map((index) => (
-            <tr key={days[index]} className="border-b border-line last:border-b-0">
+            <tr key={days[index]} className="border-b border-border last:border-b-0">
               <th scope="row" className="px-6 py-2 text-left font-normal whitespace-nowrap">
                 {formatDay(days[index] ?? '')}
               </th>

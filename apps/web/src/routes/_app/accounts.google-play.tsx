@@ -1,9 +1,14 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { CircleCheck } from 'lucide-react'
 import { useState } from 'react'
-import { Button } from '../../components/Button'
-import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '../../components/accounts/KeyFileField'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/accounts/KeyFileField'
 import {
   AccountList,
   Found,
@@ -11,11 +16,10 @@ import {
   SourcePage,
   Steps,
   emptyFamily,
-  inputClass,
   useWatch,
-} from '../../components/accounts/shared'
-import { connectGooglePlayFn } from '../../fns/google-play'
-import { accountsQuery } from '../../lib/queries'
+} from '@/components/accounts/shared'
+import { connectGooglePlayFn } from '@/fns/google-play'
+import { accountsQuery } from '@/lib/queries'
 
 export const Route = createFileRoute('/_app/accounts/google-play')({
   loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
@@ -40,19 +44,23 @@ function GooglePlayPage() {
       <Section title="Account" flush>
         <AccountList accounts={family.accounts} detail={(entry) => entry.externalAccountId} />
         <Found family={family} />
-        {outcome && (
-          <p role="status" className="mt-4 rounded-lg border border-line bg-surface px-4 py-3 text-[13px]">
+      </Section>
+
+      {outcome && (
+        <Alert role="status">
+          <CircleCheck aria-hidden="true" />
+          <AlertDescription>
             Connected. {outcome.packages} {outcome.packages === 1 ? 'package' : 'packages'} found
             {outcome.matched > 0 && `, ${outcome.matched} linked to an app`}.
             {outcome.matched < outcome.packages &&
               " Link the rest on the Apps page; each one's year of installs is fetched once it has an app."}
-          </p>
-        )}
-      </Section>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {account && !replacing ? (
         <div>
-          <Button onClick={() => setReplacing(true)}>Use a different key</Button>
+          <Button variant="outline" onClick={() => setReplacing(true)}>Use a different key</Button>
         </div>
       ) : (
         <Section title={account ? 'Use a different key' : 'Connect'}>
@@ -85,7 +93,7 @@ function GooglePlayPage() {
           />
           {account && (
             <div className="mt-4">
-              <Button onClick={() => setReplacing(false)}>Keep the current key</Button>
+              <Button variant="outline" onClick={() => setReplacing(false)}>Keep the current key</Button>
             </div>
           )}
         </Section>
@@ -127,14 +135,13 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
         onChange={(text) => setFields((current) => ({ ...current, serviceAccountJson: text }))}
       />
       {email && (
-        <p className="mt-2 text-xs text-ink-soft">
-          Play Console must have invited <span className="break-all font-medium text-ink">{email}</span>.
+        <p className="mt-2 text-xs text-muted-foreground">
+          Play Console must have invited <span className="break-all font-medium text-foreground">{email}</span>.
         </p>
       )}
-      <label htmlFor="play-storage-uri" className="mt-4 block text-sm font-medium">
-        Cloud Storage URI
-      </label>
-      <input
+      <Field className="mt-4">
+        <FieldLabel htmlFor="play-storage-uri">Cloud Storage URI</FieldLabel>
+        <Input
         id="play-storage-uri"
         type="text"
         autoComplete="off"
@@ -143,18 +150,19 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
         placeholder="gs://pubsite_prod_rev_01234567890987654321/stats/installs/"
         value={fields.storageUri}
         onChange={(event) => setFields((current) => ({ ...current, storageUri: event.target.value }))}
-        className={inputClass}
-      />
-      <p className="mt-3 text-xs text-ink-soft">
+        />
+      </Field>
+      <p className="mt-3 text-xs text-muted-foreground">
         Stored encrypted on the API. The key is not shown again and never reaches the browser after
         this.
       </p>
       <div className="mt-4">
-        <Button type="submit" variant="primary" disabled={mutation.isPending || !keyReady}>
+        <Button type="submit" disabled={mutation.isPending || !keyReady}>
+          {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Checking the reports…' : 'Connect Google Play'}
         </Button>
       </div>
-      <div role="status" className="mt-3 text-sm">
+      <div role="status" className="mt-3 text-sm text-destructive empty:hidden">
         {mutation.isError && 'Could not reach the dashboard server. Try again.'}
         {result && !result.ok && result.message}
       </div>

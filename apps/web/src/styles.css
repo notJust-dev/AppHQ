@@ -1,125 +1,241 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 @import '@fontsource-variable/ibm-plex-sans';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
 
 /*
- * Design tokens. The chrome is neutral, in a light and a dark theme; colour is reserved for
- * the three funnel stages, so a coloured mark always means views, downloads or revenue. Each
- * theme has its own stage colours, validated for colour-vision deficiency against its panels.
- * Warning and danger only ever appear when something needs the person.
+ * The dark theme applies when the person picked it in the sidebar, or when the system is dark
+ * and they did not pick light. shadcn/ui components style it with `dark:`.
  */
-@theme {
-  --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-  /* The page behind the panels. */
-  --color-paper: #f5f6f8;
-  /* Panels, inputs, the page header. */
-  --color-surface: #ffffff;
-  /* Hover and selected rows, the active nav item. */
-  --color-raised: #eef0f3;
-  --color-line: #e3e6eb;
-  --color-line-strong: #cfd4dc;
-  --color-ink: #1a1d23;
-  --color-ink-soft: #5e6573;
-  --color-ink-faint: #8a909c;
-
-  --color-views: #2a78d6;
-  --color-downloads: #1baf7a;
-  --color-revenue: #eb6834;
-
-  /* Downloads split by store: two greens of the downloads stage, checked against each other. */
-  --color-store-ios: #1baf7a;
-  --color-store-android: #0d7a54;
-
-  --color-warn: #8a5300;
-  --color-warn-soft: #fdf3e1;
-  --color-danger: #b42318;
-  --color-danger-soft: #fdeeec;
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
 }
 
-/* The dark theme: the system's choice unless the person picked one in the sidebar. */
-@layer base {
-  :root[data-theme='dark'] {
-    --color-paper: #151618;
-    --color-surface: #1c1d20;
-    --color-raised: #26282c;
-    --color-line: #2b2d31;
-    --color-line-strong: #3a3d43;
-    --color-ink: #ecedef;
-    --color-ink-soft: #9aa0aa;
-    --color-ink-faint: #6c727c;
-    --color-views: #3d8ef0;
-    --color-downloads: #1a9f72;
-    --color-revenue: #e06a37;
-    --color-store-ios: #20ad7c;
-    --color-store-android: #0c7a55;
-    --color-warn: #f0b453;
-    --color-warn-soft: #2e2413;
-    --color-danger: #f28b82;
-    --color-danger-soft: #331d1b;
-    color-scheme: dark;
-  }
+/*
+ * Design tokens, named the way shadcn/ui names them so its components take them as they are.
+ * The chrome is neutral; colour is reserved for the three funnel stages, so a coloured mark
+ * always means views, downloads or revenue. Each theme has its own stage colours, validated for
+ * colour-vision deficiency against its panels. Warning and destructive only appear when
+ * something needs the person.
+ */
+:root {
+  /* The canvas behind the cards. */
+  --background: #f5f6f8;
+  --foreground: #1a1d23;
+  --card: #ffffff;
+  --card-foreground: #1a1d23;
+  --popover: #ffffff;
+  --popover-foreground: #1a1d23;
+  --primary: #1a1d23;
+  --primary-foreground: #ffffff;
+  /* Hover and selected rows, quiet buttons, the active tab. */
+  --secondary: #eef0f3;
+  --secondary-foreground: #1a1d23;
+  --muted: #eef0f3;
+  --muted-foreground: #5e6573;
+  --accent: #eef0f3;
+  --accent-foreground: #1a1d23;
+  --destructive: #b42318;
+  --destructive-soft: #fdeeec;
+  --warning: #8a5300;
+  --warning-soft: #fdf3e1;
+  /* Text that only labels, such as a sync time. */
+  --faint: #8a909c;
+  --border: #e3e6eb;
+  --input: #cfd4dc;
+  --ring: #2a78d6;
+
+  --views: #2a78d6;
+  --downloads: #1baf7a;
+  --revenue: #eb6834;
+  /* Downloads split by store: two greens of the downloads stage, checked against each other. */
+  --store-ios: #1baf7a;
+  --store-android: #0d7a54;
+
+  --radius: 0.5rem;
+
+  --sidebar: #f5f6f8;
+  --sidebar-foreground: #1a1d23;
+  --sidebar-primary: #1a1d23;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8ebef;
+  --sidebar-accent-foreground: #1a1d23;
+  --sidebar-border: #e3e6eb;
+  --sidebar-ring: #2a78d6;
+}
+
+/* The same dark values twice: once for a picked theme, once for the system's. */
+:root[data-theme='dark'] {
+  --background: #151618;
+  --foreground: #ecedef;
+  --card: #1c1d20;
+  --card-foreground: #ecedef;
+  --popover: #212226;
+  --popover-foreground: #ecedef;
+  --primary: #ecedef;
+  --primary-foreground: #151618;
+  --secondary: #26282c;
+  --secondary-foreground: #ecedef;
+  --muted: #26282c;
+  --muted-foreground: #9aa0aa;
+  --accent: #26282c;
+  --accent-foreground: #ecedef;
+  --destructive: #f28b82;
+  --destructive-soft: #331d1b;
+  --warning: #f0b453;
+  --warning-soft: #2e2413;
+  --faint: #6c727c;
+  --border: #2b2d31;
+  --input: #3a3d43;
+  --ring: #3d8ef0;
+  --views: #3d8ef0;
+  --downloads: #1a9f72;
+  --revenue: #e06a37;
+  --store-ios: #20ad7c;
+  --store-android: #0c7a55;
+  --sidebar: #151618;
+  --sidebar-foreground: #ecedef;
+  --sidebar-primary: #ecedef;
+  --sidebar-primary-foreground: #151618;
+  --sidebar-accent: #26282c;
+  --sidebar-accent-foreground: #ecedef;
+  --sidebar-border: #2b2d31;
+  --sidebar-ring: #3d8ef0;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-paper: #151618;
-    --color-surface: #1c1d20;
-    --color-raised: #26282c;
-    --color-line: #2b2d31;
-    --color-line-strong: #3a3d43;
-    --color-ink: #ecedef;
-    --color-ink-soft: #9aa0aa;
-    --color-ink-faint: #6c727c;
-    --color-views: #3d8ef0;
-    --color-downloads: #1a9f72;
-    --color-revenue: #e06a37;
-    --color-store-ios: #20ad7c;
-    --color-store-android: #0c7a55;
-    --color-warn: #f0b453;
-    --color-warn-soft: #2e2413;
-    --color-danger: #f28b82;
-    --color-danger-soft: #331d1b;
+    --background: #151618;
+    --foreground: #ecedef;
+    --card: #1c1d20;
+    --card-foreground: #ecedef;
+    --popover: #212226;
+    --popover-foreground: #ecedef;
+    --primary: #ecedef;
+    --primary-foreground: #151618;
+    --secondary: #26282c;
+    --secondary-foreground: #ecedef;
+    --muted: #26282c;
+    --muted-foreground: #9aa0aa;
+    --accent: #26282c;
+    --accent-foreground: #ecedef;
+    --destructive: #f28b82;
+    --destructive-soft: #331d1b;
+    --warning: #f0b453;
+    --warning-soft: #2e2413;
+    --faint: #6c727c;
+    --border: #2b2d31;
+    --input: #3a3d43;
+    --ring: #3d8ef0;
+    --views: #3d8ef0;
+    --downloads: #1a9f72;
+    --revenue: #e06a37;
+    --store-ios: #20ad7c;
+    --store-android: #0c7a55;
+    --sidebar: #151618;
+    --sidebar-foreground: #ecedef;
+    --sidebar-primary: #ecedef;
+    --sidebar-primary-foreground: #151618;
+    --sidebar-accent: #26282c;
+    --sidebar-accent-foreground: #ecedef;
+    --sidebar-border: #2b2d31;
+    --sidebar-ring: #3d8ef0;
     color-scheme: dark;
   }
 }
 
+@theme inline {
+  --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-views: var(--views);
+  --color-downloads: var(--downloads);
+  --color-revenue: var(--revenue);
+  --color-store-ios: var(--store-ios);
+  --color-store-android: var(--store-android);
+  --color-chart-1: var(--views);
+  --color-chart-2: var(--downloads);
+  --color-chart-3: var(--revenue);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
   html {
-    background: var(--color-paper);
-    color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    @apply bg-background;
   }
 
   body {
     font-size: 0.875rem;
     line-height: 1.5;
+    @apply bg-background text-foreground;
   }
 
+  /* Links and anything else without its own focus ring. shadcn/ui controls draw a ring instead. */
   :focus-visible {
-    outline: 2px solid var(--color-views);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--color-views) 25%, transparent);
-  }
-
-  input,
-  select,
-  textarea {
-    color: var(--color-ink);
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--color-ink-faint);
+    background: color-mix(in oklab, var(--views) 25%, transparent);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -136,49 +252,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Form controls share one look: a panel-coloured field with a quiet border. */
-@utility field {
-  border-radius: 0.375rem;
-  border: 1px solid var(--color-line-strong);
-  background: var(--color-surface);
-  padding: 0.4375rem 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  &:hover {
-    border-color: var(--color-ink-faint);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--color-views);
-    outline-offset: 0;
-    border-color: transparent;
-  }
-  &:disabled {
-    opacity: 0.6;
-  }
-}
-
 /*
  * TanStack Charts inherit the page: text and grid lines follow currentColor, the palette and the
  * tooltip follow --ts-chart-* variables. Mapping them to the tokens makes every chart follow the
  * themes without rebuilding it.
  */
 .ts-chart-host {
-  color: var(--color-ink-soft);
+  color: var(--muted-foreground);
   font-family: var(--font-sans);
   font-size: 12px;
-  --ts-chart-1: var(--color-views);
-  --ts-chart-2: var(--color-downloads);
-  --ts-chart-3: var(--color-revenue);
-  --ts-chart-tooltip-background: var(--color-surface);
-  --ts-chart-tooltip-color: var(--color-ink);
-  --ts-chart-tooltip-border: 1px solid var(--color-line-strong);
-  --ts-chart-tooltip-border-radius: 0.5rem;
+  --ts-chart-1: var(--views);
+  --ts-chart-2: var(--downloads);
+  --ts-chart-3: var(--revenue);
+  --ts-chart-tooltip-background: var(--popover);
+  --ts-chart-tooltip-color: var(--popover-foreground);
+  --ts-chart-tooltip-border: 1px solid var(--border);
+  --ts-chart-tooltip-border-radius: var(--radius);
   --ts-chart-tooltip-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
   --ts-chart-tooltip-font: 12px/1.45 var(--font-sans);
 }
 
 /* Downloads by store: the two store greens, in stack order. */
 .store-chart {
-  --ts-chart-1: var(--color-store-ios);
-  --ts-chart-2: var(--color-store-android);
+  --ts-chart-1: var(--store-ios);
+  --ts-chart-2: var(--store-android);
 }

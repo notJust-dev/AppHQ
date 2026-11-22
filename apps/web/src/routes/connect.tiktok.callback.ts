@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { api } from '../server/api'
-import { finishOAuth, tiktokRedirectUri } from '../server/oauth'
-import { getAppSession } from '../server/session'
-import { callbackError, providerErrorMessage, redirectTo } from '../server/oauth-callback'
+import { api } from '@/server/api'
+import { finishOAuth, tiktokRedirectUri } from '@/server/oauth'
+import { getAppSession } from '@/server/session'
+import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
 
 /**
  * Where TikTok sends the browser after sign-in. It checks the session and the state from the

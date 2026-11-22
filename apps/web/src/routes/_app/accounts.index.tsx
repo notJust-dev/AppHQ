@@ -1,26 +1,37 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useState } from 'react'
+import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Smartphone, ThumbsUp } from 'lucide-react'
+import { toast } from 'sonner'
 import { z } from 'zod'
-import { AppWindow, BadgeDollarSign, Play, RefreshCw, Smartphone, ThumbsUp } from 'lucide-react'
-import { Button, buttonClass } from '../../components/Button'
-import { PageBody, PageHeader } from '../../components/ui/PageHeader'
-import { Panel } from '../../components/ui/Panel'
-import { Status } from '../../components/ui/Status'
-import { TABLE, TD, TH, THEAD_ROW, TR } from '../../components/ui/table'
 import {
   CONNECTION_STATUS,
   SOURCES,
   Section,
   emptyFamily,
   useWatch,
-} from '../../components/accounts/shared'
-import { loadDemoDataFn, removeDemoDataFn, runSyncFn } from '../../fns/settings'
-import { formatCount, formatDay, formatMoment } from '../../lib/format'
-import { metaHealth } from '../../lib/meta'
-import { accountsQuery, syncStatusQuery, type AccountFamily, type SyncRun } from '../../lib/queries'
-import { sourceLabel } from '../../lib/sources'
+} from '@/components/accounts/shared'
+import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Panel } from '@/components/Panel'
+import { Status } from '@/components/Status'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableRowHead,
+} from '@/components/ui/table'
+import { loadDemoDataFn, removeDemoDataFn, runSyncFn } from '@/fns/settings'
+import { formatCount, formatDay, formatMoment } from '@/lib/format'
+import { metaHealth } from '@/lib/meta'
+import { accountsQuery, syncStatusQuery, type AccountFamily, type SyncRun } from '@/lib/queries'
+import { sourceLabel } from '@/lib/sources'
 
 export const Route = createFileRoute('/_app/accounts/')({
   // Older sign-ins came back here; their source's page now reads the outcome.
@@ -55,7 +66,7 @@ function AccountsPage() {
           <>
             Sign in to each source once. What an account finds, its apps, Pages and social
             accounts, is linked to your apps on the{' '}
-            <Link to="/apps" className="font-medium text-ink underline underline-offset-4">
+            <Link to="/apps" className="font-medium text-foreground underline underline-offset-4">
               Apps page
             </Link>
             .
@@ -63,45 +74,48 @@ function AccountsPage() {
         }
       />
       <PageBody narrow>
-      {waiting > 0 && (
-        <p className="rounded-lg bg-warn-soft px-4 py-3 text-[13px] text-warn">
-          <span className="font-medium">
-            {formatCount(waiting)} {waiting === 1 ? 'thing waits' : 'things wait'} for a decision.
-          </span>{' '}
-          <Link to="/apps" className="font-medium underline underline-offset-4">
-            {waiting === 1 ? 'Link it on the Apps page' : 'Link them on the Apps page'}
-          </Link>
-        </p>
-      )}
+        {waiting > 0 && (
+          <Alert variant="warning">
+            <AlertTriangle aria-hidden="true" />
+            <AlertTitle>
+              {formatCount(waiting)} {waiting === 1 ? 'thing waits' : 'things wait'} for a decision
+            </AlertTitle>
+            <AlertDescription>
+              <Link to="/apps">{waiting === 1 ? 'Link it on the Apps page' : 'Link them on the Apps page'}</Link>
+            </AlertDescription>
+          </Alert>
+        )}
 
-      <Panel title="Sources" bodyClassName="">
-        <ul className="divide-y divide-line">
-          {SOURCES.map((source) => (
-            <SourceRow key={source.family} source={source} family={family(source.family)} />
-          ))}
-        </ul>
-      </Panel>
+        <Panel title="Sources" bodyClassName="">
+          <ul className="divide-y">
+            {SOURCES.map((source) => (
+              <li key={source.family}>
+                <SourceRow source={source} family={family(source.family)} />
+              </li>
+            ))}
+          </ul>
+        </Panel>
 
-      <Section
-        title="Sync"
-        intro="Every connected source is fetched on a schedule. A sync re-reads the last seven days, so late corrections are picked up."
-        flush
-      >
-        <SyncStatus runs={runs} onStarted={watch.dataChanged} />
-      </Section>
+        <Section
+          title="Sync"
+          intro="Every connected source is fetched on a schedule. A sync re-reads the last seven days, so late corrections are picked up."
+          flush
+        >
+          <SyncStatus runs={runs} onStarted={watch.dataChanged} />
+        </Section>
 
-      <Section
-        title="Demo data"
-        intro="Four made-up apps with 200 days of numbers and posts, for trying the dashboard or recording it without real figures on screen. Removing them leaves your own apps untouched."
-      >
-        <DemoData onChanged={watch.dataChanged} />
-      </Section>
+        <Section
+          title="Demo data"
+          intro="Four made-up apps with 200 days of numbers and posts, for trying the dashboard or recording it without real figures on screen. Removing them leaves your own apps untouched."
+        >
+          <DemoData onChanged={watch.dataChanged} />
+        </Section>
       </PageBody>
     </>
   )
 }
 
-/** One source: a link to its page, with its state in a line. */
+/** One source: the whole row links to its page, with its state in a line. */
 function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFamily }) {
   const { source, family } = props
   const { accounts, assets } = family
@@ -125,30 +139,28 @@ function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFam
     : [source.brings]
 
   return (
-    <li className="relative flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 transition-colors first:rounded-t-lg last:rounded-b-lg has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-views hover:bg-raised/40">
-      <span
-        className="grid size-9 shrink-0 place-items-center rounded-md border border-line bg-paper text-ink-soft"
-        aria-hidden="true"
-      >
-        <SourceIcon family={source.family} />
-      </span>
-      <div className="min-w-0 flex-1 basis-56">
-        <h3 className="font-medium">
-          {/* The link covers the whole row, so the row is one big target. */}
-          <Link to={source.to} className="after:absolute after:inset-0 focus-visible:outline-none">
-            {source.title}
-          </Link>
-        </h3>
-        <p className="mt-0.5 text-[13px] break-words text-ink-soft">{parts.join(' · ')}</p>
-        {attention && <p className="mt-1.5 max-w-prose text-xs text-warn">{attention}</p>}
-      </div>
-      <Status tone={connected ? (attention ? 'warn' : 'ok') : 'off'}>
-        {connected ? (attention ? 'Needs attention' : 'Connected') : 'Not connected'}
-      </Status>
-      <span aria-hidden="true" className={buttonClass(connected ? 'secondary' : 'primary', 'sm')}>
-        {connected ? 'Configure' : 'Connect'}
-      </span>
-    </li>
+    <Item asChild className="rounded-none px-5 py-4 focus-visible:ring-inset">
+      <Link to={source.to}>
+        <ItemMedia className="size-9 rounded-lg border bg-muted text-muted-foreground" aria-hidden="true">
+          <SourceIcon family={source.family} />
+        </ItemMedia>
+        <ItemContent className="min-w-0 basis-56">
+          <ItemTitle>{source.title}</ItemTitle>
+          <ItemDescription className="break-words">{parts.join(' · ')}</ItemDescription>
+          {attention && <p className="max-w-prose text-xs text-warning">{attention}</p>}
+        </ItemContent>
+        <ItemActions>
+          <Status tone={connected ? (attention ? 'warn' : 'ok') : 'off'}>
+            {connected ? (attention ? 'Needs attention' : 'Connected') : 'Not connected'}
+          </Status>
+          {/* The row is the link; this only shows what it does. */}
+          <span aria-hidden="true" className={buttonVariants({ variant: connected ? 'outline' : 'default', size: 'sm' })}>
+            {connected ? 'Configure' : 'Connect'}
+            <ChevronRight />
+          </span>
+        </ItemActions>
+      </Link>
+    </Item>
   )
 }
 
@@ -194,58 +206,51 @@ const RUN_STATUS: Record<string, string> = { ok: 'Succeeded', error: 'Failed', r
 
 function SyncStatus({ runs, onStarted }: { runs: SyncRun[]; onStarted: () => void }) {
   const runSync = useServerFn(runSyncFn)
-  const mutation = useMutation({ mutationFn: () => runSync(), onSuccess: onStarted })
+  const mutation = useMutation({
+    mutationFn: () => runSync(),
+    onSuccess: () => {
+      toast.success('Sync started. The table updates as sources finish.')
+      onStarted()
+    },
+    onError: () => toast.error('Could not start the sync. Try again.'),
+  })
 
   return (
     <>
       {runs.length === 0 ? (
-        <p className="px-5 py-4 text-ink-soft">Nothing has synced yet.</p>
+        <p className="px-5 py-4 text-muted-foreground">Nothing has synced yet.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className={`${TABLE} min-w-[560px]`}>
-            <thead>
-              <tr className={THEAD_ROW}>
-                <th scope="col" className={TH}>
-                  Source
-                </th>
-                <th scope="col" className={TH}>
-                  Last run
-                </th>
-                <th scope="col" className={TH}>
-                  Result
-                </th>
-                <th scope="col" className={`${TH} text-right`}>
-                  Rows written
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((run) => (
-                <tr key={run.source} className={TR}>
-                  <th scope="row" className={`${TD} text-left font-medium`}>
-                    {sourceLabel(run.source)}
-                  </th>
-                  <td className={`${TD} figures`}>{formatMoment(run.startedAt)}</td>
-                  <td className={TD}>
-                    <Status tone={run.status === 'error' ? 'danger' : 'ok'}>{RUN_STATUS[run.status] ?? run.status}</Status>
-                    {run.error && <span className="mt-1 block text-xs text-ink-soft">{run.error}</span>}
-                  </td>
-                  <td className={`${TD} figures text-right`}>{formatCount(run.rowsWritten)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table className="min-w-[560px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Source</TableHead>
+              <TableHead scope="col">Last run</TableHead>
+              <TableHead scope="col">Result</TableHead>
+              <TableHead scope="col" className="text-right">
+                Rows written
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {runs.map((run) => (
+              <TableRow key={run.source}>
+                <TableRowHead>{sourceLabel(run.source)}</TableRowHead>
+                <TableCell className="figures">{formatMoment(run.startedAt)}</TableCell>
+                <TableCell>
+                  <Status tone={run.status === 'error' ? 'danger' : 'ok'}>{RUN_STATUS[run.status] ?? run.status}</Status>
+                  {run.error && <span className="mt-1 block text-xs text-muted-foreground">{run.error}</span>}
+                </TableCell>
+                <TableCell className="figures text-right">{formatCount(run.rowsWritten)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
-      <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3">
-        <Button size="sm" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          <RefreshCw className="size-3.5" aria-hidden="true" />
+      <div className="flex flex-wrap items-center gap-3 border-t bg-muted/50 px-5 py-3">
+        <Button variant="outline" size="sm" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          {mutation.isPending ? <Spinner /> : <RefreshCw aria-hidden="true" />}
           Sync now
         </Button>
-        <span role="status" className="text-[13px] text-ink-soft">
-          {mutation.isSuccess && 'Sync started. This table updates as sources finish.'}
-          {mutation.isError && 'Could not start the sync. Try again.'}
-        </span>
       </div>
     </>
   )
@@ -254,12 +259,11 @@ function SyncStatus({ runs, onStarted }: { runs: SyncRun[]; onStarted: () => voi
 function DemoData({ onChanged }: { onChanged: () => void }) {
   const loadDemo = useServerFn(loadDemoDataFn)
   const removeDemo = useServerFn(removeDemoDataFn)
-  const [message, setMessage] = useState('')
   const done = (text: string) => {
-    setMessage(text)
+    toast.success(text)
     onChanged()
   }
-  const failed = () => setMessage('That did not work. Try again.')
+  const failed = () => toast.error('That did not work. Try again.')
 
   const load = useMutation({
     mutationFn: () => loadDemo(),
@@ -275,16 +279,15 @@ function DemoData({ onChanged }: { onChanged: () => void }) {
   const busy = load.isPending || remove.isPending
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button onClick={() => load.mutate()} disabled={busy}>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" onClick={() => load.mutate()} disabled={busy}>
+        {load.isPending && <Spinner />}
         {load.isPending ? 'Loading…' : 'Load demo data'}
       </Button>
-      <Button onClick={() => remove.mutate()} disabled={busy}>
+      <Button variant="outline" onClick={() => remove.mutate()} disabled={busy}>
+        {remove.isPending && <Spinner />}
         {remove.isPending ? 'Removing…' : 'Remove demo data'}
       </Button>
-      <span role="status" className="text-sm text-ink-soft">
-        {!busy && message}
-      </span>
     </div>
   )
 }

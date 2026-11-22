@@ -1,5 +1,6 @@
 import { AlertTriangle, CircleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
 
 /**
  * A state in words. Fine states stay quiet; only a problem gets colour, with an icon so it does
@@ -9,23 +10,20 @@ export function Status({ tone, children }: { tone: 'ok' | 'off' | 'warn' | 'dang
   if (tone === 'warn' || tone === 'danger') {
     const Icon = tone === 'warn' ? AlertTriangle : CircleAlert
     return (
-      <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
-          tone === 'warn' ? 'bg-warn-soft text-warn' : 'bg-danger-soft text-danger'
-        }`}
-      >
-        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      <Badge variant={tone === 'warn' ? 'warning' : 'destructive'}>
+        <Icon aria-hidden="true" />
         {children}
-      </span>
+      </Badge>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+    <Badge variant="outline" className="text-muted-foreground">
       <span
-        className={`size-1.5 rounded-full ${tone === 'ok' ? 'bg-ink-soft' : 'border border-ink-faint'}`}
+        // Grey, not green: colour on this page always means a funnel stage.
+        className={`size-1.5 rounded-full ${tone === 'ok' ? 'bg-muted-foreground' : 'border border-faint'}`}
         aria-hidden="true"
       />
       {children}
-    </span>
+    </Badge>
   )
 }

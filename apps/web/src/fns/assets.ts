@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { TRPCClientError } from '@trpc/client'
 import { z } from 'zod'
-import { api } from '../server/api'
+import { api } from '@/server/api'
 import { requireSession } from './auth'
 
 /** The API's own message for a problem with what was chosen; a generic line otherwise. */

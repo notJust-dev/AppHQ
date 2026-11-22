@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { isServerConfigured } from '../server/env'
+import { isServerConfigured } from '@/server/env'
 
 /**
  * Public health check for uptime monitors and for verifying a deployment without signing in.

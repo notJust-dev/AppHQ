@@ -1,14 +1,16 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { AppsTable } from '../../components/AppsTable'
-import { buttonClass } from '../../components/Button'
-import { FunnelBand } from '../../components/FunnelBand'
-import { RangeSwitch } from '../../components/RangeSwitch'
-import { PageBody, PageHeader } from '../../components/ui/PageHeader'
-import { Panel } from '../../components/ui/Panel'
-import { formatDay } from '../../lib/format'
-import { overviewQuery, reportingOf } from '../../lib/queries'
-import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '../../lib/range'
+import { LayoutDashboard } from 'lucide-react'
+import { AppsTable } from '@/components/AppsTable'
+import { FunnelBand } from '@/components/FunnelBand'
+import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Panel } from '@/components/Panel'
+import { RangeSwitch } from '@/components/RangeSwitch'
+import { Button } from '@/components/ui/button'
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { formatDay } from '@/lib/format'
+import { overviewQuery, reportingOf } from '@/lib/queries'
+import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/')({
   validateSearch: rangeSearchSchema,
@@ -32,20 +34,26 @@ function PortfolioPage() {
       />
       <PageBody>
         {data.apps.length === 0 ? (
-          <Panel title="No apps yet">
-            <p className="max-w-prose text-ink-soft">
-              Connect App Store Connect, Google Play or your social accounts, then add the apps you
-              want to track.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link to="/accounts" className={buttonClass('primary')}>
-                Connect accounts
-              </Link>
-              <Link to="/apps/new" className={buttonClass('secondary')}>
-                Add app
-              </Link>
-            </div>
-          </Panel>
+          <Empty className="border border-dashed bg-card">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <LayoutDashboard />
+              </EmptyMedia>
+              <EmptyTitle>No apps yet</EmptyTitle>
+              <EmptyDescription>
+                Connect App Store Connect, Google Play or your social accounts, then add the apps you
+                want to track.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="flex-row justify-center">
+              <Button asChild>
+                <Link to="/accounts">Connect accounts</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/apps/new">Add app</Link>
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : (
           <>
             <FunnelBand

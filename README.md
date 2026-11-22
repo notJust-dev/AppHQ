@@ -12,6 +12,12 @@ on one page. The plan, decisions and current status are in [PLAN.md](PLAN.md).
 
 The two apps are independent npm packages. Each installs, builds and deploys on its own.
 
+The dashboard's interface is built from [shadcn/ui](https://ui.shadcn.com) components (Radix
+base, "nova" style) in `apps/web/src/components/ui`, themed by the tokens in
+`apps/web/src/styles.css`. Add one with `npx shadcn@latest add <name>` from `apps/web`. The
+dashboard's own pieces, such as the sidebar, cards and charts, sit one folder up in
+`src/components`.
+
 ## Run locally
 
 Needs Node 22.13 or newer and Docker.

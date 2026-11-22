@@ -2,13 +2,15 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { takeConnectResultFn } from '../../fns/tiktok'
-import { formatCount, formatMoment } from '../../lib/format'
-import type { AccountFamily } from '../../lib/queries'
-import { sourceLabel } from '../../lib/sources'
-import { PageBody, PageHeader } from '../ui/PageHeader'
-import { Panel } from '../ui/Panel'
-import { Status } from '../ui/Status'
+import { takeConnectResultFn } from '@/fns/tiktok'
+import { formatCount, formatMoment } from '@/lib/format'
+import type { AccountFamily } from '@/lib/queries'
+import { sourceLabel } from '@/lib/sources'
+import { CircleAlert, CircleCheck } from 'lucide-react'
+import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Panel } from '@/components/Panel'
+import { Status } from '@/components/Status'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export type ConnectedAccount = AccountFamily['accounts'][number]
 export type FamilyName = AccountFamily['family']
@@ -128,7 +130,7 @@ export function Section(props: { title: string; intro?: ReactNode; flush?: boole
 /** Numbered instructions for getting a key or setting up an app on the source's side. */
 export function Steps({ children }: { children: ReactNode }) {
   return (
-    <ol className="mb-6 list-decimal space-y-2 pl-5 text-[13px] marker:text-ink-faint">
+    <ol className="mb-6 list-decimal space-y-2 pl-5 marker:text-faint">
       {children}
     </ol>
   )
@@ -140,13 +142,13 @@ export function Found(props: { family: AccountFamily }) {
   if (props.family.accounts.length === 0) return null
   const [one, many] = sourceOf(props.family.family).noun
   return (
-    <p className="border-t border-line px-5 py-3 text-[13px] text-ink-soft">
+    <p className="border-t px-5 py-3 text-muted-foreground">
       Found {formatCount(total)} {total === 1 ? one : many}: {formatCount(linked)} linked to an app
       {ignored > 0 && `, ${formatCount(ignored)} ignored`}
       {waiting > 0 && (
         <>
           ,{' '}
-          <Link to="/apps" className="font-medium text-ink underline underline-offset-4">
+          <Link to="/apps" className="font-medium text-foreground underline underline-offset-4">
             {formatCount(waiting)} waiting for a decision
           </Link>
         </>
@@ -159,10 +161,10 @@ export function Found(props: { family: AccountFamily }) {
 /** The sign-ins or keys of a source, with their state. */
 export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (account: ConnectedAccount) => string | null }) {
   if (props.accounts.length === 0) {
-    return <p className="px-5 py-4 text-ink-soft">Not connected yet.</p>
+    return <p className="px-5 py-4 text-muted-foreground">Not connected yet.</p>
   }
   return (
-    <ul className="divide-y divide-line">
+    <ul className="divide-y">
       {props.accounts.map((account) => {
         const detail = props.detail?.(account)
         return (
@@ -170,17 +172,17 @@ export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (acc
             <span className="min-w-0 break-words">
               <span className="font-medium">{account.displayName ?? sourceLabel(account.provider)}</span>
               {(account.provider === 'facebook' || account.provider === 'instagram') && (
-                <span className="text-ink-soft"> · {sourceLabel(account.provider)}</span>
+                <span className="text-muted-foreground"> · {sourceLabel(account.provider)}</span>
               )}
-              {detail && <span className="block text-xs text-ink-soft">{detail}</span>}
-              {account.note && <span className="mt-1.5 block max-w-prose text-xs text-warn">{account.note}</span>}
+              {detail && <span className="block text-xs text-muted-foreground">{detail}</span>}
+              {account.note && <span className="mt-1.5 block max-w-prose text-xs text-warning">{account.note}</span>}
             </span>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <Status tone={account.status === 'ok' ? 'ok' : account.status === 'needs_reauth' ? 'danger' : 'warn'}>
                 {CONNECTION_STATUS[account.status] ?? account.status}
               </Status>
               {account.lastSyncedAt && (
-                <span className="text-xs text-ink-faint">Synced {formatMoment(account.lastSyncedAt)}</span>
+                <span className="text-xs text-faint">Synced {formatMoment(account.lastSyncedAt)}</span>
               )}
             </span>
           </li>
@@ -223,30 +225,24 @@ export function ConnectResult(props: {
   }, [connected, clear, onConnected, take])
 
   if (!result) return null
+  const provider = PROVIDER_NAMES[result.provider ?? connected ?? 'tiktok']
   return (
-    <p
-      role="status"
-      className={`rounded-lg border px-4 py-3 text-[13px] ${
-        result.ok ? 'border-line bg-surface' : 'border-transparent bg-danger-soft text-danger'
-      }`}
-    >
-      <span className="font-medium">
-        {PROVIDER_NAMES[result.provider ?? connected ?? 'tiktok']}
-        {result.ok ? ' connected. ' : ' not connected. '}
-      </span>
-      {result.message}
-    </p>
+    <Alert variant={result.ok ? 'default' : 'destructive'} role="status">
+      {result.ok ? <CircleCheck aria-hidden="true" /> : <CircleAlert aria-hidden="true" />}
+      <AlertTitle>{result.ok ? `${provider} connected` : `${provider} not connected`}</AlertTitle>
+      <AlertDescription>{result.message}</AlertDescription>
+    </Alert>
   )
 }
 
 /** Where to read about the developer-side setup, folded away from everyday use. */
 export function DeveloperSetup(props: { summary: string; children: ReactNode }) {
   return (
-    <details className="rounded-lg border border-line bg-surface px-5 py-3.5 text-[13px]">
-      <summary className="cursor-pointer font-medium">{props.summary}</summary>
-      <div className="mt-3 space-y-3 text-ink-soft [&_code]:font-mono [&_code]:text-xs [&_code]:text-ink">{props.children}</div>
+    <details className="group rounded-xl bg-card px-5 py-3.5 ring-1 ring-foreground/10">
+      <summary className="cursor-pointer font-medium marker:text-faint">{props.summary}</summary>
+      <div className="mt-3 space-y-3 text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:text-foreground">
+        {props.children}
+      </div>
     </details>
   )
 }
-
-export const inputClass = 'mt-2 block w-full field'

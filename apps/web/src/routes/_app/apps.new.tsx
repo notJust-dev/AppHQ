@@ -1,12 +1,17 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { Info } from 'lucide-react'
 import { useState } from 'react'
-import { Button } from '../../components/Button'
-import { PageBody, PageHeader } from '../../components/ui/PageHeader'
-import { Panel } from '../../components/ui/Panel'
-import { createAppFn } from '../../fns/assets'
-import { assetsQuery } from '../../lib/queries'
+import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Panel } from '@/components/Panel'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { createAppFn } from '@/fns/assets'
+import { assetsQuery } from '@/lib/queries'
 
 /** Adds an app by name; its Settings then pick what feeds it. */
 export const Route = createFileRoute('/_app/apps/new')({
@@ -30,6 +35,11 @@ function NewAppPage() {
     },
   })
   const result = mutation.data
+  const problem = mutation.isError
+    ? 'Could not reach the dashboard server. Try again.'
+    : result && !result.ok
+      ? result.message
+      : null
 
   return (
     <>
@@ -40,51 +50,52 @@ function NewAppPage() {
         description="Give it a name, then pick what feeds it in its Settings: its iOS and Android apps, its RevenueCat project and the social accounts that promote it."
       />
       <PageBody narrow>
-      {waiting.length > 0 && (
-        <p className="rounded-lg border border-line bg-surface px-4 py-3 text-[13px]">
-          Your accounts found {waiting.length} {waiting.length === 1 ? 'app or project' : 'apps and projects'} that
-          are not tracked yet. To track one of those, add it from{' '}
-          <Link to="/apps" className="font-medium underline underline-offset-4">
-            Needs a decision
-          </Link>{' '}
-          instead, so it keeps its name and history.
-        </p>
-      )}
+        {waiting.length > 0 && (
+          <Alert>
+            <Info aria-hidden="true" />
+            <AlertDescription>
+              <p>
+                Your accounts found {waiting.length} {waiting.length === 1 ? 'app or project' : 'apps and projects'}{' '}
+                that are not tracked yet. To track one of those, add it from{' '}
+                <Link to="/apps">Needs a decision</Link> instead, so it keeps its name and history.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
 
-      <Panel>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          mutation.mutate(name)
-        }}
-      >
-        <label htmlFor="new-app-name" className="text-[13px] font-medium">
-          App name
-        </label>
-        <div className="mt-2 flex flex-wrap gap-3">
-          <input
-            id="new-app-name"
-            name="new-app-name"
-            required
-            maxLength={80}
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="min-w-0 flex-1 field"
-          />
-          <Button type="submit" variant="primary" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Adding…' : 'Add app'}
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-ink-soft">
-          For example an app that is only on Android, or one whose store listing does not exist yet.
-        </p>
-        <div role="status" className="mt-3 text-[13px] text-danger empty:hidden">
-          {mutation.isError && 'Could not reach the dashboard server. Try again.'}
-          {result && !result.ok && result.message}
-        </div>
-      </form>
-      </Panel>
+        <Panel>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              mutation.mutate(name)
+            }}
+          >
+            <Field data-invalid={problem !== null}>
+              <FieldLabel htmlFor="new-app-name">App name</FieldLabel>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  id="new-app-name"
+                  name="new-app-name"
+                  required
+                  maxLength={80}
+                  autoFocus
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  aria-invalid={problem !== null}
+                  className="min-w-0 flex-1 basis-56"
+                />
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending && <Spinner />}
+                  {mutation.isPending ? 'Adding…' : 'Add app'}
+                </Button>
+              </div>
+              <FieldDescription>
+                For example an app that is only on Android, or one whose store listing does not exist yet.
+              </FieldDescription>
+              {problem && <FieldError>{problem}</FieldError>}
+            </Field>
+          </form>
+        </Panel>
       </PageBody>
     </>
   )

@@ -1,13 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { DownloadsByStore } from '../../components/DownloadsByStore'
-import { PostsTable } from '../../components/PostsTable'
-import { RangeSwitch } from '../../components/RangeSwitch'
-import { Timeline } from '../../components/Timeline'
-import { Panel } from '../../components/ui/Panel'
-import { formatDay } from '../../lib/format'
-import { appsQuery, postsQuery, timelineQuery } from '../../lib/queries'
-import { RANGE_DAYS, rangeToDates } from '../../lib/range'
+import { DownloadsByStore } from '@/components/DownloadsByStore'
+import { PostsTable } from '@/components/PostsTable'
+import { RangeSwitch } from '@/components/RangeSwitch'
+import { Timeline } from '@/components/Timeline'
+import { Panel } from '@/components/Panel'
+import { formatDay } from '@/lib/format'
+import { appsQuery, postsQuery, timelineQuery } from '@/lib/queries'
+import { RANGE_DAYS, rangeToDates } from '@/lib/range'
 
 const SOCIAL = new Set(['tiktok', 'instagram', 'facebook'])
 
@@ -43,7 +43,7 @@ function AppOverview() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-[13px] text-ink-soft">
+        <p className="text-sm text-muted-foreground">
           {formatDay(data.range.from)} to {formatDay(data.range.to)}, {RANGE_DAYS[range]} days
         </p>
         <RangeSwitch current={range} />

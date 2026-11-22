@@ -9,8 +9,10 @@ import {
   type ErrorComponentProps,
 } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { ErrorPage } from '../components/ErrorPage'
-import { THEME_SCRIPT } from '../lib/theme'
+import { ErrorPage } from '@/components/ErrorPage'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { THEME_SCRIPT } from '@/lib/theme'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -34,9 +36,9 @@ function NotFound() {
   return (
     <main className="mx-auto max-w-md px-6 py-24">
       <h1 className="text-xl font-semibold tracking-tight">This page does not exist</h1>
-      <p className="mt-2 text-ink-soft">
+      <p className="mt-2 text-muted-foreground">
         The address may be mistyped, or the page may have moved.{' '}
-        <Link to="/" className="font-medium text-ink underline underline-offset-4">
+        <Link to="/" className="font-medium text-foreground underline underline-offset-4">
           Go to the portfolio
         </Link>
       </p>
@@ -69,7 +71,9 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <HeadContent />
       </head>
       <body className="min-h-screen">
-        {children}
+        <TooltipProvider>{children}</TooltipProvider>
+        {/* How an action went, for actions whose result has no place of its own on the page. */}
+        <Toaster position="bottom-right" />
         <Scripts />
       </body>
     </html>

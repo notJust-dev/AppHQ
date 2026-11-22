@@ -1,9 +1,14 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { CircleCheck } from 'lucide-react'
 import { useState } from 'react'
-import { Button } from '../../components/Button'
-import { KeyFileField, checkP8, keyIdFromFileName } from '../../components/accounts/KeyFileField'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { KeyFileField, checkP8, keyIdFromFileName } from '@/components/accounts/KeyFileField'
 import {
   AccountList,
   Found,
@@ -11,11 +16,10 @@ import {
   SourcePage,
   Steps,
   emptyFamily,
-  inputClass,
   useWatch,
-} from '../../components/accounts/shared'
-import { connectAppStoreFn } from '../../fns/settings'
-import { accountsQuery } from '../../lib/queries'
+} from '@/components/accounts/shared'
+import { connectAppStoreFn } from '@/fns/settings'
+import { accountsQuery } from '@/lib/queries'
 
 export const Route = createFileRoute('/_app/accounts/app-store')({
   loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
@@ -38,16 +42,20 @@ function AppStorePage() {
       <Section title="Account" flush>
         <AccountList accounts={family.accounts} />
         <Found family={family} />
-        {outcome && (
-          <div role="status" className="mt-4 rounded-lg border border-line bg-surface px-4 py-3 text-[13px]">
-            <Connected result={outcome} />
-          </div>
-        )}
       </Section>
+
+      {outcome && (
+        <Alert role="status">
+          <CircleCheck aria-hidden="true" />
+          <AlertDescription>
+            <Connected result={outcome} />
+          </AlertDescription>
+        </Alert>
+      )}
 
       {account && !replacing ? (
         <div>
-          <Button onClick={() => setReplacing(true)}>Use a different key</Button>
+          <Button variant="outline" onClick={() => setReplacing(true)}>Use a different key</Button>
         </div>
       ) : (
         <Section title={account ? 'Use a different key' : 'Connect'}>
@@ -78,7 +86,7 @@ function AppStorePage() {
           />
           {account && (
             <div className="mt-4">
-              <Button onClick={() => setReplacing(false)}>Keep the current key</Button>
+              <Button variant="outline" onClick={() => setReplacing(false)}>Keep the current key</Button>
             </div>
           )}
         </Section>
@@ -134,11 +142,9 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
         }
       />
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <div>
-          <label htmlFor="app-store-keyId" className="text-sm font-medium">
-            Key ID
-          </label>
-          <input
+        <Field>
+          <FieldLabel htmlFor="app-store-keyId">Key ID</FieldLabel>
+          <Input
             id="app-store-keyId"
             type="text"
             autoComplete="off"
@@ -147,14 +153,11 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
             minLength={4}
             value={fields.keyId}
             onChange={set('keyId')}
-            className={inputClass}
           />
-        </div>
-        <div>
-          <label htmlFor="app-store-issuerId" className="text-sm font-medium">
-            Issuer ID
-          </label>
-          <input
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="app-store-issuerId">Issuer ID</FieldLabel>
+          <Input
             id="app-store-issuerId"
             type="text"
             autoComplete="off"
@@ -163,14 +166,11 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
             minLength={8}
             value={fields.issuerId}
             onChange={set('issuerId')}
-            className={inputClass}
           />
-        </div>
-        <div>
-          <label htmlFor="app-store-vendorNumber" className="text-sm font-medium">
-            Vendor number
-          </label>
-          <input
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="app-store-vendorNumber">Vendor number</FieldLabel>
+          <Input
             id="app-store-vendorNumber"
             type="text"
             inputMode="numeric"
@@ -180,20 +180,20 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
             title="Digits only. It is shown in Payments and Financial Reports."
             value={fields.vendorNumber}
             onChange={set('vendorNumber')}
-            className={inputClass}
           />
-        </div>
+        </Field>
       </div>
-      <p className="mt-3 text-xs text-ink-soft">
+      <p className="mt-3 text-xs text-muted-foreground">
         Stored encrypted on the API. The key is not shown again and never reaches the browser after
         this.
       </p>
       <div className="mt-4">
-        <Button type="submit" variant="primary" disabled={mutation.isPending || !keyReady}>
+        <Button type="submit" disabled={mutation.isPending || !keyReady}>
+          {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Connecting…' : 'Connect App Store Connect'}
         </Button>
       </div>
-      <div role="status" className="mt-3 text-sm">
+      <div role="status" className="mt-3 text-sm text-destructive empty:hidden">
         {mutation.isError && 'Could not reach the dashboard server. Try again.'}
         {result && !result.ok && result.message}
       </div>
