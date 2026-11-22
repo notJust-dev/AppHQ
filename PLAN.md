@@ -618,6 +618,28 @@ Status on 2026-11-22 (merged to `main` and deployed):
 
 Done when: you no longer need to open either console to know about new reviews.
 
+Status on 2026-11-22: built, not deployed. Reviews sync inside the store connectors, so they need
+no new key or schedule:
+
+- App Store: `customerReviews` per tracked app, newest first, back to the sync range's first day
+  (a year on connect), with the developer reply. A key without the Admin, App Manager or Customer
+  Support role gets a 403; that is recorded (`details.reviews.access`) and noted on the Accounts
+  page, and downloads keep syncing. Checked read-only against the real key: 9 reviews in the last
+  year across 4 of 10 apps, 2 with a reply.
+- Google Play: instead of the Developer API (last week only, and a different permission), the
+  monthly `reviews/reviews_<package>_<YYYYMM>.csv` files in the bucket the installs come from,
+  readable with the same service account and holding the full history. Checked read-only: 20 files
+  for 4 packages, 94 ratings of which 12 have text. Like the App Store API, only reviews with a
+  title or text are kept. A review id comes from the review link; without one, the package and
+  submit time.
+- `reviews` table (migration 0007). Reviews more than 14 days old when first imported arrive
+  read, so connecting does not fill the inbox with a year of history; an edited rating or text
+  makes a review unread again, a new reply does not.
+- `/reviews`: filters (app, store, rating, unread) in the address, pages of 30 with "Show older
+  reviews", mark one or all (matching the filters) read, a rating summary with the last 30 days
+  against the 30 before, and an unread count on the sidebar. Replying stays in the consoles; a
+  Play review links to it. Demo data includes reviews.
+
 ### Phase 4 — MCP server
 
 1. Register the query functions as MCP tools on `/mcp` (Streamable HTTP, bearer token).

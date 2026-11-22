@@ -9,6 +9,8 @@ import { mapLimit } from '../../lib/pool.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
 import type { AccountConnector } from '../types.js'
 import { readAnalyticsState, syncStoreAnalytics, type AnalyticsState } from './analytics.js'
+import { syncAppStoreReviews, type ReviewsState } from './reviews.js'
+import { saveReviews } from '../../reviews/save.js'
 import { AppStoreError, createAppStoreClient } from './client.js'
 import { saveAppStoreApps } from './link-apps.js'
 import { summarizeSalesReport } from './sales-report.js'
@@ -41,7 +43,7 @@ export const readAppStoreCredentials = (secrets: Secrets, encrypted: string): Ap
 /**
  * Downloads, re-downloads and updates per app and day, from Apple's daily Summary Sales Report
  * (one request per day covers every app in the account), then store page views and impressions
- * from each tracked app's analytics reports.
+ * from each tracked app's analytics reports, then its customer reviews.
  */
 export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}): AccountConnector {
   return {
@@ -64,6 +66,8 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
       const failures: string[] = []
       let keyRejected = false
       let analyticsState: AnalyticsState | undefined
+      let reviewsState: ReviewsState | undefined
+      let reviewsSaved = 0
 
       try {
         // Picks up apps published since the last run.
@@ -121,6 +125,11 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
           rows.push(...analytics.rows)
           failures.push(...analytics.failures)
           analyticsState = analytics.state
+
+          const fetched = await syncAppStoreReviews({ client, tracked, range })
+          reviewsSaved = await saveReviews(db, fetched.readings)
+          failures.push(...fetched.failures)
+          reviewsState = fetched.state
         }
       } catch (err) {
         if (err instanceof AppStoreError && err.isAuthProblem) keyRejected = true
@@ -133,8 +142,14 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
         .set({
           status: keyRejected ? 'needs_reauth' : failures.length > 0 ? 'error' : 'ok',
           lastSyncedAt: new Date(),
-          ...(analyticsState
-            ? { details: { ...((connection.details as Record<string, unknown> | null) ?? {}), analytics: analyticsState } }
+          ...(analyticsState || reviewsState
+            ? {
+                details: {
+                  ...((connection.details as Record<string, unknown> | null) ?? {}),
+                  ...(analyticsState ? { analytics: analyticsState } : {}),
+                  ...(reviewsState ? { reviews: reviewsState } : {}),
+                },
+              }
             : {}),
           updatedAt: new Date(),
         })
@@ -145,7 +160,7 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
         const more = failures.length > 3 ? ` (and ${failures.length - 3} more)` : ''
         throw new Error(`${failures.length} request(s) failed. ${shown}${more}`)
       }
-      return { rowsWritten }
+      return { rowsWritten: rowsWritten + reviewsSaved }
     },
   }
 }

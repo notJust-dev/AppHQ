@@ -22,6 +22,8 @@ import {
   type ReportFile,
 } from './reports.js'
 import { StorageError, createStorageClient } from './storage.js'
+import { REVIEWS_PREFIX, parseReviewsName, readPlayReviews, type ReviewsFile } from './reviews.js'
+import { saveReviews, type ReviewReading } from '../../reviews/save.js'
 
 export const GOOGLE_PLAY = 'google_play'
 
@@ -74,8 +76,15 @@ export function createPlayClient(credentials: PlayCredentials, options: PlayClie
       }
     },
 
-    async read(file: ReportFile): Promise<string> {
+    async read(file: ReportFile | ReviewsFile): Promise<string> {
       return decodeReport(await storage.download(bucket, file.name))
+    },
+
+    /** Every monthly reviews file in the bucket. */
+    async reviewFiles(): Promise<ReviewsFile[]> {
+      return (await storage.list(bucket, REVIEWS_PREFIX))
+        .map((item) => parseReviewsName(item.name))
+        .filter((file): file is ReviewsFile => file !== null)
     },
 
     /** App titles by package, or an empty map when the Reporting API is not enabled. */
@@ -123,7 +132,7 @@ export async function savePackages(db: Db, connectionId: string, packageNames: s
 
 /**
  * Daily downloads (new users), store listing visitors and acquisitions for every app with a
- * Play package, from the monthly report files. Google posts them 3 to 7 days late and keeps
+ * Play package, from the monthly report files, and its written reviews. Google posts them 3 to 7 days late and keeps
  * rewriting the current month, so each sync re-reads every month its range touches.
  */
 export function createGooglePlayConnector(options: PlayClientOptions = {}): AccountConnector {
@@ -186,6 +195,29 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
         })
 
         const written = await upsertMetrics(db, rows)
+
+        // Reviews live in the same bucket. A problem reading them is logged, so it never holds
+        // back the installs.
+        let reviewsSaved = 0
+        try {
+          const reviewFiles = await client.reviewFiles()
+          const readings: ReviewReading[] = []
+          const since = new Date(`${range.from}T00:00:00Z`)
+          await mapLimit(
+            tracked.flatMap((app) => [...months].map((month) => ({ app, month }))),
+            4,
+            async ({ app, month }) => {
+              const file = reviewFiles.find((entry) => entry.packageName === app.androidPackage && entry.month === month)
+              if (!file) return
+              for (const review of readPlayReviews(await client.read(file), app.id, app.androidPackage ?? '')) {
+                if (review.createdAt >= since || (review.editedAt && review.editedAt >= since)) readings.push(review)
+              }
+            },
+          )
+          reviewsSaved = await saveReviews(db, readings)
+        } catch (err) {
+          log.warn(`google_play: reviews not read: ${err instanceof Error ? err.message : String(err)}`)
+        }
         await db
           .update(connections)
           .set({ status: 'ok', lastSyncedAt: new Date(), updatedAt: new Date() })
@@ -193,7 +225,7 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
         if (tracked.length < packageNames.length) {
           log.info(`google_play: ${packageNames.length - tracked.length} packages have no app yet`)
         }
-        return { rowsWritten: written }
+        return { rowsWritten: written + reviewsSaved }
       } catch (err) {
         const lostAccess =
           (err instanceof GoogleAuthError && err.code === 'invalid_grant') ||

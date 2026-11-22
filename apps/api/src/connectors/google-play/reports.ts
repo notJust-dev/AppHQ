@@ -85,14 +85,14 @@ export function parseCsv(text: string): string[][] {
 }
 
 /** The rows as objects keyed by lower-cased header, for lookups that survive renamed columns. */
-function records(text: string): Record<string, string>[] {
+export function records(text: string): Record<string, string>[] {
   const [header, ...rows] = parseCsv(text)
   if (!header) return []
   const keys = header.map((name) => name.trim().toLowerCase())
   return rows.map((row) => Object.fromEntries(keys.map((key, index) => [key, row[index] ?? ''])))
 }
 
-const pick = (record: Record<string, string>, names: string[]): string | undefined => {
+export const pick = (record: Record<string, string>, names: string[]): string | undefined => {
   for (const name of names) {
     const value = record[name]
     if (value !== undefined && value.trim() !== '') return value

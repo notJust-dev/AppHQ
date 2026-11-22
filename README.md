@@ -72,6 +72,13 @@ as a funnel per store, and the share of page views that end in a download) and M
 (revenue, MRR, subscriptions and trials). Each compares with the period before. A rate such as
 revenue per download only counts the apps, and stores, that report both of its numbers.
 
+Reviews collects the written App Store and Google Play reviews of the apps you track, newest
+first, with any reply you gave. Filter by app, store, rating or unread, and mark reviews read as
+you deal with them; the sidebar counts the unread ones. Reviews come with the store accounts you
+already connected: App Store reviews need a key with the Admin, App Manager or Customer Support
+role, and Google Play's come from the same bucket as the installs. Reviews more than two weeks
+old when first imported arrive already read.
+
 For revenue, open an app's Settings and paste a RevenueCat v2 secret key from that app's project
 (a RevenueCat key belongs to one project, so it is connected per app, not on the Accounts page).
 The key needs read access to charts and metrics, and to project configuration. About a year of

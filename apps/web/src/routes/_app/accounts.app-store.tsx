@@ -37,7 +37,7 @@ function AppStorePage() {
   return (
     <SourcePage
       title="App Store Connect"
-      intro="Daily downloads from Apple's sales reports, and store page views and impressions from its analytics reports, for the iOS apps you track. Downloads go back a year, page views to January 2024."
+      intro="Daily downloads from Apple's sales reports, store page views and impressions from its analytics reports, and customer reviews, for the iOS apps you track. Downloads and reviews go back a year, page views to January 2024."
     >
       <Section title="Account" flush>
         <AccountList accounts={family.accounts} />
@@ -67,7 +67,8 @@ function AppStorePage() {
             <li>
               Generate a key with the Admin role. Downloads only need Sales and Reports, but store
               page views and impressions come from analytics reports, and only an Admin key may ask
-              Apple to start them. After that, a Sales and Reports key can read them.
+              Apple to start them. After that, a Sales and Reports key can read them. Reviews need
+              Admin, App Manager or Customer Support.
             </li>
             <li>Download the key file. Apple offers the download only once, so keep it safe.</li>
             <li>Copy the Issuer ID shown above the list of keys.</li>

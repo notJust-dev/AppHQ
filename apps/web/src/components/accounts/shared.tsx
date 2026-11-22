@@ -33,14 +33,14 @@ export const SOURCES: {
     family: 'app_store',
     title: 'App Store Connect',
     to: '/accounts/app-store',
-    brings: 'Downloads and store page views for your iOS apps.',
+    brings: 'Downloads, store page views and reviews for your iOS apps.',
     noun: ['iOS app', 'iOS apps'],
   },
   {
     family: 'google_play',
     title: 'Google Play',
     to: '/accounts/google-play',
-    brings: 'Installs and store listing visitors for your Android apps.',
+    brings: 'Installs, store listing visitors and reviews for your Android apps.',
     noun: ['Android app', 'Android apps'],
   },
   {

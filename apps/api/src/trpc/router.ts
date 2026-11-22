@@ -22,6 +22,10 @@ import { listApps } from '../queries/list-apps.js'
 import { listAssets } from '../queries/list-assets.js'
 import { listPosts } from '../queries/list-posts.js'
 import { getMonetisationPerformance, getSocialPerformance, getStorePerformance } from '../queries/performance.js'
+import { getReviewSummary, listReviews, reviewConditions, reviewFilters } from '../queries/reviews.js'
+import { markReviews } from '../reviews/save.js'
+import { count, isNull } from 'drizzle-orm'
+import { reviews as reviewsTable } from '../db/schema.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
@@ -381,6 +385,35 @@ export const appRouter = t.router({
     monetisation: t.procedure
       .input(getMonetisationPerformance.input)
       .query(({ ctx, input }) => getMonetisationPerformance.handler(ctx, input)),
+  }),
+  /** The reviews inbox: written App Store and Google Play reviews, read state kept here. */
+  reviews: t.router({
+    list: t.procedure.input(listReviews.input).query(({ ctx, input }) => listReviews.handler(ctx, input)),
+
+    summary: t.procedure.input(getReviewSummary.input).query(({ ctx, input }) => getReviewSummary.handler(ctx, input)),
+
+    /** How many reviews wait in the inbox, for the sidebar. */
+    unreadCount: t.procedure.query(async ({ ctx }) => {
+      const [row] = await ctx.db.select({ count: count() }).from(reviewsTable).where(isNull(reviewsTable.readAt))
+      return { count: row?.count ?? 0 }
+    }),
+
+    /** Marks the given reviews, or every review matching the filters, read or unread. */
+    mark: t.procedure
+      .input(
+        z.object({
+          ids: z.array(z.uuid()).min(1).max(500).optional(),
+          filters: z.object(reviewFilters).optional(),
+          read: z.boolean(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (!input.ids && !input.filters) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Say which reviews: ids or filters.' })
+        }
+        const changed = await markReviews(ctx.db, input.filters ? reviewConditions(input.filters) : undefined, input.read, input.ids)
+        return { changed }
+      }),
   }),
   sync: t.router({
     status: t.procedure.query(({ ctx }) => getSyncStatus.handler(ctx)),

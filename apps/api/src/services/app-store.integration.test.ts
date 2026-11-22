@@ -10,7 +10,7 @@ import {
 import { salesReport } from '../connectors/app-store/fixtures.js'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
-import { apps, assets, connections, metricDaily } from '../db/schema.js'
+import { apps, assets, connections, metricDaily, reviews } from '../db/schema.js'
 import { assignAsset } from '../assets/store.js'
 import { assetOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
@@ -70,6 +70,39 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       if (pathname.endsWith('/analyticsReportRequests')) {
         if (init?.method === 'POST') return options.admin === false ? refuse(403) : json({}, 201)
         return json({ data: [] })
+      }
+      if (pathname.endsWith('/customerReviews')) {
+        // Reading reviews needs the Admin, App Manager or Customer Support role.
+        if (options.admin === false) return refuse(403)
+        if (!pathname.includes(first.id)) return json({ data: [] })
+        return json({
+          data: [
+            {
+              id: `review-${run}`,
+              attributes: {
+                rating: 2,
+                title: 'Crashes on launch',
+                body: 'Since the update it closes right away.',
+                reviewerNickname: 'sam',
+                createdDate: '2026-11-17T09:30:00-08:00',
+                territory: 'USA',
+              },
+              relationships: { response: { data: { type: 'customerReviewResponses', id: `reply-${run}` } } },
+            },
+            // Before the range: not read.
+            {
+              id: `old-review-${run}`,
+              attributes: { rating: 5, title: 'Love it', body: 'Great', createdDate: '2026-10-01T10:00:00Z' },
+            },
+          ],
+          included: [
+            {
+              type: 'customerReviewResponses',
+              id: `reply-${run}`,
+              attributes: { responseBody: 'Fixed in 1.2, thanks.', lastModifiedDate: '2026-11-18T10:00:00Z' },
+            },
+          ],
+        })
       }
       return refuse(404)
     }) as typeof fetch
@@ -142,7 +175,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
     const connection = await findAppStoreConnection(db)
     expect(connection?.status).toBe('ok')
-    expect(connection?.details).toMatchObject({ analytics: { needsAdmin: true } })
+    expect(connection?.details).toMatchObject({ analytics: { needsAdmin: true }, reviews: { access: 'forbidden' } })
   })
 
   it('writes downloads per app and day, with zero for an app missing from a report', async () => {
@@ -171,6 +204,20 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       { date: '2026-11-18', value: 0 },
     ])
     expect((await findAppStoreConnection(db))?.status).toBe('ok')
+
+    // The review written in the range, with its reply; the older one is left out.
+    const saved = await db.select().from(reviews).where(eq(reviews.appId, one?.id ?? ''))
+    expect(saved).toMatchObject([
+      {
+        store: 'app_store',
+        externalId: `review-${run}`,
+        rating: 2,
+        author: 'sam',
+        territory: 'USA',
+        reply: 'Fixed in 1.2, thanks.',
+      },
+    ])
+    expect((await findAppStoreConnection(db))?.details).toMatchObject({ reviews: { access: 'ok' } })
   })
 
   it('leaves an app from outside the account alone', async () => {

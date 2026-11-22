@@ -52,6 +52,50 @@ const appsPage = z.object({
   links: z.object({ next: z.string().nullish() }).nullish(),
 })
 
+const reviewsPage = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      attributes: z.object({
+        rating: z.number().int(),
+        title: z.string().nullish(),
+        body: z.string().nullish(),
+        reviewerNickname: z.string().nullish(),
+        createdDate: z.string(),
+        territory: z.string().nullish(),
+      }),
+      relationships: z
+        .object({ response: z.object({ data: z.object({ id: z.string() }).nullish() }).nullish() })
+        .nullish(),
+    }),
+  ),
+  included: z
+    .array(
+      z.object({
+        type: z.string(),
+        id: z.string(),
+        attributes: z
+          .object({ responseBody: z.string().nullish(), lastModifiedDate: z.string().nullish() })
+          .nullish(),
+      }),
+    )
+    .nullish(),
+  links: z.object({ next: z.string().nullish() }).nullish(),
+})
+
+/** A customer review as the App Store Connect API gives it, with the developer's reply. */
+export interface AppStoreReview {
+  id: string
+  rating: number
+  title: string | null
+  body: string | null
+  author: string | null
+  territory: string | null
+  createdAt: Date
+  reply: string | null
+  repliedAt: Date | null
+}
+
 const reportRequestsPage = z.object({
   data: z.array(
     z.object({
@@ -254,6 +298,49 @@ export function createAppStoreClient(options: {
         next = parsed.links?.next
       }
       return instances
+    },
+
+    /**
+     * The app's customer reviews written since `since`, newest first, with the developer's
+     * reply. Reading them needs a key with the Admin, App Manager or Customer Support role.
+     */
+    async listReviews(appleId: string, since: Date): Promise<AppStoreReview[]> {
+      const found: AppStoreReview[] = []
+      let next: string | null | undefined =
+        `/v1/apps/${encodeURIComponent(appleId)}/customerReviews?sort=-createdDate&limit=200&include=response`
+      for (let page = 0; next && page < MAX_PAGES; page++) {
+        const parsed = reviewsPage.parse(await getJson(next))
+        const replies = new Map(
+          (parsed.included ?? [])
+            .filter((item) => item.type === 'customerReviewResponses')
+            .map((item) => [item.id, item.attributes]),
+        )
+        let older = false
+        for (const review of parsed.data) {
+          const createdAt = new Date(review.attributes.createdDate)
+          if (createdAt < since) {
+            older = true
+            continue
+          }
+          const replyId = review.relationships?.response?.data?.id
+          const reply = replyId ? replies.get(replyId) : undefined
+          found.push({
+            id: review.id,
+            rating: review.attributes.rating,
+            title: review.attributes.title ?? null,
+            body: review.attributes.body ?? null,
+            author: review.attributes.reviewerNickname ?? null,
+            territory: review.attributes.territory ?? null,
+            createdAt,
+            reply: reply?.responseBody ?? null,
+            repliedAt: reply?.lastModifiedDate ? new Date(reply.lastModifiedDate) : null,
+          })
+        }
+        // Newest first: once a page reaches past `since`, the rest are older still.
+        if (older) break
+        next = parsed.links?.next
+      }
+      return found
     },
 
     /** The files of one instance, unzipped: tab-separated text with a header row. */

@@ -1,10 +1,11 @@
-import { queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import { getAppTimelineFn, getOverviewFn, listPostsFn } from '@/fns/portfolio'
 import { getSyncStatusFn, listAccountsFn, listAppsFn } from '@/fns/settings'
 import { listAssetsFn } from '@/fns/assets'
 import { metaSetupFn } from '@/fns/meta'
 import { tiktokSetupFn } from '@/fns/tiktok'
 import { getMonetisationPerformanceFn, getSocialPerformanceFn, getStorePerformanceFn } from '@/fns/performance'
+import { listReviewsFn, reviewSummaryFn, unreadReviewsFn } from '@/fns/reviews'
 
 export const overviewQuery = (dates: { from: string; to: string }) =>
   queryOptions({
@@ -69,6 +70,35 @@ export type PerformanceSeries =
   | SocialPerformance['series'][number]
   | StorePerformance['series'][number]
   | MonetisationPerformance['series'][number]
+
+export interface ReviewFilters {
+  appId?: string
+  store?: 'app_store' | 'google_play'
+  rating?: number
+  unread?: boolean
+}
+
+/** The inbox, page by page, newest first. */
+export const reviewsQuery = (filters: ReviewFilters) =>
+  infiniteQueryOptions({
+    queryKey: ['reviews', 'list', filters],
+    queryFn: ({ pageParam }) => listReviewsFn({ data: { ...filters, before: pageParam ?? undefined } }),
+    initialPageParam: null as { createdAt: string; id: string } | null,
+    getNextPageParam: (page) => page.next,
+  })
+
+export const reviewSummaryQuery = (filters: Pick<ReviewFilters, 'appId' | 'store'>) =>
+  queryOptions({
+    queryKey: ['reviews', 'summary', filters],
+    queryFn: () => reviewSummaryFn({ data: filters }),
+  })
+
+/** How many reviews wait in the inbox, for the sidebar. */
+export const unreadReviewsQuery = () =>
+  queryOptions({ queryKey: ['reviews', 'unread'], queryFn: () => unreadReviewsFn(), staleTime: 60_000 })
+
+export type Review = Awaited<ReturnType<typeof listReviewsFn>>['reviews'][number]
+export type ReviewSummary = Awaited<ReturnType<typeof reviewSummaryFn>>
 
 export type Overview = Awaited<ReturnType<typeof getOverviewFn>>
 

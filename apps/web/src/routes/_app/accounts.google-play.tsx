@@ -39,7 +39,7 @@ function GooglePlayPage() {
   return (
     <SourcePage
       title="Google Play"
-      intro="Installs and store listing visitors for every Android app in your developer account, from the monthly reports Google Play keeps in a Cloud Storage bucket. Google posts the numbers 3 to 7 days late."
+      intro="Installs, store listing visitors and written reviews for every Android app in your developer account, from the monthly reports Google Play keeps in a Cloud Storage bucket. Google posts the numbers 3 to 7 days late."
     >
       <Section title="Account" flush>
         <AccountList accounts={family.accounts} detail={(entry) => entry.externalAccountId} />

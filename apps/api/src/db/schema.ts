@@ -172,6 +172,49 @@ export const postSnapshots = pgTable(
   (t) => [primaryKey({ columns: [t.postId, t.date] })],
 )
 
+/**
+ * Written store reviews: App Store customer reviews and Google Play reviews with text. A review
+ * belongs to the app its store listing feeds. `readAt` is the inbox's state: null is unread.
+ * Reviews already a fortnight old when first imported arrive read, so connecting a store does
+ * not bury the inbox under a year of history; an edited review becomes unread again.
+ */
+export const reviews = pgTable(
+  'reviews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    appId: text('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
+    /** 'app_store' | 'google_play' */
+    store: text('store').notNull(),
+    /** The store's review id; for a Play review without one, its package and submit time. */
+    externalId: text('external_id').notNull(),
+    rating: integer('rating').notNull(),
+    title: text('title'),
+    body: text('body'),
+    author: text('author'),
+    /** The App Store's territory (ISO 3166-1 alpha-3, e.g. USA). */
+    territory: text('territory'),
+    /** The language Google Play reports for the reviewer, e.g. en. */
+    language: text('language'),
+    appVersion: text('app_version'),
+    device: text('device'),
+    /** A link to the review in the store's console, when the store gives one. */
+    url: text('url'),
+    reply: text('reply'),
+    repliedAt: timestamp('replied_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('reviews_store_external_idx').on(t.store, t.externalId),
+    index('reviews_app_created_idx').on(t.appId, t.createdAt),
+    index('reviews_created_idx').on(t.createdAt),
+  ],
+)
+
 /** One row per connector run, so failures are visible in the dashboard and to the bot. */
 export const syncRuns = pgTable(
   'sync_runs',
@@ -199,3 +242,5 @@ export type Connection = typeof connections.$inferSelect
 export type Post = typeof posts.$inferSelect
 export type NewPost = typeof posts.$inferInsert
 export type Asset = typeof assets.$inferSelect
+export type Review = typeof reviews.$inferSelect
+export type NewReview = typeof reviews.$inferInsert

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AppWindow, LayoutDashboard, LogOut, Megaphone, Monitor, Moon, Plug, Plus, Store, Sun, Wallet } from 'lucide-react'
+import { AppWindow, LayoutDashboard, LogOut, Megaphone, MessageSquareText, Monitor, Moon, Plug, Plus, Store, Sun, Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { BrandMark } from '@/components/Brand'
 import {
@@ -21,13 +21,14 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { signOutFn } from '@/fns/auth'
-import { appsQuery } from '@/lib/queries'
+import { appsQuery, unreadReviewsQuery } from '@/lib/queries'
 import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
 
 /** TanStack marks the link to the current page with aria-current; that is the active item. */
@@ -50,6 +51,7 @@ const APPS_SHOWN = 12
  */
 export function AppSidebar() {
   const { data: apps = [] } = useQuery(appsQuery())
+  const { data: unread } = useQuery(unreadReviewsQuery())
   const own = apps.filter((app) => app.kind !== 'portfolio')
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
@@ -93,6 +95,17 @@ export function AppSidebar() {
                     <span>Apps</span>
                   </Link>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Reviews" className={ACTIVE}>
+                  <Link to="/reviews" activeOptions={{ includeSearch: false }}>
+                    <MessageSquareText />
+                    <span>Reviews</span>
+                  </Link>
+                </SidebarMenuButton>
+                {unread && unread.count > 0 && (
+                  <SidebarMenuBadge aria-label={`${unread.count} unread`}>{unread.count > 99 ? '99+' : unread.count}</SidebarMenuBadge>
+                )}
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Accounts" className={ACTIVE}>

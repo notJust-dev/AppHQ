@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppMonetisationRouteImport } from './routes/_app/monetisation'
+import { Route as AppReviewsRouteImport } from './routes/_app/reviews'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSocialRouteImport } from './routes/_app/social'
 import { Route as AppStoreRouteImport } from './routes/_app/store'
@@ -59,6 +60,11 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
 const AppMonetisationRoute = AppMonetisationRouteImport.update({
   id: '/monetisation',
   path: '/monetisation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReviewsRoute = AppReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRouteWithChildren
   '/monetisation': typeof AppMonetisationRoute
+  '/reviews': typeof AppReviewsRoute
   '/settings': typeof AppSettingsRoute
   '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/monetisation': typeof AppMonetisationRoute
+  '/reviews': typeof AppReviewsRoute
   '/settings': typeof AppSettingsRoute
   '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/accounts': typeof AppAccountsRouteWithChildren
   '/_app/monetisation': typeof AppMonetisationRoute
+  '/_app/reviews': typeof AppReviewsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/social': typeof AppSocialRoute
   '/_app/store': typeof AppStoreRoute
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/monetisation'
+    | '/reviews'
     | '/settings'
     | '/social'
     | '/store'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/monetisation'
+    | '/reviews'
     | '/settings'
     | '/social'
     | '/store'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/accounts'
     | '/_app/monetisation'
+    | '/_app/reviews'
     | '/_app/settings'
     | '/_app/social'
     | '/_app/store'
@@ -332,6 +344,13 @@ declare module '@tanstack/react-router' {
       path: '/monetisation'
       fullPath: '/monetisation'
       preLoaderRoute: typeof AppMonetisationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reviews': {
+      id: '/_app/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof AppReviewsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -488,6 +507,7 @@ const AppAppsAppIdRouteWithChildren = AppAppsAppIdRoute._addFileChildren(
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRouteWithChildren
   AppMonetisationRoute: typeof AppMonetisationRoute
+  AppReviewsRoute: typeof AppReviewsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSocialRoute: typeof AppSocialRoute
   AppStoreRoute: typeof AppStoreRoute
@@ -500,6 +520,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRouteWithChildren,
   AppMonetisationRoute: AppMonetisationRoute,
+  AppReviewsRoute: AppReviewsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSocialRoute: AppSocialRoute,
   AppStoreRoute: AppStoreRoute,

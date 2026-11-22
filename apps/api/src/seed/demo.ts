@@ -4,6 +4,7 @@ import { apps, assets, posts, type NewApp, type NewMetric, type NewPost } from '
 import { addDays, parseIsoDate, todayUtc, type IsoDate } from '../lib/dates.js'
 import type { Source } from '../metrics/catalog.js'
 import { upsertMetrics } from '../metrics/upsert.js'
+import { saveReviews, type ReviewReading } from '../reviews/save.js'
 
 /**
  * Generated demo data: a few fictional apps whose social views occasionally spike, with store
@@ -237,6 +238,72 @@ export function generateDemoData(options: DemoOptions): {
   }
 }
 
+/** Made-up review texts by star rating; each app's name is put in where it says APP. */
+const REVIEW_TEXTS: Record<number, { title: string; body: string }[]> = {
+  5: [
+    { title: 'Exactly what I needed', body: 'Simple, fast and it just works. APP is now on my home screen.' },
+    { title: 'Worth every penny', body: 'Tried a few others before this one. APP is the only one I kept.' },
+    { title: 'Love the new update', body: 'The latest version feels smoother and the widgets are great.' },
+    { title: 'Five stars', body: 'Clean design and no clutter. Recommended it to my friends.' },
+  ],
+  4: [
+    { title: 'Really good', body: 'Does almost everything I want. A dark mode schedule would make it perfect.' },
+    { title: 'Great, one wish', body: 'I use APP every day. Please add an export option.' },
+  ],
+  3: [{ title: 'Okay so far', body: 'It does the job, but the onboarding is long and the free tier is limited.' }],
+  2: [{ title: 'Too pricey', body: 'Nice idea, but the subscription is too much for what it does.' }],
+  1: [
+    { title: 'Crashes on launch', body: 'Since the last update APP closes right after opening. Please fix.' },
+    { title: 'Lost my data', body: 'Switched phones and everything was gone. No way to restore it.' },
+  ],
+}
+
+const REPLIES = [
+  'Thank you for the kind words! We are glad APP helps.',
+  'Sorry about that. A fix is in the next update; please write to us if it keeps happening.',
+  'Thanks for the idea. It is on our list for the coming months.',
+]
+
+/**
+ * A few dozen written reviews per demo app over the generated days, mostly good, some not,
+ * a third of them answered. The ones from the last fortnight start unread, as real ones do.
+ */
+export function generateDemoReviews(options: DemoOptions): ReviewReading[] {
+  const endDate = options.endDate ?? addDays(todayUtc(), -1)
+  const readings: ReviewReading[] = []
+  for (const profile of PROFILES) {
+    const rand = mulberry32(hash(`${profile.id}:reviews`))
+    const count = Math.round(options.days * 0.3 * Math.sqrt(profile.scale))
+    for (let i = 0; i < count; i++) {
+      const roll = rand()
+      const rating = roll < 0.55 ? 5 : roll < 0.75 ? 4 : roll < 0.83 ? 3 : roll < 0.89 ? 2 : 1
+      const texts = REVIEW_TEXTS[rating] ?? []
+      const text = texts[Math.floor(rand() * texts.length)] ?? { title: 'Review', body: 'Review' }
+      const day = addDays(endDate, -Math.floor(rand() * options.days))
+      const createdAt = new Date(`${day}T${String(8 + Math.floor(rand() * 12)).padStart(2, '0')}:00:00Z`)
+      const android = rand() < profile.androidShare
+      const answered = rand() < 0.33
+      const fill = (value: string) => value.replace('APP', profile.name)
+      readings.push({
+        appId: profile.id,
+        store: android ? 'google_play' : 'app_store',
+        externalId: `${profile.id}-review-${i}`,
+        rating,
+        title: fill(text.title),
+        body: fill(text.body),
+        author: android ? null : `user${Math.floor(rand() * 9000 + 1000)}`,
+        territory: android ? null : (['USA', 'GBR', 'DEU', 'CAN', 'AUS'][Math.floor(rand() * 5)] ?? 'USA'),
+        language: android ? (['en', 'de', 'es'][Math.floor(rand() * 3)] ?? 'en') : null,
+        appVersion: `2.${Math.floor(rand() * 4)}.${Math.floor(rand() * 10)}`,
+        createdAt,
+        reply: answered ? fill(REPLIES[rating >= 4 ? 0 : rating === 3 ? 2 : 1] ?? '') : null,
+        repliedAt: answered ? new Date(createdAt.getTime() + 86_400_000) : null,
+      })
+    }
+  }
+  return readings
+}
+
 /**
  * What each demo app is made of, so the Apps page shows full rows. No account stands behind
  * them, so no connector ever reads them.
@@ -290,7 +357,7 @@ export async function clearDemo(db: Db) {
 }
 
 /**
- * Replaces the demo apps with their assets, metrics and posts. Real apps (ids without the
+ * Replaces the demo apps with their assets, metrics, posts and reviews. Real apps (ids without the
  * prefix) are untouched.
  */
 export async function seedDemo(db: Db, options: DemoOptions) {
@@ -306,6 +373,7 @@ export async function seedDemo(db: Db, options: DemoOptions) {
     for (let i = 0; i < data.posts.length; i += 500) {
       await tx.insert(posts).values(data.posts.slice(i, i + 500))
     }
+    await saveReviews(tx as unknown as Db, generateDemoReviews(options))
   })
   return { apps: data.apps.length, metrics: data.metrics.length, posts: data.posts.length }
 }

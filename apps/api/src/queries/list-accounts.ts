@@ -1,6 +1,7 @@
 import { asc } from 'drizzle-orm'
 import { z } from 'zod'
 import { readAnalyticsState } from '../connectors/app-store/analytics.js'
+import { readReviewsState } from '../connectors/app-store/reviews.js'
 import { assets, connections } from '../db/schema.js'
 import { defineQuery } from './define.js'
 
@@ -70,11 +71,16 @@ export const listAccounts = defineQuery({
 })
 
 function noteFor(provider: string, details: unknown): string | null {
-  if (provider === 'app_store' && readAnalyticsState(details).needsAdmin) {
-    return (
+  if (provider !== 'app_store') return null
+  const notes: string[] = []
+  if (readAnalyticsState(details).needsAdmin) {
+    notes.push(
       'This key may not ask Apple for analytics reports, so store page views and impressions ' +
-      'cannot start. Connect once with an Admin key; a Sales and Reports key can read them after that.'
+        'cannot start. Connect once with an Admin key; a Sales and Reports key can read them after that.',
     )
   }
-  return null
+  if (readReviewsState(details)?.access === 'forbidden') {
+    notes.push('This key may not read customer reviews; that needs the Admin, App Manager or Customer Support role.')
+  }
+  return notes.length > 0 ? notes.join(' ') : null
 }
