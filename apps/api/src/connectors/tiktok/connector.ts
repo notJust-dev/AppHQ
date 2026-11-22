@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm'
+import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
 import { connections, postSnapshots, posts, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
@@ -13,11 +14,11 @@ import { dailyViews, type PostHistory } from './daily-views.js'
 /** Refresh a little early, so a token never expires halfway through a sync. */
 const REFRESH_MARGIN_MS = 5 * 60_000
 
+/** The TikTok accounts linked to an app, as their connection rows (tokens and state). */
 const tiktokConnections = (db: Db, appId: string) =>
-  db
-    .select()
-    .from(connections)
-    .where(and(eq(connections.provider, TIKTOK), eq(connections.appId, appId)))
+  linkedAssets(db, 'tiktok_account', appId).then((rows) =>
+    rows.flatMap((row) => (row.connection ? [row.connection] : [])),
+  )
 
 /**
  * Keeps one account's access token usable. TikTok's access tokens last two hours and every

@@ -1,45 +1,43 @@
 import { eq } from 'drizzle-orm'
+import { autoLink, createApp, upsertAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
-import { apps } from '../../db/schema.js'
-import { uniqueSlug } from '../../lib/slug.js'
+import { assets } from '../../db/schema.js'
 import type { AppStoreApp } from './client.js'
 
 /**
- * Brings the `apps` table in step with the App Store account: an app already known by its Apple
- * ID or bundle id gets both recorded, and an app seen for the first time is added. Apps are
- * matched by bundle id so that an app connected through RevenueCat first is not duplicated.
+ * Saves the account's iOS apps as assets. One seen for the first time goes to the app exact
+ * evidence points at (a RevenueCat project or Android package with the same bundle id) or,
+ * failing that, gets an app of its own: most apps start on iOS. One the user has unlinked or
+ * ignored stays that way.
  */
-export async function linkAppStoreApps(db: Db, storeApps: AppStoreApp[]) {
-  return db.transaction(async (tx) => {
-    const known = await tx.select().from(apps)
-    const taken = new Set(known.map((app) => app.id))
-    let created = 0
-    let linked = 0
+export async function saveAppStoreApps(db: Db, connectionId: string, storeApps: AppStoreApp[]) {
+  const known = new Set(
+    (await db.select({ externalId: assets.externalId }).from(assets).where(eq(assets.kind, 'ios_app'))).map(
+      (row) => row.externalId,
+    ),
+  )
+  const saved = await upsertAssets(
+    db,
+    storeApps.map((app) => ({
+      kind: 'ios_app' as const,
+      externalId: app.appleId,
+      name: app.name,
+      connectionId,
+      details: { bundleId: app.bundleId },
+    })),
+  )
+  await autoLink(db)
 
-    for (const storeApp of storeApps) {
-      const existing = known.find(
-        (app) => app.iosAppId === storeApp.appleId || app.iosBundleId === storeApp.bundleId,
-      )
-      if (existing) {
-        if (existing.iosAppId !== storeApp.appleId || existing.iosBundleId !== storeApp.bundleId) {
-          await tx
-            .update(apps)
-            .set({ iosAppId: storeApp.appleId, iosBundleId: storeApp.bundleId })
-            .where(eq(apps.id, existing.id))
-          linked++
-        }
-        continue
-      }
-      const id = uniqueSlug(storeApp.name, taken)
-      taken.add(id)
-      await tx.insert(apps).values({
-        id,
-        name: storeApp.name,
-        iosAppId: storeApp.appleId,
-        iosBundleId: storeApp.bundleId,
-      })
-      created++
-    }
-    return { created, linked }
-  })
+  let created = 0
+  for (const asset of saved) {
+    if (known.has(asset.externalId)) continue
+    const [fresh] = await db.select().from(assets).where(eq(assets.id, asset.id)).limit(1)
+    if (!fresh || fresh.appId !== null || fresh.ignored) continue
+    const appId = await createApp(db, asset.name)
+    await db.update(assets).set({ appId, updatedAt: new Date() }).where(eq(assets.id, asset.id))
+    created++
+  }
+  // A new app can make other links obvious, e.g. an Android package equal to its bundle id.
+  if (created > 0) await autoLink(db)
+  return { created }
 }

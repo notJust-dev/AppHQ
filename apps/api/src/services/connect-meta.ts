@@ -1,14 +1,8 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { autoLink, upsertAssets, type AssetInput } from '../assets/store.js'
 import { MetaError, createMetaClient, type MetaPage } from '../connectors/meta/client.js'
-import {
-  ESSENTIAL_PERMISSIONS,
-  FACEBOOK,
-  INSTAGRAM,
-  META_PROVIDERS,
-  requireMetaConfig,
-} from '../connectors/meta/config.js'
+import { ESSENTIAL_PERMISSIONS, FACEBOOK, INSTAGRAM, requireMetaConfig } from '../connectors/meta/config.js'
 import type { Db } from '../db/client.js'
-import { apps, connections } from '../db/schema.js'
+import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import { ConnectInputError } from './connect-app-store.js'
 
@@ -82,11 +76,19 @@ export async function connectMeta(
   const pages = (await client.pages(signInToken).catch(unlessRefused<MetaPage>)).filter(
     (page) => page.access_token,
   )
-  const instagramAccounts = new Map<string, { username?: string; name?: string; pageToken?: string; pageName?: string }>()
+  const instagramAccounts = new Map<
+    string,
+    { username?: string; name?: string; pageToken?: string; pageName?: string; pageId?: string }
+  >()
   for (const page of pages) {
     const account = page.instagram_business_account
     if (account) {
-      instagramAccounts.set(account.id, { ...account, pageToken: page.access_token, pageName: page.name })
+      instagramAccounts.set(account.id, {
+        ...account,
+        pageToken: page.access_token,
+        pageName: page.name,
+        pageId: page.id,
+      })
     }
   }
   for (const account of await client
@@ -106,8 +108,9 @@ export async function connectMeta(
   }
 
   const encryptedSignIn = deps.secrets.encrypt(signInToken)
+  const found: AssetInput[] = []
   await deps.db.transaction(async (tx) => {
-    const save = (row: {
+    const save = async (row: {
       provider: string
       externalAccountId: string
       displayName: string
@@ -115,16 +118,18 @@ export async function connectMeta(
       refreshTokenEnc: string | null
       expiresAt: Date | null
     }) => {
-      // `appId` is left out of the update, so reconnecting keeps each account's app.
       const values = { ...row, scopes: granted?.join(',') ?? null, status: 'ok', updatedAt: new Date() }
-      return tx
+      const [saved] = await tx
         .insert(connections)
         .values(values)
         .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+        .returning({ id: connections.id })
+      if (!saved) throw new Error('could not save a Meta connection')
+      return saved.id
     }
 
     for (const page of pages) {
-      await save({
+      const connectionId = await save({
         provider: FACEBOOK,
         externalAccountId: page.id,
         displayName: page.name,
@@ -132,21 +137,33 @@ export async function connectMeta(
         refreshTokenEnc: null,
         expiresAt: null,
       })
+      found.push({ kind: 'facebook_page', externalId: page.id, name: page.name, connectionId })
     }
     for (const [id, account] of instagramAccounts) {
-      await save({
+      const name = account.username ? `@${account.username}` : (account.name ?? account.pageName ?? 'Instagram account')
+      const connectionId = await save({
         provider: INSTAGRAM,
         externalAccountId: id,
-        displayName: account.username
-          ? `@${account.username}`
-          : (account.name ?? account.pageName ?? 'Instagram account'),
+        displayName: name,
         // Without a linked Page the sign-in token is the only one, so it fills both places.
         accessTokenEnc: account.pageToken ? deps.secrets.encrypt(account.pageToken) : encryptedSignIn,
         refreshTokenEnc: encryptedSignIn,
         expiresAt,
       })
+      found.push({
+        kind: 'instagram_account',
+        externalId: id,
+        name,
+        connectionId,
+        details: account.pageId ? { pageId: account.pageId } : null,
+      })
     }
   })
+
+  // New Pages and accounts wait for an app to be chosen; one linked to a Page that already has
+  // its app follows the Page. Reconnecting keeps every choice made before.
+  await upsertAssets(deps.db, found)
+  await autoLink(deps.db)
 
   return {
     pages: pages.length,
@@ -154,28 +171,4 @@ export async function connectMeta(
     expiresAt: expiresAt?.toISOString() ?? null,
     missing,
   }
-}
-
-/** Says which app a Page or Instagram account promotes; null stops tracking it. */
-export async function assignMetaAccount(
-  db: Db,
-  input: { connectionId: string; appId: string | null },
-): Promise<{ provider: string; appId: string | null }> {
-  const [connection] = await db
-    .select({ id: connections.id, provider: connections.provider })
-    .from(connections)
-    .where(and(eq(connections.id, input.connectionId), inArray(connections.provider, [...META_PROVIDERS])))
-    .limit(1)
-  if (!connection) throw new ConnectInputError('That account is no longer connected. Reload the page.')
-
-  if (input.appId !== null) {
-    const [app] = await db.select({ id: apps.id }).from(apps).where(eq(apps.id, input.appId)).limit(1)
-    if (!app) throw new ConnectInputError('That app no longer exists. Reload the page.')
-  }
-
-  await db
-    .update(connections)
-    .set({ appId: input.appId, updatedAt: new Date() })
-    .where(eq(connections.id, connection.id))
-  return { provider: connection.provider, appId: input.appId }
 }

@@ -13,10 +13,6 @@ function messageFrom(err: unknown, fallback: string): string {
   return fallback
 }
 
-export const playPackagesFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
-  .handler(() => api().googlePlay.packages.query())
-
 export const connectGooglePlayFn = createServerFn({ method: 'POST' })
   .middleware([requireSession])
   .validator(
@@ -30,18 +26,5 @@ export const connectGooglePlayFn = createServerFn({ method: 'POST' })
       return { ok: true as const, ...(await api().googlePlay.connect.mutate(data)) }
     } catch (err) {
       return { ok: false as const, message: messageFrom(err, 'Could not reach the API.') }
-    }
-  })
-
-/** Gives a package to an app, to a new app ('new'), or to none (null). */
-export const assignPlayPackageFn = createServerFn({ method: 'POST' })
-  .middleware([requireSession])
-  .validator(z.object({ packageName: z.string().min(1).max(200), appId: z.string().min(1).max(64).nullable() }))
-  .handler(async ({ data }) => {
-    try {
-      await api().googlePlay.assign.mutate(data)
-      return { ok: true as const }
-    } catch (err) {
-      return { ok: false as const, message: messageFrom(err, 'Could not save that. Try again.') }
     }
   })

@@ -1,8 +1,8 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAppTimelineFn, getOverviewFn, listPostsFn } from '../fns/portfolio'
 import { getSyncStatusFn, listAccountsFn, listAppsFn } from '../fns/settings'
-import { playPackagesFn } from '../fns/google-play'
-import { metaAccountsFn, metaSetupFn } from '../fns/meta'
+import { listAssetsFn } from '../fns/assets'
+import { metaSetupFn } from '../fns/meta'
 import { tiktokSetupFn } from '../fns/tiktok'
 
 export const overviewQuery = (dates: { from: string; to: string }) =>
@@ -29,11 +29,7 @@ export const tiktokSetupQuery = () =>
 export const metaSetupQuery = () =>
   queryOptions({ queryKey: ['meta-setup'], queryFn: () => metaSetupFn() })
 
-export const playPackagesQuery = () =>
-  queryOptions({ queryKey: ['play-packages'], queryFn: () => playPackagesFn() })
-
-export const metaAccountsQuery = () =>
-  queryOptions({ queryKey: ['meta-accounts'], queryFn: () => metaAccountsFn() })
+export const assetsQuery = () => queryOptions({ queryKey: ['assets'], queryFn: () => listAssetsFn() })
 
 export const appsQuery = () => queryOptions({ queryKey: ['apps'], queryFn: () => listAppsFn() })
 
@@ -47,9 +43,8 @@ export type Overview = Awaited<ReturnType<typeof getOverviewFn>>
 export type Timeline = NonNullable<Awaited<ReturnType<typeof getAppTimelineFn>>>
 export type AppSummary = Awaited<ReturnType<typeof listAppsFn>>[number]
 export type SyncRun = Awaited<ReturnType<typeof getSyncStatusFn>>[number]
-export type Account = Awaited<ReturnType<typeof listAccountsFn>>[number]
+export type AccountFamily = Awaited<ReturnType<typeof listAccountsFn>>[number]
 export type Post = Awaited<ReturnType<typeof listPostsFn>>[number]
 export type TikTokSetup = Awaited<ReturnType<typeof tiktokSetupFn>>
 export type MetaSetup = Awaited<ReturnType<typeof metaSetupFn>>
-export type MetaAccount = Awaited<ReturnType<typeof metaAccountsFn>>[number]
-export type PlayAccount = Awaited<ReturnType<typeof playPackagesFn>>
+export type Asset = Awaited<ReturnType<typeof listAssetsFn>>[number]

@@ -13,7 +13,7 @@ interface OAuthData {
   /** The app the account will be connected to. */
   appId?: string
   startedAt?: number
-  /** Shown once on the Settings page after the redirect back, then cleared. */
+  /** Shown once on the Accounts page after the redirect back, then cleared. */
   result?: { ok: boolean; message: string; provider?: OAuthProvider }
 }
 
@@ -85,7 +85,7 @@ export async function finishOAuth(provider: OAuthProvider, returnedState: string
   return {
     matches,
     appId: appId ?? null,
-    /** Stores the message Settings shows once, and saves the cookie. */
+    /** Stores the message the Accounts page shows once, and saves the cookie. */
     async report(ok: boolean, message: string) {
       oauth.result = { ok, message, provider }
       await oauth.save()

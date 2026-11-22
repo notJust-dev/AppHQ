@@ -3,18 +3,15 @@ import { GoogleAuthError, serviceAccountSchema } from '../connectors/google-play
 import {
   GOOGLE_PLAY,
   createPlayClient,
-  detailsSchema,
   findPlayConnection,
-  matchPackages,
   packagesIn,
   savePackages,
   type PlayClientOptions,
 } from '../connectors/google-play/connector.js'
 import { StorageError } from '../connectors/google-play/storage.js'
 import type { Db } from '../db/client.js'
-import { apps, connections } from '../db/schema.js'
+import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
-import { uniqueSlug } from '../lib/slug.js'
 import { ConnectInputError } from './connect-app-store.js'
 
 /**
@@ -31,7 +28,7 @@ export function parseBucket(input: string): string | null {
 export interface GooglePlayConnectResult {
   serviceAccount: string
   packages: number
-  /** Packages given to an app automatically, because an iOS bundle id is the same. */
+  /** Packages linked to an app automatically, by exact evidence. */
   matched: number
 }
 
@@ -112,56 +109,6 @@ export async function connectGooglePlay(
     .returning()
   if (!connection) throw new Error('could not save the Google Play connection')
 
-  await savePackages(deps.db, connection, packageNames, await client.titles())
-  const matched = await matchPackages(deps.db, packageNames)
+  const matched = await savePackages(deps.db, connection.id, packageNames, await client.titles())
   return { serviceAccount: email, packages: packageNames.length, matched }
-}
-
-/** The packages found in the reports, each with the app it belongs to, if any. */
-export async function listPlayPackages(db: Db) {
-  const connection = await findPlayConnection(db)
-  if (!connection) return null
-  const packages = detailsSchema.safeParse(connection.details).data?.packages ?? []
-  const owners = await db.select({ id: apps.id, name: apps.name, androidPackage: apps.androidPackage }).from(apps)
-  return {
-    serviceAccount: connection.displayName,
-    bucket: connection.externalAccountId,
-    status: connection.status,
-    lastSyncedAt: connection.lastSyncedAt?.toISOString() ?? null,
-    packages: packages.map((item) => {
-      const owner = owners.find((app) => app.androidPackage === item.packageName)
-      return { ...item, appId: owner?.id ?? null }
-    }),
-  }
-}
-
-/**
- * Gives a package to an app (`appId`), to a new app made for it (`'new'`), or to none (`null`).
- * An app has one Play package, so giving it another replaces the old one.
- */
-export async function assignPlayPackage(
-  db: Db,
-  input: { packageName: string; appId: string | null },
-): Promise<{ appId: string | null }> {
-  const listed = await listPlayPackages(db)
-  const item = listed?.packages.find((entry) => entry.packageName === input.packageName)
-  if (!item) throw new ConnectInputError('That package is not in the Google Play reports. Reload the page.')
-
-  return db.transaction(async (tx) => {
-    await tx.update(apps).set({ androidPackage: null }).where(eq(apps.androidPackage, input.packageName))
-    if (input.appId === null) return { appId: null }
-
-    if (input.appId === 'new') {
-      const known = await tx.select({ id: apps.id }).from(apps)
-      const name = item.title ?? input.packageName
-      const id = uniqueSlug(name, new Set(known.map((app) => app.id)))
-      await tx.insert(apps).values({ id, name, androidPackage: input.packageName })
-      return { appId: id }
-    }
-
-    const [app] = await tx.select({ id: apps.id }).from(apps).where(eq(apps.id, input.appId)).limit(1)
-    if (!app) throw new ConnectInputError('That app no longer exists. Reload the page.')
-    await tx.update(apps).set({ androidPackage: input.packageName }).where(eq(apps.id, app.id))
-    return { appId: app.id }
-  })
 }

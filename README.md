@@ -46,10 +46,17 @@ cd apps/web && npm install && npm run dev
 
 ## Connecting real data
 
-Sign in and open Settings. To add an app, paste a RevenueCat v2 secret key from its project. The
-key needs read access to charts and metrics, and to project configuration. The app is created
-from the project, about a year of history is fetched in the background, and later syncs re-read
-the last seven days.
+Sign in and open Accounts. Each source is signed in to there once; what it finds (iOS and Android
+apps, RevenueCat projects, Pages, Instagram and TikTok accounts) lands on the Apps page. Links
+that exact evidence settles, like an Android package equal to an iOS bundle id, are made for you;
+the rest waits under "Needs a decision", where you link each one to an app, to a new app, to
+Shared accounts (for a social account that promotes several apps), or ignore it. Each app's page
+has a Sources panel to change what feeds it. Linking something fetches its history.
+
+To add an app from RevenueCat, paste a v2 secret key from its project. The key needs read access
+to charts and metrics, and to project configuration. The project is matched to a store app by
+bundle id or package, or becomes a new app; about a year of history is fetched in the background,
+and later syncs re-read the last seven days.
 
 For downloads, connect App Store Connect in the same place with a team API key (Issuer ID, Key
 ID, the `.p8` file) and your vendor number. The Sales and Reports role is enough. The account's
@@ -58,9 +65,9 @@ With an Admin key the dashboard also asks Apple to start analytics reports for e
 
 For Google Play, create a service account in Google Cloud with a JSON key, and invite its email
 in Play Console (Users and permissions) with "View app information and download bulk reports"
-for all apps; access can take up to a day. In Settings, paste the key and the Cloud Storage URI
+for all apps; access can take up to a day. On the Accounts page, paste the key and the Cloud Storage URI
 from Play Console (Download reports, Statistics, Copy Cloud Storage URI). Packages whose name
-equals an iOS bundle id are matched to that app; pick the app for the others, or make a new one.
+equals an iOS bundle id are linked to that app; link the others on the Apps page, or make a new one.
 Downloads are new users per day and store page views are store listing visitors, both from
 Google's monthly report files, which arrive 3 to 7 days late. Enabling the Play Developer
 Reporting API in the service account's project adds app titles. `GOOGLE_STORAGE_URL` and
@@ -68,9 +75,9 @@ Reporting API in the service account's project adds app titles. `GOOGLE_STORAGE_
 
 For TikTok, create an app (or a sandbox of one) at developers.tiktok.com with Login Kit for web
 and the scopes `user.info.basic`, `user.info.profile`, `user.info.stats` and `video.list`.
-Register the redirect URI that Settings shows under "Connect TikTok", exactly as written, and
+Register the redirect URI that the Accounts page shows under "Connect TikTok", exactly as written, and
 set `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` on the API (a sandbox has its own pair). Then
-pick the app an account promotes and press Connect TikTok. Every sync saves each video's
+pick the app an account promotes (or Shared accounts) and press Connect TikTok. Every sync saves each video's
 lifetime totals as that day's snapshot; daily views are the gains between days, so they start
 the day after an account is connected. With a sandbox, only the accounts added as target users
 can sign in.
@@ -80,14 +87,14 @@ To try the flow without TikTok, point the API at a stand-in with `TIKTOK_API_URL
 
 For Facebook Pages and Instagram, create an app at developers.facebook.com, owned by your business
 portfolio, with the use cases "Manage everything on your Page" and "Manage messaging & content on
-Instagram" (API setup with Unified login; the Facebook login setup also works). Add the redirect URI that Settings shows under "Connect Facebook and
+Instagram" (API setup with Unified login; the Facebook login setup also works). Add the redirect URI that the Accounts page shows under "Connect Facebook and
 Instagram", and create a login configuration (user access token) with `pages_show_list`,
 `pages_read_engagement`, `pages_read_user_content`, `read_insights`, `instagram_basic`,
 `instagram_manage_insights` and `business_management`. Set `META_APP_ID`, `META_APP_SECRET` and
 `META_LOGIN_CONFIG_ID` on the API. One sign-in finds every Page you manage and the Instagram
-accounts linked to them; then pick the app each one promotes. Facebook brings a year of daily
+accounts linked to them; link each to the app it promotes on the Apps page. Facebook brings a year of daily
 Page insights, Instagram 90 days. Meta's sign-in lasts about 60 days and cannot be renewed by the
-server, so connect again before the date Settings shows (Facebook Pages keep working without).
+server, so connect again before the date the Accounts page shows (Facebook Pages keep working without).
 `META_GRAPH_URL` and `META_DIALOG_URL` point the API at a stand-in.
 
 ## Commands
@@ -132,13 +139,13 @@ Things to know:
 - **A push to `main` redeploys both apps,** whichever folder changed. Each app restarts briefly.
 - **Both apps answer `GET /health`.** The dashboard's also says whether it is fully configured
   and can reach the API, so a deployment can be checked without signing in.
-- **`ENCRYPTION_KEY` protects stored credentials.** API keys pasted in Settings are encrypted
+- **`ENCRYPTION_KEY` protects stored credentials.** API keys pasted on the Accounts page are encrypted
   with it before they reach the database. The API starts without it, but connecting a source
   then fails with a message saying so. Changing it means reconnecting every source.
 - **Demo data without a shell.** `POST /trpc/demo.seed` and `POST /trpc/demo.clear` on the API,
   sent with the internal token, load and remove the generated demo apps. They only touch apps
   whose id starts with `demo-`.
 - **The TikTok redirect URI comes from the request** (the proxy's forwarded host and
-  protocol). If Settings shows the wrong address, set `PUBLIC_URL` on the dashboard, for
+  protocol). If the Accounts page shows the wrong address, set `PUBLIC_URL` on the dashboard, for
   example `https://app.example.com`.
 - Both apps listen on `PORT` when it is set and on 3000 otherwise, over IPv4.

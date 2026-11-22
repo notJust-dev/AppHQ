@@ -1,7 +1,8 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull } from 'drizzle-orm'
+import { autoLink, linkedAssets, upsertAssets } from '../../assets/store.js'
 import { z } from 'zod'
 import type { Db } from '../../db/client.js'
-import { apps, connections, type Connection, type NewMetric } from '../../db/schema.js'
+import { apps, assets, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { mapLimit } from '../../lib/pool.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
@@ -33,17 +34,13 @@ const credentialsSchema = z.object({
 })
 export type PlayCredentials = z.infer<typeof credentialsSchema>
 
-export const detailsSchema = z.object({
-  packages: z.array(z.object({ packageName: z.string(), title: z.string().nullable() })),
-})
-export type PlayDetails = z.infer<typeof detailsSchema>
 
 /** The single Google Play developer account: a connection that belongs to no particular app. */
 export const findPlayConnection = (db: Db) =>
   db
     .select()
     .from(connections)
-    .where(and(eq(connections.provider, GOOGLE_PLAY), isNull(connections.appId)))
+    .where(eq(connections.provider, GOOGLE_PLAY))
     .limit(1)
     .then((rows) => rows[0])
 
@@ -91,35 +88,37 @@ export const packagesIn = (files: { installs: ReportFile[]; store: ReportFile[] 
   [...new Set([...files.installs, ...files.store].map((file) => file.packageName))].sort()
 
 /**
- * Gives each Play package to the app it obviously belongs to: one whose iOS bundle id is the
- * same string and that has no Android package yet. Anything less obvious is left for Settings.
+ * Saves the packages the reports cover as Android app assets, with titles when known, and links
+ * the ones exact evidence settles (a package equal to an app's iOS bundle id, or named in its
+ * RevenueCat project). The rest wait for a decision in the dashboard.
  */
-export async function matchPackages(db: Db, packageNames: string[]): Promise<number> {
-  if (packageNames.length === 0) return 0
-  const known = await db.select().from(apps)
-  const taken = new Set(known.map((app) => app.androidPackage).filter(Boolean))
-  let matched = 0
-  for (const packageName of packageNames) {
-    if (taken.has(packageName)) continue
-    const app = known.find((candidate) => candidate.iosBundleId === packageName && !candidate.androidPackage)
-    if (!app) continue
-    await db.update(apps).set({ androidPackage: packageName }).where(eq(apps.id, app.id))
-    taken.add(packageName)
-    matched++
-  }
-  return matched
-}
-
-/** Stores the packages found, keeping titles already known for packages the lookup missed. */
-export async function savePackages(db: Db, connection: Connection, packageNames: string[], titles: Map<string, string>) {
-  const previous = detailsSchema.safeParse(connection.details).data?.packages ?? []
-  const details: PlayDetails = {
-    packages: packageNames.map((packageName) => ({
-      packageName,
-      title: titles.get(packageName) ?? previous.find((item) => item.packageName === packageName)?.title ?? null,
-    })),
-  }
-  await db.update(connections).set({ details, updatedAt: new Date() }).where(eq(connections.id, connection.id))
+export async function savePackages(db: Db, connectionId: string, packageNames: string[], titles: Map<string, string>) {
+  const known = new Map(
+    (await db.select().from(assets).where(eq(assets.kind, 'android_app'))).map((asset) => [asset.externalId, asset]),
+  )
+  await upsertAssets(
+    db,
+    packageNames.map((packageName) => {
+      const previous = known.get(packageName)
+      const previousTitle = (previous?.details as { title?: string } | null)?.title ?? null
+      const title = titles.get(packageName) ?? previousTitle
+      return {
+        kind: 'android_app' as const,
+        externalId: packageName,
+        name: title ?? previous?.name ?? packageName,
+        connectionId,
+        details: { title },
+      }
+    }),
+  )
+  await autoLink(db)
+  // How many of this account's packages belong to an app now; autoLink's own count covers
+  // every asset, not just these.
+  const linked = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(and(eq(assets.kind, 'android_app'), inArray(assets.externalId, packageNames), isNotNull(assets.appId)))
+  return linked.length
 }
 
 /**
@@ -144,17 +143,21 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
       try {
         const files = await client.files()
         const packageNames = packagesIn(files)
-        const known = detailsSchema.safeParse(connection.details).data?.packages ?? []
-        const needTitles = packageNames.some((name) => !known.find((item) => item.packageName === name)?.title)
-        await savePackages(db, connection, packageNames, needTitles ? await client.titles() : new Map())
-        await matchPackages(db, packageNames)
+        const titled = new Set(
+          (await db.select().from(assets).where(eq(assets.kind, 'android_app')))
+            .filter((asset) => (asset.details as { title?: string } | null)?.title)
+            .map((asset) => asset.externalId),
+        )
+        const needTitles = packageNames.some((name) => !titled.has(name))
+        await savePackages(db, connection.id, packageNames, needTitles ? await client.titles() : new Map())
 
-        const tracked = packageNames.length
-          ? await db
-              .select({ id: apps.id, androidPackage: apps.androidPackage })
-              .from(apps)
-              .where(and(eq(apps.isActive, true), inArray(apps.androidPackage, packageNames)))
-          : []
+        const active = new Set(
+          (await db.select({ id: apps.id }).from(apps).where(eq(apps.isActive, true))).map((app) => app.id),
+        )
+        const tracked = (await linkedAssets(db, 'android_app'))
+          .map(({ asset }) => asset)
+          .filter((asset) => asset.connectionId === connection.id && asset.appId !== null && active.has(asset.appId))
+          .map((asset) => ({ id: asset.appId ?? '', androidPackage: asset.externalId }))
 
         const months = new Set(monthsIn(range.from, range.to))
         const inRange = (date: string) => date >= range.from && date <= range.to

@@ -1,10 +1,11 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, notFound } from '@tanstack/react-router'
+import { AppSources } from '../../components/AppSources'
 import { PostsTable } from '../../components/PostsTable'
 import { RangeSwitch } from '../../components/RangeSwitch'
 import { Timeline } from '../../components/Timeline'
 import { formatDay } from '../../lib/format'
-import { appsQuery, postsQuery, timelineQuery } from '../../lib/queries'
+import { appsQuery, assetsQuery, postsQuery, timelineQuery } from '../../lib/queries'
 import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '../../lib/range'
 
 const SOCIAL = new Set(['tiktok', 'instagram', 'facebook'])
@@ -18,6 +19,7 @@ export const Route = createFileRoute('/_app/apps/$appId')({
       context.queryClient.ensureQueryData(timelineQuery(params.appId, dates)),
       context.queryClient.ensureQueryData(postsQuery(params.appId, dates)),
       context.queryClient.ensureQueryData(appsQuery()),
+      context.queryClient.ensureQueryData(assetsQuery()),
     ])
     if (!timeline) throw notFound()
   },
@@ -32,12 +34,13 @@ function AppPage() {
   const { data } = useSuspenseQuery(timelineQuery(appId, dates))
   const { data: posts } = useSuspenseQuery(postsQuery(appId, dates))
   const { data: apps } = useSuspenseQuery(appsQuery())
+  const { data: assets } = useSuspenseQuery(assetsQuery())
   // The loader has already turned a missing app into the not-found page.
   if (!data) return null
-  const connected = new Set(
-    apps.find((app) => app.id === appId)?.connections.map((connection) => connection.provider),
-  )
-  const hasSocialAccount = [...connected].some((provider) => SOCIAL.has(provider))
+  const app = apps.find((entry) => entry.id === appId)
+  // The sources something feeds this app from, e.g. `app_store` or `tiktok`.
+  const connected = new Set(app?.assets.map((asset) => asset.source))
+  const hasSocialAccount = [...connected].some((source) => SOCIAL.has(source))
 
   return (
     <>
@@ -45,7 +48,10 @@ function AppPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">{data.app.name}</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            {formatDay(data.range.from)} to {formatDay(data.range.to)}, {RANGE_DAYS[range]} days
+            {formatDay(data.range.from)} to {formatDay(data.range.to)}, {RANGE_DAYS[range]} days ·{' '}
+            <a href="#sources" className="underline underline-offset-4 hover:text-ink">
+              Sources
+            </a>
           </p>
         </div>
         <RangeSwitch current={range} />
@@ -66,6 +72,7 @@ function AppPage() {
           <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} />
         </div>
       </section>
+      {app && <AppSources app={app} apps={apps} assets={assets} />}
     </>
   )
 }

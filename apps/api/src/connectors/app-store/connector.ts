@@ -1,5 +1,6 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
 import { apps, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
@@ -8,7 +9,7 @@ import { mapLimit } from '../../lib/pool.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
 import type { AccountConnector } from '../types.js'
 import { AppStoreError, createAppStoreClient } from './client.js'
-import { linkAppStoreApps } from './link-apps.js'
+import { saveAppStoreApps } from './link-apps.js'
 import { summarizeSalesReport } from './sales-report.js'
 import type { AppStoreCredentials } from './token.js'
 
@@ -29,7 +30,7 @@ export const findAppStoreConnection = (db: Db) =>
   db
     .select()
     .from(connections)
-    .where(and(eq(connections.provider, APP_STORE), isNull(connections.appId)))
+    .where(eq(connections.provider, APP_STORE))
     .limit(1)
     .then((rows) => rows[0])
 
@@ -62,16 +63,27 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
       let keyRejected = false
 
       try {
-        // Picks up apps published since the last run, and Apple IDs for apps known by bundle id.
+        // Picks up apps published since the last run.
         const storeApps = await client.listApps()
-        await linkAppStoreApps(db, storeApps)
+        await saveAppStoreApps(db, connection.id, storeApps)
 
-        // Only apps this account owns. A report says nothing about any other app, so an app
-        // from elsewhere (demo data, another account) must not be given zeros.
+        // Only this account's iOS apps that belong to an active app. A report says nothing
+        // about any other app, so an app from elsewhere (demo data, another account) must not
+        // be given zeros.
         const owned = new Set(storeApps.map((app) => app.appleId))
-        const tracked = (await db.select().from(apps).where(eq(apps.isActive, true))).filter(
-          (app) => app.iosAppId !== null && owned.has(app.iosAppId),
+        const active = new Set(
+          (await db.select({ id: apps.id }).from(apps).where(eq(apps.isActive, true))).map((app) => app.id),
         )
+        const tracked = (await linkedAssets(db, 'ios_app'))
+          .map(({ asset }) => asset)
+          .filter(
+            (asset) =>
+              asset.connectionId === connection.id &&
+              owned.has(asset.externalId) &&
+              asset.appId !== null &&
+              active.has(asset.appId),
+          )
+          .map((asset) => ({ id: asset.appId ?? '', iosAppId: asset.externalId }))
 
         await mapLimit(eachDay(range), 4, async (date) => {
           if (keyRejected) return

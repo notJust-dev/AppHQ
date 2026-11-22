@@ -6,7 +6,7 @@ import { callbackError, providerErrorMessage, redirectTo } from '../server/oauth
 
 /**
  * Where TikTok sends the browser after sign-in. It checks the session and the state from the
- * OAuth cookie, has the API trade the code for tokens, and goes back to Settings with the
+ * OAuth cookie, has the API trade the code for tokens, and goes back to Accounts with the
  * outcome stored in the cookie. Nothing from the query string is shown as text, so a crafted
  * link cannot put words on the page.
  */
@@ -21,7 +21,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
         const attempt = await finishOAuth('tiktok', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
           await attempt.report(ok, message)
-          return redirectTo('/settings?connected=tiktok')
+          return redirectTo('/accounts?connected=tiktok')
         }
 
         const error = params.get('error')

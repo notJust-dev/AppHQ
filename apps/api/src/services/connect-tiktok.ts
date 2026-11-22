@@ -2,7 +2,8 @@ import { eq } from 'drizzle-orm'
 import { createTikTokClient } from '../connectors/tiktok/client.js'
 import { REQUIRED_SCOPES, TIKTOK, requireTikTokConfig } from '../connectors/tiktok/config.js'
 import type { Db } from '../db/client.js'
-import { apps, connections } from '../db/schema.js'
+import { upsertAssets } from '../assets/store.js'
+import { apps, assets, connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import { ConnectInputError } from './connect-app-store.js'
 
@@ -49,7 +50,6 @@ export async function connectTikTok(
   const account = user.username ? `@${user.username}` : (user.display_name ?? 'TikTok account')
 
   const values = {
-    appId: app.id,
     displayName: account,
     accessTokenEnc: deps.secrets.encrypt(tokens.accessToken),
     refreshTokenEnc: deps.secrets.encrypt(tokens.refreshToken),
@@ -59,13 +59,23 @@ export async function connectTikTok(
     status: 'ok',
     updatedAt: new Date(),
   }
-  await deps.db
+  const [connection] = await deps.db
     .insert(connections)
     .values({ provider: TIKTOK, externalAccountId: tokens.openId, ...values })
     .onConflictDoUpdate({
       target: [connections.provider, connections.externalAccountId],
       set: values,
     })
+    .returning({ id: connections.id })
+  if (!connection) throw new Error('could not save the TikTok connection')
+
+  // The account goes to the app picked before signing in; connecting it again can move it.
+  const [asset] = await upsertAssets(deps.db, [
+    { kind: 'tiktok_account', externalId: tokens.openId, name: account, connectionId: connection.id },
+  ])
+  if (asset) {
+    await deps.db.update(assets).set({ appId: app.id, ignored: false, updatedAt: new Date() }).where(eq(assets.id, asset.id))
+  }
 
   return { appId: app.id, appName: app.name, account }
 }

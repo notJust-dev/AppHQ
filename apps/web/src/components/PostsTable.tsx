@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import { formatCount, formatDay } from '../lib/format'
 import { liftSentence, liftShort } from '../lib/lift'
 import type { Post } from '../lib/queries'
@@ -16,10 +15,10 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean }) 
           'No posts were published in this range.'
         ) : (
           <>
-            No social account is connected to this app yet.{' '}
-            <Link to="/settings" className="font-medium text-ink underline">
-              Connect TikTok in Settings
-            </Link>
+            No social account is linked to this app yet.{' '}
+            <a href="#sources" className="font-medium text-ink underline">
+              Link one under Sources
+            </a>
           </>
         )}
       </p>

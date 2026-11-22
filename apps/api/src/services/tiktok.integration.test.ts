@@ -4,9 +4,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTikTokConnector } from '../connectors/tiktok/connector.js'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
-import { apps, connections, metricDaily, postSnapshots, posts } from '../db/schema.js'
+import { apps, assets, connections, metricDaily, postSnapshots, posts } from '../db/schema.js'
 import { createSecrets } from '../lib/crypto.js'
 import { listPosts } from '../queries/list-posts.js'
+import { assetOf } from '../test/assets.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { ConnectInputError } from './connect-app-store.js'
 import { connectTikTok } from './connect-tiktok.js'
@@ -147,6 +148,8 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
 
   afterAll(async () => {
     await db.delete(apps).where(eq(apps.id, appId))
+    await db.delete(assets).where(eq(assets.externalId, openId))
+    await db.delete(connections).where(eq(connections.externalAccountId, openId))
     await sql.end({ timeout: 5 })
   })
 
@@ -167,7 +170,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     expect(result).toEqual({ appId, appName: 'TikTok Test App', account: '@tinykicks' })
 
     const row = await connection()
-    expect(row.appId).toBe(appId)
+    expect((await assetOf(db, 'tiktok_account', openId)).appId).toBe(appId)
     expect(row.accessTokenEnc).not.toContain('act.')
     expect(secrets.decrypt(row.refreshTokenEnc ?? '')).toBe(tiktok.state.refreshToken)
     expect(row.scopes).toContain('video.list')

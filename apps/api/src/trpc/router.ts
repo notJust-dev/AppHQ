@@ -19,7 +19,7 @@ import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
 import { listAccounts } from '../queries/list-accounts.js'
 import { listApps } from '../queries/list-apps.js'
-import { listMetaAccounts } from '../queries/list-meta-accounts.js'
+import { listAssets } from '../queries/list-assets.js'
 import { listPosts } from '../queries/list-posts.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
@@ -28,12 +28,10 @@ import {
   GOOGLE_PLAY,
   GOOGLE_PLAY_HISTORY_DAYS,
 } from '../connectors/google-play/connector.js'
-import {
-  assignPlayPackage,
-  connectGooglePlay,
-  listPlayPackages,
-} from '../services/connect-google-play.js'
-import { assignMetaAccount, connectMeta } from '../services/connect-meta.js'
+import { connectGooglePlay } from '../services/connect-google-play.js'
+import { connectMeta } from '../services/connect-meta.js'
+import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
+import { assignAsset, createApp, setIgnored } from '../assets/store.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 
@@ -163,6 +161,15 @@ export const appRouter = t.router({
 
     posts: t.procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
 
+    /** Makes an app by name, to link assets to; returns its id. */
+    create: t.procedure
+      .input(z.object({ name: z.string().trim().min(1).max(80) }))
+      .mutation(async ({ ctx, input }) => ({
+        appId: await createApp(ctx.db, input.name).catch((err: unknown) => {
+          throw connectError(err)
+        }),
+      })),
+
     /** Registers the app behind a RevenueCat secret key and starts fetching its history. */
     connectRevenueCat: t.procedure
       .input(z.object({ apiKey: z.string().trim().min(8).max(500) }))
@@ -273,26 +280,6 @@ export const appRouter = t.router({
         startSync(ctx, { connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
         return result
       }),
-
-    packages: t.procedure.query(({ ctx }) => listPlayPackages(ctx.db)),
-
-    /** Says which app a package belongs to ('new' makes one), and fetches its history. */
-    assign: t.procedure
-      .input(
-        z.object({
-          packageName: z.string().min(1).max(200),
-          appId: z.union([z.string().min(1).max(64), z.null()]),
-        }),
-      )
-      .mutation(async ({ ctx, input }) => {
-        const result = await assignPlayPackage(ctx.db, input).catch((err: unknown) => {
-          throw connectError(err)
-        })
-        if (result.appId) {
-          startSync(ctx, { connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
-        }
-        return result
-      }),
   }),
   /**
    * Facebook Pages and their linked Instagram accounts, through one Facebook sign-in. Like
@@ -318,26 +305,42 @@ export const appRouter = t.router({
           throw connectError(err)
         }),
       ),
+  }),
+  /**
+   * What the accounts give access to, and which app each belongs to. Linking an asset fetches
+   * its history; an app holds one iOS app, one Android app and one RevenueCat project.
+   */
+  assets: t.router({
+    list: t.procedure.query(({ ctx }) => listAssets.handler(ctx)),
 
-    accounts: t.procedure.query(({ ctx }) => listMetaAccounts.handler(ctx)),
-
-    /** Says which app an account promotes, and fetches its history when it gets one. */
+    /** Gives an asset to an app, to a new app (`'new'`), to the portfolio, or to none (`null`). */
     assign: t.procedure
-      .input(z.object({ connectionId: z.uuid(), appId: z.string().min(1).max(64).nullable() }))
+      .input(z.object({ assetId: z.uuid(), appId: z.string().min(1).max(64).nullable() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await assignMetaAccount(ctx.db, input).catch((err: unknown) => {
+        const { asset, appId } = await assignAsset(ctx.db, input).catch((err: unknown) => {
           throw connectError(err)
         })
-        if (result.appId) {
-          // Facebook keeps two years of Page insights; Instagram keeps 90 days.
+        if (appId !== null && isAssetKind(asset.kind)) {
+          const kind = ASSET_KINDS[asset.kind]
           startSync(ctx, {
             connectors,
-            sources: [result.provider],
-            appIds: [result.appId],
-            range: trailingRange(result.provider === FACEBOOK ? 365 : 90),
+            sources: [kind.provider],
+            // The App Store and Google Play sync every app of the account at once.
+            ...(kind.provider === 'app_store' || kind.provider === 'google_play' ? {} : { appIds: [appId] }),
+            range: trailingRange(kind.backfillDays),
           })
         }
-        return result
+        return { appId }
+      }),
+
+    /** Stops an asset asking for a decision (and unlinks it), or brings it back. */
+    ignore: t.procedure
+      .input(z.object({ assetId: z.uuid(), ignored: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        await setIgnored(ctx.db, input.assetId, input.ignored).catch((err: unknown) => {
+          throw connectError(err)
+        })
+        return { ok: true }
       }),
   }),
   overview: t.router({

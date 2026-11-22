@@ -6,14 +6,15 @@ import { createFacebookConnector } from '../connectors/meta/facebook-connector.j
 import { createInstagramConnector } from '../connectors/meta/instagram-connector.js'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
-import { apps, connections, metricDaily, posts } from '../db/schema.js'
+import { apps, assets, connections, metricDaily, posts } from '../db/schema.js'
 import { createSecrets } from '../lib/crypto.js'
 import { addDays, eachDay } from '../lib/dates.js'
 import { listAccounts } from '../queries/list-accounts.js'
-import { listMetaAccounts } from '../queries/list-meta-accounts.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { ConnectInputError } from './connect-app-store.js'
-import { assignMetaAccount, connectMeta } from './connect-meta.js'
+import { assignAsset } from '../assets/store.js'
+import { assetOf } from '../test/assets.js'
+import { connectMeta } from './connect-meta.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
 const url = testDatabaseUrl()
@@ -190,11 +191,9 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   afterAll(async () => {
     await db.delete(apps).where(eq(apps.id, appId))
-    await db
-      .delete(connections)
-      .where(
-        inArray(connections.externalAccountId, [meta.ids.pageA, meta.ids.pageB, meta.ids.ig, meta.ids.igOnly]),
-      )
+    const ids = [meta.ids.pageA, meta.ids.pageB, meta.ids.ig, meta.ids.igOnly]
+    await db.delete(assets).where(inArray(assets.externalId, ids))
+    await db.delete(connections).where(inArray(connections.externalAccountId, ids))
     await sql.end({ timeout: 5 })
   })
 
@@ -204,16 +203,23 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
     const page = await row(meta.ids.pageA)
     const ig = await row(meta.ids.ig)
-    expect(page).toMatchObject({ provider: 'facebook', appId: null, displayName: 'TinyKicks', expiresAt: null })
+    expect(page).toMatchObject({ provider: 'facebook', displayName: 'TinyKicks', expiresAt: null })
     expect(secrets.decrypt(page.accessTokenEnc ?? '')).toBe('page-A')
-    expect(ig).toMatchObject({ provider: 'instagram', appId: null, displayName: '@tinykicks.app' })
+    expect(ig).toMatchObject({ provider: 'instagram', displayName: '@tinykicks.app' })
+    // Found, but no app yet; the Instagram account remembers its Page.
+    expect(await assetOf(db, 'facebook_page', meta.ids.pageA)).toMatchObject({ appId: null, name: 'TinyKicks' })
+    expect(await assetOf(db, 'instagram_account', meta.ids.ig)).toMatchObject({
+      appId: null,
+      details: { pageId: meta.ids.pageA },
+    })
     expect(secrets.decrypt(ig.refreshTokenEnc ?? '')).toBe('user-long')
     expect(ig.expiresAt?.getTime()).toBeGreaterThan(Date.now() + 59 * 86_400_000)
 
-    const listed = await listMetaAccounts.handler({ db })
-    expect(listed.filter((a) => [meta.ids.pageA, meta.ids.pageB, meta.ids.ig].includes(a.id) || a.displayName === 'Other Page').length).toBeGreaterThan(0)
-    const accountWide = await listAccounts.handler({ db })
-    expect(accountWide.some((a) => a.provider === 'facebook' || a.provider === 'instagram')).toBe(false)
+    const metaFamily = (await listAccounts.handler({ db })).find((family) => family.family === 'meta')
+    expect(metaFamily?.accounts.map((account) => account.displayName)).toEqual(
+      expect.arrayContaining(['TinyKicks', 'Other Page', '@tinykicks.app']),
+    )
+    expect(metaFamily?.assets.waiting).toBeGreaterThanOrEqual(3)
   })
 
   it('connects with Unified login: a lasting token and an Instagram account without a Page', async () => {
@@ -237,17 +243,17 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
     expect(secrets.decrypt(ig.refreshTokenEnc ?? '')).toBe('suat-1')
   })
 
-  it('assigns accounts to an app and keeps that through a reconnect', async () => {
-    for (const id of [meta.ids.pageA, meta.ids.ig]) {
-      await assignMetaAccount(db, { connectionId: (await row(id)).id, appId })
-    }
+  it('links a Page to an app, brings its Instagram account along, and keeps both through a reconnect', async () => {
+    await assignAsset(db, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageA)).id, appId })
+    expect((await assetOf(db, 'instagram_account', meta.ids.ig)).appId).toBe(appId)
     await expect(
-      assignMetaAccount(db, { connectionId: (await row(meta.ids.pageB)).id, appId: 'no-such-app' }),
+      assignAsset(db, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageB)).id, appId: 'no-such-app' }),
     ).rejects.toBeInstanceOf(ConnectInputError)
 
     await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })
-    expect((await row(meta.ids.pageA)).appId).toBe(appId)
-    expect((await row(meta.ids.pageB)).appId).toBeNull()
+    expect((await assetOf(db, 'facebook_page', meta.ids.pageA)).appId).toBe(appId)
+    expect((await assetOf(db, 'instagram_account', meta.ids.ig)).appId).toBe(appId)
+    expect((await assetOf(db, 'facebook_page', meta.ids.pageB)).appId).toBeNull()
   })
 
   it('reads Page insights onto Pacific days, and posts and reels with their views', async () => {

@@ -1,22 +1,23 @@
 import { eq } from 'drizzle-orm'
+import { autoLink, createApp, upsertAssets } from '../assets/store.js'
 import { RevenueCatError, createRevenueCatClient } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
 import type { Db } from '../db/client.js'
-import { apps, connections } from '../db/schema.js'
+import { apps, assets, connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
-import { uniqueSlug } from '../lib/slug.js'
 
 export interface ConnectedApp {
   appId: string
   name: string
-  /** False when the project was already known and only its key was replaced. */
+  /** False when the project went to an app that was already there. */
   created: boolean
 }
 
 /**
- * Registers the app behind a RevenueCat secret key: looks up the project the key belongs to,
- * creates the app if it is new, and stores the key encrypted. Connecting the same project again
- * replaces its key.
+ * Connects the projects behind a RevenueCat secret key: stores the key encrypted, saves each
+ * project as an asset, and links it to the app exact evidence points at (an iOS app or Android
+ * package the project names). A project seen for the first time with no such app gets an app of
+ * its own. Connecting the same project again replaces its key.
  */
 export async function connectRevenueCat(
   deps: { db: Db; secrets: Secrets; fetch?: typeof fetch },
@@ -36,65 +37,47 @@ export async function connectRevenueCat(
       if (err instanceof RevenueCatError && err.isAuthProblem) return []
       throw err
     })
-    const iosBundleId =
-      storeApps.find((app) => app.type === 'app_store')?.app_store?.bundle_id ?? null
-    const androidPackage =
-      storeApps.find((app) => app.type === 'play_store')?.play_store?.package_name ?? null
+    const bundleId = storeApps.find((app) => app.type === 'app_store')?.app_store?.bundle_id ?? null
+    const androidPackage = storeApps.find((app) => app.type === 'play_store')?.play_store?.package_name ?? null
 
-    connected.push(
-      await deps.db.transaction(async (tx) => {
-        // The project may already be known, or its app may have arrived from a store account.
-        const known = await tx.select().from(apps)
-        const existing =
-          known.find((app) => app.revenuecatProjectId === project.id) ??
-          known.find(
-            (app) =>
-              app.revenuecatProjectId === null &&
-              ((iosBundleId !== null && app.iosBundleId === iosBundleId) ||
-                (androidPackage !== null && app.androidPackage === androidPackage)),
-          )
+    const values = { displayName: project.name, accessTokenEnc: encryptedKey, status: 'ok', updatedAt: new Date() }
+    const [connection] = await deps.db
+      .insert(connections)
+      .values({ provider: REVENUECAT, externalAccountId: project.id, ...values })
+      .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+      .returning({ id: connections.id })
+    if (!connection) throw new Error('could not save the RevenueCat connection')
 
-        let appId: string
-        if (existing) {
-          appId = existing.id
-          await tx
-            .update(apps)
-            .set({
-              revenuecatProjectId: project.id,
-              iosBundleId: existing.iosBundleId ?? iosBundleId,
-              androidPackage: existing.androidPackage ?? androidPackage,
-              isActive: true,
-            })
-            .where(eq(apps.id, appId))
-        } else {
-          appId = uniqueSlug(project.name, new Set(known.map((app) => app.id)))
-          await tx.insert(apps).values({
-            id: appId,
-            name: project.name,
-            revenuecatProjectId: project.id,
-            iosBundleId,
-            androidPackage,
-          })
-        }
+    const [known] = await deps.db
+      .select({ id: assets.id })
+      .from(assets)
+      .where(eq(assets.externalId, project.id))
+      .limit(1)
+    const [asset] = await upsertAssets(deps.db, [
+      {
+        kind: 'revenuecat_project',
+        externalId: project.id,
+        name: project.name,
+        connectionId: connection.id,
+        details: { bundleId, androidPackage },
+      },
+    ])
+    if (!asset) throw new Error('could not save the RevenueCat project')
+    await autoLink(deps.db)
 
-        const connection = {
-          appId,
-          displayName: project.name,
-          accessTokenEnc: encryptedKey,
-          status: 'ok',
-          updatedAt: new Date(),
-        }
-        await tx
-          .insert(connections)
-          .values({ provider: REVENUECAT, externalAccountId: project.id, ...connection })
-          .onConflictDoUpdate({
-            target: [connections.provider, connections.externalAccountId],
-            set: connection,
-          })
+    const [current] = await deps.db.select().from(assets).where(eq(assets.id, asset.id)).limit(1)
+    let appId = current?.appId ?? null
+    let created = false
+    if (appId === null && !known && !current?.ignored) {
+      appId = await createApp(deps.db, project.name)
+      await deps.db.update(assets).set({ appId, updatedAt: new Date() }).where(eq(assets.id, asset.id))
+      await autoLink(deps.db)
+      created = true
+    }
+    if (appId === null) continue
 
-        return { appId, name: existing?.name ?? project.name, created: !existing }
-      }),
-    )
+    const [app] = await deps.db.select({ name: apps.name }).from(apps).where(eq(apps.id, appId)).limit(1)
+    connected.push({ appId, name: app?.name ?? project.name, created })
   }
 
   return connected

@@ -10,7 +10,8 @@ import {
 import { salesReport } from '../connectors/app-store/fixtures.js'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
-import { apps, connections, metricDaily } from '../db/schema.js'
+import { apps, assets, connections, metricDaily } from '../db/schema.js'
+import { assetOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { ConnectInputError, connectAppStore } from './connect-app-store.js'
@@ -72,15 +73,30 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       return refuse(404)
     }) as typeof fetch
 
-  const ourApps = () =>
-    db.select().from(apps).where(inArray(apps.iosAppId, [first.id, second.id])).orderBy(apps.name)
+  /** The apps the two iOS apps of the account belong to, with each one's bundle id. */
+  const ourApps = async () => {
+    const linked = await db
+      .select()
+      .from(assets)
+      .where(and(eq(assets.kind, 'ios_app'), inArray(assets.externalId, [first.id, second.id])))
+    const ids = linked.flatMap((asset) => (asset.appId ? [asset.appId] : []))
+    if (ids.length === 0) return []
+    const rows = await db.select().from(apps).where(inArray(apps.id, ids)).orderBy(apps.name)
+    return rows.map((app) => ({
+      ...app,
+      bundleId: (linked.find((asset) => asset.appId === app.id)?.details as { bundleId?: string } | null)?.bundleId,
+    }))
+  }
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
   })
 
   afterAll(async () => {
-    await db.delete(apps).where(inArray(apps.iosAppId, [first.id, second.id]))
+    const created = (await ourApps()).map((app) => app.id)
+    if (created.length > 0) await db.delete(apps).where(inArray(apps.id, created))
+    await db.delete(assets).where(inArray(assets.externalId, [first.id, second.id, `proj_${run}`]))
+    await db.delete(connections).where(eq(connections.externalAccountId, `proj_${run}`))
     await db
       .delete(connections)
       .where(and(eq(connections.provider, 'app_store'), eq(connections.externalAccountId, input.vendorNumber)))
@@ -101,7 +117,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       created: 2,
       analytics: { requested: 2, existing: 0, problem: null },
     })
-    expect((await ourApps()).map((app) => app.iosBundleId)).toEqual([first.bundleId, second.bundleId])
+    expect((await ourApps()).map((app) => app.bundleId)).toEqual([first.bundleId, second.bundleId])
 
     const connection = await findAppStoreConnection(db)
     expect(connection?.displayName).toBe('Vendor 85999001')
@@ -149,8 +165,9 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
   })
 
   it('leaves an app from outside the account alone', async () => {
-    const outsider = { id: `outsider-${run}`, name: 'Outsider', iosAppId: `not-in-account-${run}` }
+    const outsider = { id: `outsider-${run}`, name: 'Outsider' }
     await db.insert(apps).values(outsider)
+    await db.insert(assets).values({ kind: 'ios_app', externalId: `not-in-account-${run}`, name: 'Outsider', appId: outsider.id })
     try {
       await db.insert(metricDaily).values({
         appId: outsider.id,
@@ -170,6 +187,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       expect(rows).toEqual([{ date: '2026-11-17', value: 55 }])
     } finally {
       await db.delete(apps).where(eq(apps.id, outsider.id))
+      await db.delete(assets).where(eq(assets.externalId, `not-in-account-${run}`))
     }
   })
 
@@ -187,7 +205,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
     const [one] = await ourApps()
     expect(connected).toMatchObject({ appId: one?.id, created: false })
-    expect(one?.revenuecatProjectId).toBe(projectId)
+    expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(one?.id)
     expect(await ourApps()).toHaveLength(2)
   })
 

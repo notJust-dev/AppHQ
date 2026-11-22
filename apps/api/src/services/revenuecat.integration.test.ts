@@ -4,7 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createRevenueCatConnector } from '../connectors/revenuecat/connector.js'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
-import { apps, connections, metricDaily } from '../db/schema.js'
+import { apps, assets, connections, metricDaily } from '../db/schema.js'
+import { assetOf, connectionOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { connectRevenueCat } from './connect-revenuecat.js'
@@ -63,6 +64,8 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
 
   afterAll(async () => {
     if (appId) await db.delete(apps).where(eq(apps.id, appId))
+    await db.delete(assets).where(eq(assets.externalId, projectId))
+    await db.delete(connections).where(eq(connections.externalAccountId, projectId))
     await sql.end({ timeout: 5 })
   })
 
@@ -71,14 +74,13 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     appId = connected?.appId ?? ''
 
     expect(connected).toMatchObject({ name: 'Integration Test App', created: true })
-    const [app] = await db.select().from(apps).where(eq(apps.id, appId))
-    expect(app).toMatchObject({
-      revenuecatProjectId: projectId,
-      iosBundleId: 'dev.example.app',
-      androidPackage: 'dev.example.app',
+    const project = await assetOf(db, 'revenuecat_project', projectId)
+    expect(project).toMatchObject({
+      appId,
+      details: { bundleId: 'dev.example.app', androidPackage: 'dev.example.app' },
     })
 
-    const [connection] = await db.select().from(connections).where(eq(connections.appId, appId))
+    const connection = await connectionOf(db, 'revenuecat_project', projectId)
     expect(connection?.accessTokenEnc).not.toContain('sk_live_key')
     expect(secrets.decrypt(connection?.accessTokenEnc ?? '')).toBe('sk_live_key')
   })
@@ -87,7 +89,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     const [again] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key')
 
     expect(again).toMatchObject({ appId, created: false })
-    const rows = await db.select().from(connections).where(eq(connections.appId, appId))
+    const rows = await db.select().from(connections).where(eq(connections.externalAccountId, projectId))
     expect(rows).toHaveLength(1)
     expect(secrets.decrypt(rows[0]?.accessTokenEnc ?? '')).toBe('sk_new_key')
   })
@@ -115,7 +117,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     // Two revenue days, plus one point for each of the other five charts.
     expect(first.rowsWritten).toBe(7)
 
-    const [connection] = await db.select().from(connections).where(eq(connections.appId, appId))
+    const connection = await connectionOf(db, 'revenuecat_project', projectId)
     expect(connection?.status).toBe('ok')
     expect(connection?.lastSyncedAt).toBeInstanceOf(Date)
   })
@@ -129,7 +131,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
       connector.sync({ db, app, range: { from: '2026-11-01', to: '2026-11-19' }, log, secrets }),
     ).rejects.toThrow(/6 of 6 charts failed/)
 
-    const [connection] = await db.select().from(connections).where(eq(connections.appId, appId))
+    const connection = await connectionOf(db, 'revenuecat_project', projectId)
     expect(connection?.status).toBe('needs_reauth')
   })
 

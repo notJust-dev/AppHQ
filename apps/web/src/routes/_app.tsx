@@ -21,7 +21,8 @@ function AppShell() {
     <>
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-6 sm:gap-8">
-          <Link to="/" className="font-display text-lg font-semibold tracking-tight">
+          {/* On a phone the name makes way for the sections; Portfolio leads to the same page. */}
+          <Link to="/" className="hidden font-display text-lg font-semibold tracking-tight sm:block">
             AppDashboard
           </Link>
           <nav aria-label="Sections" className="flex gap-4 text-sm font-medium sm:gap-6">
@@ -33,12 +34,15 @@ function AppShell() {
             >
               Portfolio
             </Link>
+            <Link to="/apps" className="text-ink-soft hover:text-ink" activeProps={{ className: 'text-ink' }}>
+              Apps
+            </Link>
             <Link
-              to="/settings"
+              to="/accounts"
               className="text-ink-soft hover:text-ink"
               activeProps={{ className: 'text-ink' }}
             >
-              Settings
+              Accounts
             </Link>
           </nav>
           <button

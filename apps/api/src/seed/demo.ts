@@ -1,6 +1,6 @@
-import { like } from 'drizzle-orm'
+import { and, eq, isNull, like, or } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
-import { apps, posts, type NewApp, type NewMetric, type NewPost } from '../db/schema.js'
+import { apps, assets, posts, type NewApp, type NewMetric, type NewPost } from '../db/schema.js'
 import { addDays, parseIsoDate, todayUtc, type IsoDate } from '../lib/dates.js'
 import type { Source } from '../metrics/catalog.js'
 import { upsertMetrics } from '../metrics/upsert.js'
@@ -110,6 +110,7 @@ export interface DemoOptions {
 
 export function generateDemoData(options: DemoOptions): {
   apps: NewApp[]
+  assets: (typeof assets.$inferInsert)[]
   metrics: NewMetric[]
   posts: NewPost[]
 } {
@@ -226,20 +227,61 @@ export function generateDemoData(options: DemoOptions): {
     }
   }
 
+  const demoAssets = demoAssetsOf()
+
   return {
-    apps: PROFILES.map(({ id, name }) => ({
-      id,
-      name,
-      iosAppId: `demo.${id}`,
-      androidPackage: `demo.${id.replace('-', '.')}`,
-    })),
+    apps: PROFILES.map(({ id, name }) => ({ id, name })),
+    assets: demoAssets,
     metrics,
     posts: demoPosts,
   }
 }
 
+/**
+ * What each demo app is made of, so the Apps page shows full rows. No account stands behind
+ * them, so no connector ever reads them.
+ */
+function demoAssetsOf() {
+  return PROFILES.flatMap(({ id, name }) => {
+    const handle = name.toLowerCase()
+    // Like most apps, the same identifier on both stores.
+    const bundleId = `com.${handle}.app`
+    return [
+      { kind: 'ios_app', externalId: `demo.${id}`, name, appId: id, details: { bundleId } },
+      { kind: 'android_app', externalId: bundleId, name, appId: id, details: { title: name } },
+      {
+        kind: 'revenuecat_project',
+        externalId: `demo-project-${id}`,
+        name,
+        appId: id,
+        details: { bundleId, androidPackage: bundleId },
+      },
+      { kind: 'tiktok_account', externalId: `demo-tiktok-${id}`, name: `@${handle}.app`, appId: id },
+      { kind: 'instagram_account', externalId: `demo-instagram-${id}`, name: `@${handle}`, appId: id },
+    ]
+  })
+}
+
+/**
+ * Demo assets have no account behind them; anything with an account is real and stays. That
+ * includes a demo asset someone took off its app on the Apps page.
+ */
+const deleteDemoAssets = (db: Db) =>
+  db
+    .delete(assets)
+    .where(
+      and(
+        isNull(assets.connectionId),
+        or(
+          like(assets.appId, `${DEMO_PREFIX}%`),
+          ...demoAssetsOf().map((asset) => and(eq(assets.kind, asset.kind), eq(assets.externalId, asset.externalId))),
+        ),
+      ),
+    )
+
 /** Removes the demo apps and, through ON DELETE CASCADE, everything recorded for them. */
 export async function clearDemo(db: Db) {
+  await deleteDemoAssets(db)
   const removed = await db
     .delete(apps)
     .where(like(apps.id, `${DEMO_PREFIX}%`))
@@ -248,15 +290,18 @@ export async function clearDemo(db: Db) {
 }
 
 /**
- * Replaces the demo apps with their metrics and posts. Real apps (ids without the prefix) are
- * untouched.
+ * Replaces the demo apps with their assets, metrics and posts. Real apps (ids without the
+ * prefix) are untouched.
  */
 export async function seedDemo(db: Db, options: DemoOptions) {
   const data = generateDemoData(options)
   await db.transaction(async (tx) => {
-    // Metrics and posts go with the apps through ON DELETE CASCADE.
+    // Metrics and posts go with the apps through ON DELETE CASCADE; demo assets first, since
+    // removing an app only unlinks its assets.
+    await deleteDemoAssets(tx as unknown as Db)
     await tx.delete(apps).where(like(apps.id, `${DEMO_PREFIX}%`))
     await tx.insert(apps).values(data.apps)
+    await tx.insert(assets).values(data.assets).onConflictDoNothing()
     await upsertMetrics(tx as unknown as Db, data.metrics)
     for (let i = 0; i < data.posts.length; i += 500) {
       await tx.insert(posts).values(data.posts.slice(i, i + 500))

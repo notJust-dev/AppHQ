@@ -80,8 +80,10 @@ export const getOverview = defineQuery({
       return firstDay != null && firstDay <= previousRange.from
     }
 
-    const perApp = appRows.map((app) => ({
-      app: { id: app.id, name: app.name, iconUrl: app.iconUrl },
+    // Shared accounts count toward the totals, but only show as a row once they have numbers.
+    const shown = appRows.filter((app) => app.kind !== 'portfolio' || firstDayByApp.has(app.id))
+    const perApp = shown.map((app) => ({
+      app: { id: app.id, name: app.name, kind: app.kind, iconUrl: app.iconUrl },
       totals: sumOver(app.id, days),
       previous: sumOver(app.id, previousDays),
       comparable: isComparable(app.id),

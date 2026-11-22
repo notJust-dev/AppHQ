@@ -19,7 +19,7 @@ export const Route = createFileRoute('/connect/meta/callback')({
         const attempt = await finishOAuth('meta', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
           await attempt.report(ok, message)
-          return redirectTo('/settings?connected=meta')
+          return redirectTo('/accounts?connected=meta')
         }
 
         const error = params.get('error')

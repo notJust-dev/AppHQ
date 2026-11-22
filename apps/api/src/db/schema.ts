@@ -14,31 +14,35 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-/** The portfolio. `id` is a short slug used in URLs and by the AI tools. */
+/**
+ * The portfolio. `id` is a short slug used in URLs and by the AI tools. What feeds an app (its
+ * store listings, RevenueCat project, social accounts) is in `assets`.
+ *
+ * One row has `kind` 'portfolio' (id `portfolio`): it holds accounts that promote several apps,
+ * such as a personal build-in-public account, so their numbers count toward the portfolio's
+ * totals without landing in any single app's funnel.
+ */
 export const apps = pgTable('apps', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   iconUrl: text('icon_url'),
-  /** Numeric App Store id, used by App Store Connect reports. */
-  iosAppId: text('ios_app_id'),
-  iosBundleId: text('ios_bundle_id'),
-  androidPackage: text('android_package'),
-  revenuecatProjectId: text('revenuecat_project_id'),
+  /** 'app' | 'portfolio' */
+  kind: text('kind').notNull().default('app'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 /**
- * Credentials that have to live in the database: OAuth tokens that rotate (TikTok, Instagram)
- * and per-project API keys pasted in Settings (RevenueCat). Token columns hold ciphertext.
- * Account-level static keys (App Store Connect, Google Play) stay in env variables.
+ * Credentials: one row per signed-in account or key, never tied to an app. App Store Connect and
+ * Google Play keys, RevenueCat project keys, and OAuth tokens (TikTok accounts; Facebook Pages
+ * and Instagram accounts, each with its own token). Token columns hold ciphertext. What an
+ * account gives access to, and which app it belongs to, is in `assets`.
  */
 export const connections = pgTable(
   'connections',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     provider: text('provider').notNull(),
-    appId: text('app_id').references(() => apps.id, { onDelete: 'cascade' }),
     externalAccountId: text('external_account_id'),
     displayName: text('display_name'),
     accessTokenEnc: text('access_token_enc'),
@@ -57,6 +61,39 @@ export const connections = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('connections_provider_account_idx').on(t.provider, t.externalAccountId)],
+)
+
+/**
+ * What the connected accounts give access to: iOS apps, Android apps, RevenueCat projects,
+ * Facebook Pages, Instagram accounts, TikTok accounts. Each belongs to one app (or to the
+ * portfolio), or to none yet; `ignored` marks one that should stop asking for a decision.
+ * An app has at most one iOS app, one Android app and one RevenueCat project, and any number of
+ * social accounts.
+ */
+export const assets = pgTable(
+  'assets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** 'ios_app' | 'android_app' | 'revenuecat_project' | 'facebook_page' | 'instagram_account' | 'tiktok_account' */
+    kind: text('kind').notNull(),
+    /** Apple ID, package name, RevenueCat project id, Page id, Instagram id, TikTok open_id. */
+    externalId: text('external_id').notNull(),
+    name: text('name').notNull(),
+    appId: text('app_id').references(() => apps.id, { onDelete: 'set null' }),
+    /** The account it was found through, whose credentials read it. Null for demo assets. */
+    connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'set null' }),
+    ignored: boolean('ignored').notNull().default(false),
+    /** A person chose where this goes, or that it goes nowhere; automatic linking leaves it alone. */
+    decided: boolean('decided').notNull().default(false),
+    /** Non-secret facts used for matching, e.g. an iOS app's bundle id. */
+    details: jsonb('details'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('assets_kind_external_idx').on(t.kind, t.externalId),
+    index('assets_app_idx').on(t.appId),
+  ],
 )
 
 /**
@@ -161,3 +198,4 @@ export type SyncRun = typeof syncRuns.$inferSelect
 export type Connection = typeof connections.$inferSelect
 export type Post = typeof posts.$inferSelect
 export type NewPost = typeof posts.$inferInsert
+export type Asset = typeof assets.$inferSelect

@@ -1,4 +1,5 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
+import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
 import { connections, type App, type NewMetric } from '../../db/schema.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
@@ -21,13 +22,9 @@ const CHARTS = [
   { chart: 'customers_new', metric: 'new_customers', wanted: /customer/i },
 ] as const
 
-const findConnection = (db: Db, app: App) =>
-  db
-    .select()
-    .from(connections)
-    .where(and(eq(connections.provider, REVENUECAT), eq(connections.appId, app.id)))
-    .limit(1)
-    .then((rows) => rows[0])
+/** The app's RevenueCat project and the key that reads it. */
+const findProject = (db: Db, app: App) =>
+  linkedAssets(db, 'revenuecat_project', app.id).then((rows) => rows.find((row) => row.connection) ?? null)
 
 /** Revenue and subscription metrics, one RevenueCat project per app. Six requests per run. */
 export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}): AppConnector {
@@ -36,12 +33,14 @@ export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}
     scope: 'app',
 
     async isConfigured(app, db) {
-      return app.revenuecatProjectId !== null && (await findConnection(db, app)) !== undefined
+      return (await findProject(db, app)) !== null
     },
 
     async sync({ db, app, range, log, secrets }) {
-      const connection = await findConnection(db, app)
-      if (!connection?.accessTokenEnc || !app.revenuecatProjectId) {
+      const found = await findProject(db, app)
+      const connection = found?.connection
+      const projectId = found?.asset.externalId
+      if (!connection?.accessTokenEnc || !projectId) {
         throw new Error('No RevenueCat key is stored for this app')
       }
       const client = createRevenueCatClient({
@@ -57,7 +56,7 @@ export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}
       for (const { chart, metric, wanted } of CHARTS) {
         try {
           const series = toDailySeries(
-            await client.getDailyChart(app.revenuecatProjectId, chart, range),
+            await client.getDailyChart(projectId, chart, range),
             wanted,
           )
           if (series.fallback) {

@@ -171,8 +171,9 @@ All dates are UTC calendar days as reported by each source (see risk 5).
 
 | Table | Purpose | Key columns |
 |---|---|---|
-| `apps` | The portfolio | `id` (slug), `name`, `icon_url`, `ios_app_id`, `android_package`, `revenuecat_project_id`, `is_active` |
-| `connections` | Credentials that live in the database | `provider`, `app_id` (nullable), `external_account_id`, `display_name`, `access_token_enc`, `refresh_token_enc`, `expires_at`, `status` (`ok`, `needs_reauth`, `error`) |
+| `apps` | The portfolio | `id` (slug), `name`, `kind` (`app`, or `portfolio` for the one Shared accounts row), `icon_url`, `is_active` |
+| `connections` | Credentials: one row per sign-in or key | `provider`, `external_account_id`, `display_name`, `access_token_enc`, `refresh_token_enc`, `expires_at`, `status` (`ok`, `needs_reauth`, `error`), `details` |
+| `assets` | What the connections give access to | unique (`kind`, `external_id`), `name`, `app_id` (null until linked), `connection_id`, `ignored`, `decided`, `details` (bundle id, title, Page id) |
 | `metric_daily` | The single fact table | PK (`app_id`, `date`, `source`, `metric`, `dimension`), `value` |
 | `posts` | Social posts | `platform`, `external_id`, `app_id`, `url`, `caption`, `published_at`, latest totals |
 | `post_snapshot` | Nightly totals per post | PK (`post_id`, `date`), `views`, `likes`, `comments`, `shares`, `saves`, `reach` |
@@ -191,6 +192,31 @@ starts on the first sync.
 
 OAuth tokens and pasted API keys are encrypted with AES-256-GCM using a key from an env variable.
 
+### Accounts, assets and apps
+
+Three layers, so one sign-in can serve several apps and one app can gather several sources:
+
+- **Accounts** (`connections`) are the sign-ins and keys: one App Store Connect key, one Google
+  Play service account, one key per RevenueCat project, one Meta sign-in, one sign-in per TikTok
+  account. They hold credentials and nothing about apps.
+- **Assets** are what an account finds: iOS apps, Android packages, RevenueCat projects,
+  Facebook Pages, Instagram and TikTok accounts. Kinds and their rules are in
+  `apps/api/src/assets/kinds.ts`.
+- **Apps** gather assets. An app holds at most one iOS app, one Android app and one RevenueCat
+  project, and any number of social accounts. Social accounts that promote several apps belong to
+  Shared accounts (`apps.id = 'portfolio'`); their views count toward the portfolio only.
+
+Linking happens by itself only on exact evidence, and only into a free slot: an Android package
+equal to an app's iOS bundle id, a RevenueCat project naming a store app's bundle id or package
+(and the other way round), an Instagram account linked to a Page that has its app. A new iOS app
+gets an app of its own. Everything else waits on the Apps page under "Needs a decision", with a
+suggestion when the name matches an app; a person links, ignores, or makes a new app. Once a
+person has placed an asset, or taken it off an app, `decided` keeps automatic linking away from
+it. Linking an asset fetches its history.
+
+Connectors read their assets: the App Store and Google Play sync every linked app of their
+account; RevenueCat, Facebook, Instagram and TikTok sync per linked asset.
+
 ## 6. Data sources
 
 Every connector implements `sync(app, range)`, is idempotent (upserts), and re-fetches a trailing
@@ -207,7 +233,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - Charts stored: `revenue` → `revenue`, `mrr` → `mrr`, `actives` → `active_subs`, `trials` →
   `active_trials`, `trials_new` → `trials`, `customers_new` → `new_customers`. Six requests per
   app per sync.
-- Auth: a v2 secret key per project, pasted in Settings and stored encrypted in `connections`.
+- Auth: a v2 secret key per project, pasted on the Accounts page and stored encrypted in `connections`.
   It needs `charts_metrics:charts:read`, plus `project_configuration:projects:read` and
   `project_configuration:apps:read` so the app can be created from the project (name, iOS bundle
   id, Android package).
@@ -221,7 +247,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 ### App Store Connect (downloads built and run against a real key)
 
 - Auth: a team API key (Issuer ID, Key ID, `.p8`) signed as an ES256 JWT with a 15-minute life,
-  plus the vendor number. Entered in Settings and stored encrypted as one account-level
+  plus the vendor number. Entered on the Accounts page and stored encrypted as one account-level
   connection. Individual keys cannot read sales reports.
 - Roles: Sales and Reports (or Finance, Admin) reads sales reports. Only Admin can create
   analytics report requests; Sales and Reports can read the resulting reports.
@@ -242,7 +268,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   account's first sale answer 404 and are stored as gaps. First sync: 10 apps, 7,020 rows, daily
   reports from 2026-03-31 to the day before, no missing days in between. Not yet seen: a 404 for
   a day with no sales after the first one (it would show as a gap, not a zero).
-- The outcome of the analytics report requests is shown once in Settings and not stored; the
+- The outcome of the analytics report requests is shown once on the Accounts page and not stored; the
   analytics connector will list the requests itself.
 
 ### Google Play (built; Google's docs checked 2026-11-22; tested against a stand-in)
@@ -250,7 +276,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - No API has installs or store visitors (the Play Developer Reporting API is vitals only), so
   they come from the monthly CSVs in the account's Cloud Storage bucket
   (`pubsite_prod_rev_<id>`, from Play Console, Download reports, Copy Cloud Storage URI).
-- Auth: a Google Cloud service account, pasted in Settings as its JSON key and stored encrypted
+- Auth: a Google Cloud service account, pasted on the Accounts page as its JSON key and stored encrypted
   (not an env variable). RS256 JWT → `oauth2.googleapis.com/token`, scope
   `devstorage.read_only` (plus `playdeveloperreporting` for titles). In Play Console the account
   needs "View app information and download bulk reports" at account level; Google gives no
@@ -274,9 +300,9 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   acquisition metrics (Google's page contradicts itself on whether clicks are in the CSVs too).
 - App titles from the Reporting API's `apps:search` when that API is enabled in the service
   account's project; otherwise packages show by name.
-- Packages map to apps through `apps.android_package`: matched automatically when a package
-  equals an app's iOS bundle id; otherwise chosen in Settings, including "New app" for
-  Android-only apps. The packages found are kept in `connections.details`.
+- Each package found is an `android_app` asset. It links by itself when it equals an app's iOS
+  bundle id; otherwise it waits on the Apps page, where "A new app named …" covers Android-only
+  apps.
 - Reviews (Phase 3): the Android Publisher reviews endpoint only returns the last week, so
   syncing must start early; older reviews come from the bucket's review CSVs.
 
@@ -290,7 +316,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   URIs must be HTTPS, static (no query string) and an exact match; up to 10.
 - The callback lands on the dashboard (`/connect/tiktok/callback`), which holds the session and
   checks the state from a short-lived encrypted cookie; the API holds the client secret and
-  trades the code. The redirect URI is shown in Settings.
+  trades the code. The redirect URI is shown on the Accounts page.
 - Tokens: access token 2 hours, refresh token 180 days and rotating: the old refresh token stops
   working once a new one is issued, so the new pair is saved before use. Only one environment
   can own an account's token. `invalid_grant` on refresh means connect again.
@@ -329,10 +355,11 @@ Pages. Graph API v27.0 (out 2026-11-04).
   days, no server-side refresh; signing in again renews it). `/me/accounts` returns a Page token per Page, which does
   not expire. Instagram accounts keep both; the connector tries the Page token and falls back to
   the user token (Meta documents the user token). So after ~60 days Instagram may stop until the
-  next sign-in, while Facebook keeps going; Settings shows the date. Every call carries an
+  next sign-in, while Facebook keeps going; the Accounts page shows the date. Every call carries an
   `appsecret_proof`.
-- Accounts: the sign-in saves every Page and linked Instagram account unassigned; Settings picks
-  the app each promotes (or "Not tracked"). Signing in again keeps those choices.
+- Accounts: the sign-in saves every Page and Instagram account as an asset without an app; the
+  Apps page links each to the app it promotes, to Shared accounts, or ignores it. An Instagram
+  account follows its Page's app when the Page is linked. Signing in again keeps those choices.
 - Facebook daily (Page insights, `period=day`, at most 90 days per request, two years kept):
   `page_media_view` → `views`, `page_total_media_view_unique` → `reach`, `page_post_engagements`
   → `engagements`, `page_follows` → `followers`. `page_impressions*` and `page_fans` were removed
@@ -488,14 +515,22 @@ Status on 2026-11-22 (merged to `main` and deployed):
   `snapshot` command is needed.
 - The sandbox's client key and secret are on the `api` app. Up to 10 accounts can be target
   users; more, or other people's accounts, need the app to pass TikTok's review.
-- Open: an account that posts about several apps (build in public) can only be connected to
-  one. Splitting its posts across apps would need a per-post app, set by hand or by hashtag.
+- An account that posts about several apps (build in public) goes to Shared accounts. Splitting
+  its posts across apps would still need a per-post app, set by hand or by hashtag.
 - Steps 1 and 3, plus step 7 (merged and deployed 2026-11-22): "Connect Facebook and
   Instagram" in Settings and the two connectors described under Data sources. Tested with unit
   tests, database tests and a browser run against a stand-in Graph API (connect, pick apps,
   backfill, cancel), then against Meta: TinyKicks and ZenFit, each with a Page and an Instagram
   account. The Meta app uses Unified login, and its configuration offers Pages and Instagram
   accounts as assets, so one sign-in covers both.
+
+- Accounts, assets and apps (branch `assets-model`, 2026-11-22, not deployed yet): Settings
+  became two pages. Accounts holds the sign-ins and keys, each with what it found and how much
+  waits for a decision. Apps lists every app with its iOS, Android, revenue and social sources,
+  the "Needs a decision" list (link, new app, Shared accounts, ignore) and the ignored assets.
+  Each app's page has a Sources panel to change any of them. `/settings` redirects to
+  `/accounts`. Migrations 0004 to 0006 move the existing links into `assets` (checked on a copy
+  shaped like production), drop the old link columns and add `decided`.
 
 ### Phase 3 — Reviews inbox
 

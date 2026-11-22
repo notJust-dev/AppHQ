@@ -1,4 +1,5 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
+import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
 import { connections, type NewMetric } from '../../db/schema.js'
 import type { IsoDate } from '../../lib/dates.js'
@@ -9,11 +10,11 @@ export const FRESH_POST_DAYS = 30
 /** How far back posts are listed. */
 export const POST_HISTORY_DAYS = 365
 
+/** The Pages or Instagram accounts linked to an app, as their connection rows (tokens, state). */
 export const metaConnections = (db: Db, provider: string, appId: string) =>
-  db
-    .select()
-    .from(connections)
-    .where(and(eq(connections.provider, provider), eq(connections.appId, appId)))
+  linkedAssets(db, provider === 'facebook' ? 'facebook_page' : 'instagram_account', appId).then((rows) =>
+    rows.flatMap((row) => (row.connection ? [row.connection] : [])),
+  )
 
 /** Sums values per metric and day across an app's accounts. */
 export class DailyTotals {
