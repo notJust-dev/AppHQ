@@ -51,6 +51,7 @@ function PortfolioPage() {
             <FunnelBand
               totals={data.totals}
               previous={data.comparable ? data.previousTotals : null}
+              reporting={data.reporting}
               comparedWith={`vs previous ${days} days`}
             />
             <Panel title="Apps" description="Each app's funnel over the same days, most revenue first." bodyClassName="">

@@ -1,8 +1,10 @@
 import { change, formatCompact, formatMoney, formatRatio, per, type Change } from '../lib/format'
 import type { Overview } from '../lib/queries'
 import { Delta } from './Delta'
+import { NoData } from './ui/NoData'
 
 type Totals = Overview['totals']
+type Reporting = Overview['reporting']
 
 /**
  * The portfolio as one funnel: views, downloads, revenue, with the conversion between each
@@ -11,15 +13,20 @@ type Totals = Overview['totals']
 export function FunnelBand({
   totals,
   previous,
+  reporting,
   comparedWith,
 }: {
   totals: Totals
   /** Null when history does not cover the previous period. */
   previous: Totals | null
+  /** Which totals any source reported; the others are no data, not zero. */
+  reporting: Reporting
   comparedWith: string
 }) {
-  const downloadsPerThousandViews = per(totals.downloads * 1000, totals.socialViews)
-  const revenuePerDownload = per(totals.revenue, totals.downloads)
+  // A conversion needs both of its stages to have numbers.
+  const downloadsPerThousandViews =
+    reporting.socialViews && reporting.downloads ? per(totals.downloads * 1000, totals.socialViews) : null
+  const revenuePerDownload = reporting.revenue && reporting.downloads ? per(totals.revenue, totals.downloads) : null
 
   return (
     <section
@@ -29,7 +36,7 @@ export function FunnelBand({
       <Stage
         label="Social views"
         swatch="bg-views"
-        value={formatCompact(totals.socialViews)}
+        value={reporting.socialViews ? formatCompact(totals.socialViews) : null}
         change={previous ? change(totals.socialViews, previous.socialViews) : 'incomparable'}
         comparedWith={comparedWith}
       />
@@ -40,7 +47,7 @@ export function FunnelBand({
       <Stage
         label="Downloads"
         swatch="bg-downloads"
-        value={formatCompact(totals.downloads)}
+        value={reporting.downloads ? formatCompact(totals.downloads) : null}
         change={previous ? change(totals.downloads, previous.downloads) : 'incomparable'}
         comparedWith={comparedWith}
       />
@@ -51,7 +58,7 @@ export function FunnelBand({
       <Stage
         label="Revenue"
         swatch="bg-revenue"
-        value={formatMoney(totals.revenue)}
+        value={reporting.revenue ? formatMoney(totals.revenue) : null}
         change={previous ? change(totals.revenue, previous.revenue) : 'incomparable'}
         comparedWith={comparedWith}
       />
@@ -62,7 +69,8 @@ export function FunnelBand({
 function Stage(props: {
   label: string
   swatch: string
-  value: string
+  /** Null when no source reported this stage in the range. */
+  value: string | null
   /** Null when there is nothing in either period; 'incomparable' when history is too short. */
   change: Change | null | 'incomparable'
   comparedWith: string
@@ -75,9 +83,17 @@ function Stage(props: {
         <span className={`size-2 rounded-full ${props.swatch}`} aria-hidden="true" />
         {props.label}
       </p>
-      <p className="figures mt-2 text-[32px] leading-none font-semibold tracking-tight">{props.value}</p>
+      <p
+        className={`figures mt-2 text-[32px] leading-none font-semibold tracking-tight ${
+          props.value === null ? 'text-ink-faint' : ''
+        }`}
+      >
+        {props.value ?? <NoData />}
+      </p>
       <p className="mt-2 text-xs text-ink-soft">
-        {props.change === 'incomparable' ? (
+        {props.value === null ? (
+          'No data in this range'
+        ) : props.change === 'incomparable' ? (
           'Not enough history to compare'
         ) : props.change === null ? (
           'No data yet'
