@@ -25,6 +25,7 @@ export const SOURCES: {
     | '/accounts/revenuecat'
     | '/accounts/meta'
     | '/accounts/tiktok'
+    | '/accounts/search-console'
   brings: string
   /** What it finds, one and many. */
   noun: [string, string]
@@ -63,6 +64,13 @@ export const SOURCES: {
     to: '/accounts/tiktok',
     brings: 'Video views and followers.',
     noun: ['account', 'accounts'],
+  },
+  {
+    family: 'search_console',
+    title: 'Google Search Console',
+    to: '/accounts/search-console',
+    brings: "Google search clicks, impressions and position for your apps' websites.",
+    noun: ['website', 'websites'],
   },
 ]
 

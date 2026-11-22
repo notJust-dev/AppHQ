@@ -79,6 +79,13 @@ already connected: App Store reviews need a key with the Admin, App Manager or C
 role, and Google Play's come from the same bucket as the installs. Reviews more than two weeks
 old when first imported arrive already read.
 
+For SEO, connect Google Search Console on the Accounts page with a Google Cloud service account:
+the one Google Play uses works, or another key. Enable the Google Search Console API in that
+service account's project, and in Search Console add its email to each website (Settings, Users
+and permissions, Restricted is enough). Each website then waits on the Apps page to be linked to
+its app, like a store app; 16 months of daily clicks, impressions and position are fetched. The
+SEO page shows them with the top queries and pages, which are read from Google as it opens.
+
 For revenue, open an app's Settings and paste a RevenueCat v2 secret key from that app's project
 (a RevenueCat key belongs to one project, so it is connected per app, not on the Accounts page).
 The key needs read access to charts and metrics, and to project configuration. About a year of

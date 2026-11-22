@@ -5,10 +5,12 @@ import { change } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 /** A row of headline numbers, as many per line as the room allows. */
-export function StatGrid({ children }: { children: ReactNode }) {
+export function StatGrid({ children, columns = 3 }: { children: ReactNode; columns?: 3 | 4 }) {
   return (
     <section aria-label="Totals" className="@container">
-      <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @2xl:grid-cols-3">{children}</div>
+      <div className={cn('grid grid-cols-1 gap-3 @md:grid-cols-2', columns === 4 ? '@3xl:grid-cols-4' : '@2xl:grid-cols-3')}>
+        {children}
+      </div>
     </section>
   )
 }

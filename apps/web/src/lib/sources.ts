@@ -5,6 +5,7 @@ const LABELS: Record<string, string> = {
   tiktok: 'TikTok',
   instagram: 'Instagram',
   facebook: 'Facebook',
+  search_console: 'Search Console',
   heartbeat: 'Cron check',
 }
 

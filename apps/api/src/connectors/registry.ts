@@ -3,6 +3,7 @@ import { createGooglePlayConnector } from './google-play/connector.js'
 import { createFacebookConnector } from './meta/facebook-connector.js'
 import { createInstagramConnector } from './meta/instagram-connector.js'
 import { createRevenueCatConnector } from './revenuecat/connector.js'
+import { createSearchConsoleConnector } from './search-console/connector.js'
 import { createTikTokConnector } from './tiktok/connector.js'
 import type { Connector } from './types.js'
 
@@ -14,4 +15,5 @@ export const connectors: Connector[] = [
   createTikTokConnector(),
   createFacebookConnector(),
   createInstagramConnector(),
+  createSearchConsoleConnector(),
 ]

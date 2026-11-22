@@ -21,7 +21,15 @@ import { listAccounts } from '../queries/list-accounts.js'
 import { listApps } from '../queries/list-apps.js'
 import { listAssets } from '../queries/list-assets.js'
 import { listPosts } from '../queries/list-posts.js'
-import { getMonetisationPerformance, getSocialPerformance, getStorePerformance } from '../queries/performance.js'
+import {
+  getMonetisationPerformance,
+  getSearchPerformance,
+  getSocialPerformance,
+  getStorePerformance,
+} from '../queries/performance.js'
+import { connectSearchConsole } from '../services/connect-search-console.js'
+import { searchTop } from '../services/search-top.js'
+import { SEARCH_CONSOLE, SEARCH_CONSOLE_HISTORY_DAYS, SearchConsoleError } from '../connectors/search-console/client.js'
 import { getReviewSummary, listReviews, reviewConditions, reviewFilters } from '../queries/reviews.js'
 import { markReviews } from '../reviews/save.js'
 import { count, isNull } from 'drizzle-orm'
@@ -385,6 +393,49 @@ export const appRouter = t.router({
     monetisation: t.procedure
       .input(getMonetisationPerformance.input)
       .query(({ ctx, input }) => getMonetisationPerformance.handler(ctx, input)),
+    search: t.procedure
+      .input(getSearchPerformance.input)
+      .query(({ ctx, input }) => getSearchPerformance.handler(ctx, input)),
+  }),
+  /**
+   * Google Search Console, through a service account added to the person's properties: the
+   * Google Play one, or another key.
+   */
+  searchConsole: t.router({
+    connect: t.procedure
+      .input(
+        z
+          .object({ serviceAccountJson: z.string().trim().min(100).max(10_000).optional(), usePlayKey: z.boolean().optional() })
+          .refine((value) => value.serviceAccountJson || value.usePlayKey, 'Give a key, or use the Google Play one'),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await connectSearchConsole(ctx, input).catch((err: unknown) => {
+          ctx.log.error(`connect Search Console failed: ${err instanceof Error ? err.message : err}`)
+          throw connectError(err)
+        })
+        startSync(ctx, { connectors, sources: [SEARCH_CONSOLE], range: trailingRange(SEARCH_CONSOLE_HISTORY_DAYS) })
+        return result
+      }),
+
+    /** The top queries or pages over a range, read live from Search Console. */
+    top: t.procedure
+      .input(
+        z.object({
+          appId: z.string().min(1).max(64).optional(),
+          from: z.iso.date(),
+          to: z.iso.date(),
+          dimension: z.enum(['query', 'page']),
+          limit: z.number().int().min(1).max(100).default(20),
+        }),
+      )
+      .query(({ ctx, input }) =>
+        searchTop(ctx, input).catch((err: unknown) => {
+          if (err instanceof SearchConsoleError) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: `Search Console answered: ${err.message}` })
+          }
+          throw err
+        }),
+      ),
   }),
   /** The reviews inbox: written App Store and Google Play reviews, read state kept here. */
   reviews: t.router({

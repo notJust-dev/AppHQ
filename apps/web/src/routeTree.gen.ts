@@ -16,6 +16,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppMonetisationRouteImport } from './routes/_app/monetisation'
 import { Route as AppReviewsRouteImport } from './routes/_app/reviews'
+import { Route as AppSeoRouteImport } from './routes/_app/seo'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSocialRouteImport } from './routes/_app/social'
 import { Route as AppStoreRouteImport } from './routes/_app/store'
@@ -24,6 +25,7 @@ import { Route as AppAccountsAppStoreRouteImport } from './routes/_app/accounts.
 import { Route as AppAccountsGooglePlayRouteImport } from './routes/_app/accounts.google-play'
 import { Route as AppAccountsMetaRouteImport } from './routes/_app/accounts.meta'
 import { Route as AppAccountsRevenuecatRouteImport } from './routes/_app/accounts.revenuecat'
+import { Route as AppAccountsSearchConsoleRouteImport } from './routes/_app/accounts.search-console'
 import { Route as AppAccountsTiktokRouteImport } from './routes/_app/accounts.tiktok'
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
 import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
@@ -67,6 +69,11 @@ const AppReviewsRoute = AppReviewsRouteImport.update({
   path: '/reviews',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSeoRoute = AppSeoRouteImport.update({
+  id: '/seo',
+  path: '/seo',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -107,6 +114,12 @@ const AppAccountsRevenuecatRoute = AppAccountsRevenuecatRouteImport.update({
   path: '/revenuecat',
   getParentRoute: () => AppAccountsRoute,
 } as any)
+const AppAccountsSearchConsoleRoute =
+  AppAccountsSearchConsoleRouteImport.update({
+    id: '/search-console',
+    path: '/search-console',
+    getParentRoute: () => AppAccountsRoute,
+  } as any)
 const AppAccountsTiktokRoute = AppAccountsTiktokRouteImport.update({
   id: '/tiktok',
   path: '/tiktok',
@@ -155,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/accounts': typeof AppAccountsRouteWithChildren
   '/monetisation': typeof AppMonetisationRoute
   '/reviews': typeof AppReviewsRoute
+  '/seo': typeof AppSeoRoute
   '/settings': typeof AppSettingsRoute
   '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
@@ -162,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/accounts/google-play': typeof AppAccountsGooglePlayRoute
   '/accounts/meta': typeof AppAccountsMetaRoute
   '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
+  '/accounts/search-console': typeof AppAccountsSearchConsoleRoute
   '/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/apps/new': typeof AppAppsNewRoute
@@ -177,6 +192,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/monetisation': typeof AppMonetisationRoute
   '/reviews': typeof AppReviewsRoute
+  '/seo': typeof AppSeoRoute
   '/settings': typeof AppSettingsRoute
   '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
@@ -185,6 +201,7 @@ export interface FileRoutesByTo {
   '/accounts/google-play': typeof AppAccountsGooglePlayRoute
   '/accounts/meta': typeof AppAccountsMetaRoute
   '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
+  '/accounts/search-console': typeof AppAccountsSearchConsoleRoute
   '/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/apps/new': typeof AppAppsNewRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
@@ -202,6 +219,7 @@ export interface FileRoutesById {
   '/_app/accounts': typeof AppAccountsRouteWithChildren
   '/_app/monetisation': typeof AppMonetisationRoute
   '/_app/reviews': typeof AppReviewsRoute
+  '/_app/seo': typeof AppSeoRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/social': typeof AppSocialRoute
   '/_app/store': typeof AppStoreRoute
@@ -210,6 +228,7 @@ export interface FileRoutesById {
   '/_app/accounts/google-play': typeof AppAccountsGooglePlayRoute
   '/_app/accounts/meta': typeof AppAccountsMetaRoute
   '/_app/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
+  '/_app/accounts/search-console': typeof AppAccountsSearchConsoleRoute
   '/_app/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/_app/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/_app/apps/new': typeof AppAppsNewRoute
@@ -229,6 +248,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/monetisation'
     | '/reviews'
+    | '/seo'
     | '/settings'
     | '/social'
     | '/store'
@@ -236,6 +256,7 @@ export interface FileRouteTypes {
     | '/accounts/google-play'
     | '/accounts/meta'
     | '/accounts/revenuecat'
+    | '/accounts/search-console'
     | '/accounts/tiktok'
     | '/apps/$appId'
     | '/apps/new'
@@ -251,6 +272,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/monetisation'
     | '/reviews'
+    | '/seo'
     | '/settings'
     | '/social'
     | '/store'
@@ -259,6 +281,7 @@ export interface FileRouteTypes {
     | '/accounts/google-play'
     | '/accounts/meta'
     | '/accounts/revenuecat'
+    | '/accounts/search-console'
     | '/accounts/tiktok'
     | '/apps/new'
     | '/connect/meta/callback'
@@ -275,6 +298,7 @@ export interface FileRouteTypes {
     | '/_app/accounts'
     | '/_app/monetisation'
     | '/_app/reviews'
+    | '/_app/seo'
     | '/_app/settings'
     | '/_app/social'
     | '/_app/store'
@@ -283,6 +307,7 @@ export interface FileRouteTypes {
     | '/_app/accounts/google-play'
     | '/_app/accounts/meta'
     | '/_app/accounts/revenuecat'
+    | '/_app/accounts/search-console'
     | '/_app/accounts/tiktok'
     | '/_app/apps/$appId'
     | '/_app/apps/new'
@@ -353,6 +378,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReviewsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/seo': {
+      id: '/_app/seo'
+      path: '/seo'
+      fullPath: '/seo'
+      preLoaderRoute: typeof AppSeoRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -407,6 +439,13 @@ declare module '@tanstack/react-router' {
       path: '/revenuecat'
       fullPath: '/accounts/revenuecat'
       preLoaderRoute: typeof AppAccountsRevenuecatRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
+    '/_app/accounts/search-console': {
+      id: '/_app/accounts/search-console'
+      path: '/search-console'
+      fullPath: '/accounts/search-console'
+      preLoaderRoute: typeof AppAccountsSearchConsoleRouteImport
       parentRoute: typeof AppAccountsRoute
     }
     '/_app/accounts/tiktok': {
@@ -473,6 +512,7 @@ interface AppAccountsRouteChildren {
   AppAccountsGooglePlayRoute: typeof AppAccountsGooglePlayRoute
   AppAccountsMetaRoute: typeof AppAccountsMetaRoute
   AppAccountsRevenuecatRoute: typeof AppAccountsRevenuecatRoute
+  AppAccountsSearchConsoleRoute: typeof AppAccountsSearchConsoleRoute
   AppAccountsTiktokRoute: typeof AppAccountsTiktokRoute
   AppAccountsIndexRoute: typeof AppAccountsIndexRoute
 }
@@ -482,6 +522,7 @@ const AppAccountsRouteChildren: AppAccountsRouteChildren = {
   AppAccountsGooglePlayRoute: AppAccountsGooglePlayRoute,
   AppAccountsMetaRoute: AppAccountsMetaRoute,
   AppAccountsRevenuecatRoute: AppAccountsRevenuecatRoute,
+  AppAccountsSearchConsoleRoute: AppAccountsSearchConsoleRoute,
   AppAccountsTiktokRoute: AppAccountsTiktokRoute,
   AppAccountsIndexRoute: AppAccountsIndexRoute,
 }
@@ -508,6 +549,7 @@ interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRouteWithChildren
   AppMonetisationRoute: typeof AppMonetisationRoute
   AppReviewsRoute: typeof AppReviewsRoute
+  AppSeoRoute: typeof AppSeoRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSocialRoute: typeof AppSocialRoute
   AppStoreRoute: typeof AppStoreRoute
@@ -521,6 +563,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRouteWithChildren,
   AppMonetisationRoute: AppMonetisationRoute,
   AppReviewsRoute: AppReviewsRoute,
+  AppSeoRoute: AppSeoRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSocialRoute: AppSocialRoute,
   AppStoreRoute: AppStoreRoute,

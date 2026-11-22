@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AppWindow, LayoutDashboard, LogOut, Megaphone, MessageSquareText, Monitor, Moon, Plug, Plus, Store, Sun, Wallet } from 'lucide-react'
+import { AppWindow, LayoutDashboard, LogOut, Megaphone, MessageSquareText, Monitor, Moon, Plug, Plus, Search, Store, Sun, Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { BrandMark } from '@/components/Brand'
 import {
@@ -40,6 +40,7 @@ const PERFORMANCE = [
   { to: '/social', label: 'Social', Icon: Megaphone },
   { to: '/store', label: 'Store', Icon: Store },
   { to: '/monetisation', label: 'Monetisation', Icon: Wallet },
+  { to: '/seo', label: 'SEO', Icon: Search },
 ] as const
 
 /** How many apps the sidebar lists before pointing to the Apps page for the rest. */

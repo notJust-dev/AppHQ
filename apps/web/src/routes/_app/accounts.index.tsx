@@ -1,7 +1,7 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Smartphone, ThumbsUp } from 'lucide-react'
+import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Search, Smartphone, ThumbsUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import {
@@ -294,6 +294,6 @@ function DemoData({ onChanged }: { onChanged: () => void }) {
 
 /** A plain pictogram per source; the names carry the brands. */
 function SourceIcon({ family }: { family: AccountFamily['family'] }) {
-  const Icon = { app_store: Smartphone, google_play: AppWindow, revenuecat: BadgeDollarSign, meta: ThumbsUp, tiktok: Play }[family]
+  const Icon = { app_store: Smartphone, google_play: AppWindow, revenuecat: BadgeDollarSign, meta: ThumbsUp, tiktok: Play, search_console: Search }[family]
   return <Icon className="size-4" />
 }

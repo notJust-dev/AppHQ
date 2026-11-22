@@ -214,13 +214,14 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   }
 
   return (
-    <Table className="min-w-[680px]">
+    <Table className="min-w-[800px]">
       <TableHeader>
         <TableRow>
           <TableHead scope="col">App</TableHead>
           <TableHead scope="col">iOS</TableHead>
           <TableHead scope="col">Android</TableHead>
           <TableHead scope="col">Revenue</TableHead>
+          <TableHead scope="col">Website</TableHead>
           <TableHead scope="col">Social</TableHead>
           <TableHead scope="col">
             <span className="sr-only">Settings</span>
@@ -251,7 +252,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                 )}
               </TableRowHead>
               {portfolio ? (
-                <TableCell colSpan={3} className="align-top text-muted-foreground">
+                <TableCell colSpan={4} className="align-top text-muted-foreground">
                   Social accounts only
                 </TableCell>
               ) : (
@@ -259,6 +260,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                   <SlotCell asset={one('ios_app')} detail={(asset) => asset.bundleId ?? asset.name} mono />
                   <SlotCell asset={one('android_app')} detail={(asset) => asset.externalId} mono />
                   <SlotCell asset={one('revenuecat_project')} detail={(asset) => asset.name} />
+                  <SlotCell asset={one('search_console_site')} detail={(asset) => asset.name} />
                 </>
               )}
               <TableCell className="align-top">

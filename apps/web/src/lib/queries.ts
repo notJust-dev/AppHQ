@@ -6,6 +6,7 @@ import { metaSetupFn } from '@/fns/meta'
 import { tiktokSetupFn } from '@/fns/tiktok'
 import { getMonetisationPerformanceFn, getSocialPerformanceFn, getStorePerformanceFn } from '@/fns/performance'
 import { listReviewsFn, reviewSummaryFn, unreadReviewsFn } from '@/fns/reviews'
+import { getSearchPerformanceFn, searchTopFn } from '@/fns/search'
 
 export const overviewQuery = (dates: { from: string; to: string }) =>
   queryOptions({
@@ -62,6 +63,21 @@ export const monetisationPerformanceQuery = (input: PerformanceInput) =>
     queryFn: () => getMonetisationPerformanceFn({ data: input }),
   })
 
+export const searchPerformanceQuery = (input: PerformanceInput) =>
+  queryOptions({
+    queryKey: ['performance', 'search', input.from, input.to, input.appId ?? 'all'],
+    queryFn: () => getSearchPerformanceFn({ data: input }),
+  })
+
+/** The top queries or pages, read live from Google; kept a few minutes, as Google is slow. */
+export const searchTopQuery = (input: PerformanceInput & { dimension: 'query' | 'page' }) =>
+  queryOptions({
+    queryKey: ['search-top', input.dimension, input.from, input.to, input.appId ?? 'all'],
+    queryFn: () => searchTopFn({ data: input }),
+    staleTime: 5 * 60_000,
+  })
+
+export type SearchPerformance = Awaited<ReturnType<typeof getSearchPerformanceFn>>
 export type SocialPerformance = Awaited<ReturnType<typeof getSocialPerformanceFn>>
 export type StorePerformance = Awaited<ReturnType<typeof getStorePerformanceFn>>
 export type MonetisationPerformance = Awaited<ReturnType<typeof getMonetisationPerformanceFn>>
@@ -70,6 +86,7 @@ export type PerformanceSeries =
   | SocialPerformance['series'][number]
   | StorePerformance['series'][number]
   | MonetisationPerformance['series'][number]
+  | SearchPerformance['series'][number]
 
 export interface ReviewFilters {
   appId?: string

@@ -290,3 +290,15 @@ export const getMonetisationPerformance = defineQuery({
   input,
   handler: async ({ db }, range) => (await loadSection(db, PERFORMANCE.monetisation, range)).result,
 })
+
+export const getSearchPerformance = defineQuery({
+  name: 'get_search_performance',
+  description:
+    'Google search performance over a date range, for one app or all, from Search Console: ' +
+    'clicks and impressions of the websites linked to apps, and `positionSum`, the average ' +
+    'position times impressions (divide by impressions for the average position; lower is ' +
+    'better). Google posts a day two or three days late. ' +
+    SERIES_NOTE,
+  input,
+  handler: async ({ db }, range) => (await loadSection(db, PERFORMANCE.search, range)).result,
+})

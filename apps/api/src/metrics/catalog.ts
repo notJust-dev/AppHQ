@@ -6,6 +6,7 @@ export const SOURCES = [
   'tiktok',
   'instagram',
   'facebook',
+  'search_console',
 ] as const
 
 export type Source = (typeof SOURCES)[number]
@@ -121,6 +122,12 @@ export const PERFORMANCE = {
     { key: 'trials', label: 'Trials started', metric: 'trials', sources: ['revenuecat'], unit: 'count', aggregate: 'sum' },
     { key: 'newCustomers', label: 'New customers', metric: 'new_customers', sources: ['revenuecat'], unit: 'count', aggregate: 'sum' },
     { key: 'downloads', label: 'Downloads', metric: 'downloads', sources: STORE_SOURCES, unit: 'count', aggregate: 'sum' },
+  ],
+  search: [
+    { key: 'clicks', label: 'Search clicks', metric: 'search_clicks', sources: ['search_console'], unit: 'count', aggregate: 'sum' },
+    { key: 'impressions', label: 'Search impressions', metric: 'search_impressions', sources: ['search_console'], unit: 'count', aggregate: 'sum' },
+    // Average position is this over impressions; stored as a sum so days and sites add up.
+    { key: 'positionSum', label: 'Position × impressions', metric: 'search_position_sum', sources: ['search_console'], unit: 'count', aggregate: 'sum' },
   ],
 } as const satisfies Record<
   string,

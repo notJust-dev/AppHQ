@@ -6,7 +6,7 @@ import { assets, connections } from '../db/schema.js'
 import { defineQuery } from './define.js'
 
 /** Sources as people know them: Facebook and Instagram arrive through one Meta sign-in. */
-export const ACCOUNT_FAMILIES = ['app_store', 'google_play', 'revenuecat', 'meta', 'tiktok'] as const
+export const ACCOUNT_FAMILIES = ['app_store', 'google_play', 'revenuecat', 'meta', 'tiktok', 'search_console'] as const
 export type AccountFamily = (typeof ACCOUNT_FAMILIES)[number]
 
 const familyOf = (provider: string): AccountFamily | null =>
@@ -20,7 +20,7 @@ export const listAccounts = defineQuery({
   name: 'list_accounts',
   description:
     'The connected accounts, grouped by source (App Store Connect, Google Play, RevenueCat, ' +
-    'Meta for Facebook and Instagram, TikTok): each sign-in or key with its state, when it last ' +
+    'Meta for Facebook and Instagram, TikTok, Google Search Console): each sign-in or key with its state, when it last ' +
     'synced and when it expires, a note when it needs the person (an App Store key that may not ' +
     'start analytics reports, say), and how many assets the source found, how many belong to an ' +
     'app, and how many wait for a decision.',

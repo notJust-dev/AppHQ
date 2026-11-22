@@ -126,6 +126,7 @@ export function generateDemoData(options: DemoOptions): {
     const noise = (spread: number) => 1 + (rand() * 2 - 1) * spread
     // Posts draw from their own sequence, so adding them left every metric exactly as it was.
     const postRand = mulberry32(hash(`${id}:posts`))
+    const searchRand = mulberry32(hash(`${id}:search`))
     const addPost = (platform: Source, index: number, date: IsoDate, views: number) => {
       const hour = String(13 + Math.floor(postRand() * 8)).padStart(2, '0')
       const minute = String(Math.floor(postRand() * 60)).padStart(2, '0')
@@ -220,6 +221,13 @@ export function generateDemoData(options: DemoOptions): {
       const converting = (downloadsByDay[i - 7] ?? downloads) * 0.11 * 0.38
       mrr = mrr * (1 - 0.0035) + converting * monthlyPrice
       const revenue = converting * monthlyPrice + (mrr / 30) * noise(0.12)
+
+      // Google search for the app's website, from its own sequence so nothing above changes.
+      const searchImpressions = Math.round(scale * 1_400 * weekend * (0.85 + searchRand() * 0.3) * (1 + i / options.days))
+      const searchPosition = 14 - (6 * i) / options.days + (searchRand() - 0.5) * 2
+      push('search_console', 'search_impressions', searchImpressions)
+      push('search_console', 'search_clicks', Math.round(searchImpressions * (0.025 + searchRand() * 0.02)))
+      push('search_console', 'search_position_sum', Math.round(searchPosition * searchImpressions))
 
       push('revenuecat', 'trials', Math.round(downloads * 0.11 * noise(0.15)))
       push('revenuecat', 'revenue', Math.round(revenue * 100) / 100)
@@ -325,6 +333,7 @@ function demoAssetsOf() {
       },
       { kind: 'tiktok_account', externalId: `demo-tiktok-${id}`, name: `@${handle}.app`, appId: id },
       { kind: 'instagram_account', externalId: `demo-instagram-${id}`, name: `@${handle}`, appId: id },
+      { kind: 'search_console_site', externalId: `https://www.${handle}.app/`, name: `${handle}.app`, appId: id },
     ]
   })
 }

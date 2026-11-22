@@ -79,13 +79,14 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
   )
 }
 
-/** Store apps come from an account connected once, on the Accounts page. */
-const STORE_KINDS = ['ios_app', 'android_app'] as const
+/** Store apps and the website come from an account connected once, on the Accounts page. */
+const STORE_KINDS = ['ios_app', 'android_app', 'search_console_site'] as const
 
-/** The page where the account behind each store kind is set up. */
+/** The page where the account behind each kind is set up. */
 const SETUP_PAGE = {
   ios_app: '/accounts/app-store',
   android_app: '/accounts/google-play',
+  search_console_site: '/accounts/search-console',
 } as const
 
 /** A select's value for "nothing chosen"; Radix keeps the empty string for its placeholder. */

@@ -609,6 +609,16 @@ Status on 2026-11-22 (merged to `main` and deployed):
   way. Charts are small multiples on one day axis (a fixed value-axis width lines them up), one
   stage colour each: platforms and stores are named in tables, not told apart by colour, since
   three blues that pass the colour-vision checks in the dark theme do not exist.
+- Google Search Console (2026-11-22, not deployed): a service account added to the person's
+  properties (the Google Play one can be reused with one click; the Search Console API must be
+  enabled in its project). Each property is a `search_console_site` asset ("Website"), one per
+  app, linked by hand. The `search_console` connector writes `search_clicks`,
+  `search_impressions` and `search_position_sum` (position × impressions, so an average over
+  days and sites is a true one) per day, filling days Google leaves out as zeros up to its
+  latest day. The SEO page has clicks, impressions, click-through rate and average position, by
+  day and by app; its top queries and pages are read live (`searchConsole.top`), not stored.
+  Checked read-only: the Google Play service account authenticates against the API but no
+  property is shared with it yet. Demo apps have websites and search numbers.
 
 ### Phase 3 — Reviews inbox
 
