@@ -1,26 +1,82 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/bricolage-grotesque';
 @import '@fontsource-variable/ibm-plex-sans';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
 
 /*
- * Design tokens. The chrome stays in ink and paper; colour is reserved for the three funnel
- * stages, so a coloured mark always means "this is views / downloads / revenue".
- * The stage colours are the first three slots of a palette validated for colour-vision
- * deficiency; they mark identity next to a text label and are never used for text itself.
+ * Design tokens. The chrome is neutral, in a light and a dark theme; colour is reserved for
+ * the three funnel stages, so a coloured mark always means views, downloads or revenue. Each
+ * theme has its own stage colours, validated for colour-vision deficiency against its panels.
+ * Warning and danger only ever appear when something needs the person.
  */
 @theme {
   --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque Variable', 'IBM Plex Sans Variable', sans-serif;
+  --font-display: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --color-paper: #f2f5f9;
+  /* The page behind the panels. */
+  --color-paper: #f5f6f8;
+  /* Panels, inputs, the page header. */
   --color-surface: #ffffff;
-  --color-ink: #101b33;
-  --color-ink-soft: #4b5876;
-  --color-line: #d9e0ea;
+  /* Hover and selected rows, the active nav item. */
+  --color-raised: #eef0f3;
+  --color-line: #e3e6eb;
+  --color-line-strong: #cfd4dc;
+  --color-ink: #1a1d23;
+  --color-ink-soft: #5e6573;
+  --color-ink-faint: #8a909c;
 
   --color-views: #2a78d6;
   --color-downloads: #1baf7a;
   --color-revenue: #eb6834;
+
+  --color-warn: #8a5300;
+  --color-warn-soft: #fdf3e1;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdeeec;
+}
+
+/* The dark theme: the system's choice unless the person picked one in the sidebar. */
+@layer base {
+  :root[data-theme='dark'] {
+    --color-paper: #151618;
+    --color-surface: #1c1d20;
+    --color-raised: #26282c;
+    --color-line: #2b2d31;
+    --color-line-strong: #3a3d43;
+    --color-ink: #ecedef;
+    --color-ink-soft: #9aa0aa;
+    --color-ink-faint: #6c727c;
+    --color-views: #3d8ef0;
+    --color-downloads: #1a9f72;
+    --color-revenue: #e06a37;
+    --color-warn: #f0b453;
+    --color-warn-soft: #2e2413;
+    --color-danger: #f28b82;
+    --color-danger-soft: #331d1b;
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-paper: #151618;
+    --color-surface: #1c1d20;
+    --color-raised: #26282c;
+    --color-line: #2b2d31;
+    --color-line-strong: #3a3d43;
+    --color-ink: #ecedef;
+    --color-ink-soft: #9aa0aa;
+    --color-ink-faint: #6c727c;
+    --color-views: #3d8ef0;
+    --color-downloads: #1a9f72;
+    --color-revenue: #e06a37;
+    --color-warn: #f0b453;
+    --color-warn-soft: #2e2413;
+    --color-danger: #f28b82;
+    --color-danger-soft: #331d1b;
+    color-scheme: dark;
+  }
 }
 
 @layer base {
@@ -28,15 +84,67 @@
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-size: 0.875rem;
+    line-height: 1.5;
   }
 
   :focus-visible {
     outline: 2px solid var(--color-views);
     outline-offset: 2px;
   }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-views) 25%, transparent);
+  }
+
+  input,
+  select,
+  textarea {
+    color: var(--color-ink);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-faint);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
 }
 
 @utility figures {
   font-variant-numeric: tabular-nums;
+}
+
+/* Form controls share one look: a panel-coloured field with a quiet border. */
+@utility field {
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  padding: 0.4375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  &:hover {
+    border-color: var(--color-ink-faint);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--color-views);
+    outline-offset: 0;
+    border-color: transparent;
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
 }

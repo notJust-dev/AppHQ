@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { formatCount, formatDay } from '../lib/format'
 import { liftSentence, liftShort } from '../lib/lift'
 import type { Post } from '../lib/queries'
+import { TABLE, TD, TH, THEAD_ROW, TR } from './ui/table'
 import { sourceLabel } from '../lib/sources'
 
 /**
@@ -11,7 +12,7 @@ import { sourceLabel } from '../lib/sources'
 export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean; appId: string }) {
   if (props.posts.length === 0) {
     return (
-      <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
+      <p className="px-5 py-6 text-ink-soft">
         {props.hasSocialAccount ? (
           'No posts were published in this range.'
         ) : (
@@ -32,37 +33,37 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean; ap
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-      <table className="w-full min-w-[760px] border-collapse text-sm">
+    <div className="overflow-x-auto">
+      <table className={`${TABLE} min-w-[760px]`}>
         <caption className="sr-only">
           Posts published in this range, newest first, with lifetime totals and download lift
         </caption>
         <thead>
-          <tr className="border-b border-line text-left text-ink-soft">
-            <th scope="col" className="px-6 py-3 font-medium">
+          <tr className={THEAD_ROW}>
+            <th scope="col" className={TH}>
               Posted
             </th>
-            <th scope="col" className="px-6 py-3 font-medium">
+            <th scope="col" className={TH}>
               Post
             </th>
             {['Views', 'Likes', 'Comments', 'Shares'].map((label) => (
-              <th key={label} scope="col" className="px-4 py-3 text-right font-medium">
+              <th key={label} scope="col" className={`${TH} text-right`}>
                 {label}
               </th>
             ))}
-            <th scope="col" className="px-6 py-3 text-right font-medium whitespace-nowrap">
+            <th scope="col" className={`${TH} text-right`}>
               Download lift
             </th>
           </tr>
         </thead>
         <tbody>
           {props.posts.map((post) => (
-            <tr key={post.id} className="border-b border-line align-top last:border-b-0">
-              <td className="figures whitespace-nowrap px-6 py-3">
+            <tr key={post.id} className={TR}>
+              <td className={`${TD} figures whitespace-nowrap`}>
                 {formatDay(post.publishedAt.slice(0, 10))}
                 <span className="block text-xs text-ink-soft">{sourceLabel(post.platform)}</span>
               </td>
-              <td className="max-w-[22rem] px-6 py-3">
+              <td className={`${TD} max-w-[22rem]`}>
                 {post.url ? (
                   <a
                     href={post.url}
@@ -77,7 +78,7 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean; ap
                 )}
               </td>
               {[post.views, post.likes, post.comments, post.shares].map((value, index) => (
-                <td key={index} className="figures px-4 py-3 text-right">
+                <td key={index} className={`${TD} figures text-right`}>
                   {formatCount(value)}
                 </td>
               ))}

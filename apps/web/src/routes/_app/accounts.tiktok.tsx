@@ -47,7 +47,7 @@ function TikTokPage() {
     >
       <ConnectResult connected={connected} clear={clear} onConnected={watch.dataChanged} />
 
-      <Section title="Accounts">
+      <Section title="Accounts" flush>
         <AccountList accounts={family.accounts} />
       </Section>
 
@@ -101,7 +101,7 @@ function ConnectTikTok(props: { apps: AppSummary[]; setup: TikTokSetup }) {
 
   if (!props.setup.configured) {
     return (
-      <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm">
+      <p className="text-[13px]">
         TikTok is not set up on the API yet. See &quot;Setting up the TikTok app&quot; below, then
         reload this page.
       </p>
@@ -109,7 +109,7 @@ function ConnectTikTok(props: { apps: AppSummary[]; setup: TikTokSetup }) {
   }
   if (props.apps.length === 0) {
     return (
-      <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
+      <p className="text-[13px] text-ink-soft">
         Add an app first: a TikTok account is connected to the app it promotes.
       </p>
     )
@@ -130,7 +130,7 @@ function ConnectTikTok(props: { apps: AppSummary[]; setup: TikTokSetup }) {
           id="tiktok-app"
           value={appId}
           onChange={(event) => setAppId(event.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+          className="min-w-0 flex-1 field"
         >
           {props.apps.map((app) => (
             <option key={app.id} value={app.id}>

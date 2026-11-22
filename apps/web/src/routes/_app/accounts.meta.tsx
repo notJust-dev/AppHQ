@@ -49,7 +49,7 @@ function MetaPage() {
     >
       <ConnectResult connected={connected} clear={clear} onConnected={watch.dataChanged} />
 
-      <Section title="Pages and accounts">
+      <Section title="Pages and accounts" flush>
         <AccountList accounts={family.accounts} />
         <Found family={family} />
       </Section>
@@ -97,7 +97,7 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
   return (
     <>
       {missing.length > 0 && (
-        <p className="mb-4 rounded-lg border border-ink bg-surface px-6 py-4 text-sm">
+        <p className="mb-4 rounded-md bg-warn-soft px-4 py-3 text-[13px] text-warn [&_code]:font-mono [&_code]:text-xs">
           <span className="font-medium">Missing permissions. </span>
           The sign-in was not granted {missing.map((scope) => <code key={scope}>{scope} </code>)}
           so some numbers cannot be read. Add them to the login configuration in the Meta app
@@ -113,7 +113,7 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
       )}
 
       {!props.setup.configured ? (
-        <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm">
+        <p className="text-[13px]">
           Facebook and Instagram are not set up on the API yet. See &quot;Setting up the Meta
           app&quot; below, then reload this page.
         </p>

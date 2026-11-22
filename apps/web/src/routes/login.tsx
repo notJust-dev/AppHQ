@@ -1,6 +1,8 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
+import { buttonClass } from '../components/Button'
+import { BrandMark } from '../components/ui/Brand'
 import { getSessionFn, signInFn } from '../fns/auth'
 
 export const Route = createFileRoute('/login')({
@@ -25,10 +27,14 @@ function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 pb-24">
-      <p className="font-display text-lg font-semibold tracking-tight">AppDashboard</p>
-      <h1 className="mt-6 font-display text-3xl font-semibold tracking-tight">Sign in</h1>
+      <p className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
+        <BrandMark />
+        AppDashboard
+      </p>
+      <div className="mt-8 rounded-lg border border-line bg-surface p-6">
+      <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
       <form
-        className="mt-8"
+        className="mt-5"
         onSubmit={async (event) => {
           event.preventDefault()
           setPending(true)
@@ -44,7 +50,7 @@ function LoginPage() {
           }
         }}
       >
-        <label htmlFor="password" className="text-sm font-medium">
+        <label htmlFor="password" className="text-[13px] font-medium">
           Password
         </label>
         <input
@@ -61,21 +67,18 @@ function LoginPage() {
           }}
           aria-invalid={problem !== null}
           aria-describedby={problem ? 'password-problem' : undefined}
-          className="mt-2 block w-full rounded-md border border-line bg-surface px-3 py-2"
+          className="mt-2 block w-full field"
         />
         {problem && (
-          <p id="password-problem" role="alert" className="mt-2 text-sm">
+          <p id="password-problem" role="alert" className="mt-2 text-[13px] text-danger">
             {MESSAGES[problem]}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-6 w-full cursor-pointer rounded-md bg-ink px-4 py-2.5 font-medium text-surface disabled:cursor-default disabled:opacity-60"
-        >
+        <button type="submit" disabled={pending} className={`mt-5 w-full ${buttonClass('primary')} h-9`}>
           {pending ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
+      </div>
     </main>
   )
 }

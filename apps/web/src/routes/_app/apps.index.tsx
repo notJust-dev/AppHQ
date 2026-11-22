@@ -1,7 +1,12 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useEffect, useId, useState, type ReactNode } from 'react'
-import { Button } from '../../components/Button'
+import { useEffect, useId, useState } from 'react'
+import { Plus } from 'lucide-react'
+import { Button, buttonClass } from '../../components/Button'
+import { Notice } from '../../components/ui/Notice'
+import { PageBody, PageHeader } from '../../components/ui/PageHeader'
+import { Panel } from '../../components/ui/Panel'
+import { TABLE, TD, TH, THEAD_ROW, TR } from '../../components/ui/table'
 import { useAssetActions, type AssetActions } from '../../components/useAssetActions'
 import {
   ATTENTION,
@@ -47,93 +52,80 @@ function AppsPage() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Apps</h1>
-        <Link to="/apps/new" className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-surface">
-          Add app
-        </Link>
-      </div>
-      <p className="mt-2 max-w-prose text-ink-soft">
-        An app gathers its iOS and Android apps, its RevenueCat project and the social accounts that
-        promote it. The accounts you sign in to on the{' '}
-        <Link to="/accounts" className="font-medium text-ink underline underline-offset-4">
-          Accounts page
-        </Link>{' '}
-        find these, and nothing becomes an app until you add it. Once an app is here, what clearly
-        belongs to it joins by itself, like an Android package equal to its iOS bundle id.
-      </p>
+      <PageHeader
+        title="Apps"
+        description={
+          <>
+            An app gathers its iOS and Android apps, its RevenueCat project and the social accounts
+            that promote it. Your{' '}
+            <Link to="/accounts" className="font-medium text-ink underline underline-offset-4">
+              accounts
+            </Link>{' '}
+            find these; nothing becomes an app until you add it.
+          </>
+        }
+        actions={
+          <Link to="/apps/new" className={buttonClass('primary')}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add app
+          </Link>
+        }
+      />
+      <PageBody>
+        {removedApp && !actions.notice && (
+          <Notice>Removed {removedApp}. What fed it waits below, to add again or ignore.</Notice>
+        )}
+        {actions.notice && <Notice ok={actions.notice.ok}>{actions.notice.message}</Notice>}
 
-      {removedApp && !actions.notice && (
-        <p role="status" className="mt-6 max-w-3xl rounded-lg border border-line bg-surface px-6 py-4 text-sm">
-          Removed {removedApp}. What fed it waits below, to add again or ignore.
-        </p>
-      )}
-
-      {actions.notice && (
-        <p
-          role="status"
-          className={`mt-6 max-w-3xl rounded-lg border bg-surface px-6 py-4 text-sm ${
-            actions.notice.ok ? 'border-line' : 'border-ink'
-          }`}
-        >
-          {actions.notice.message}
-        </p>
-      )}
-
-      {waiting.length > 0 && (
-        <Section
-          title="Needs a decision"
-          intro="Found by your accounts, not tracked yet. Add the ones you want as apps, link them to an app, or ignore them. A suggestion comes from a matching name; check it before linking."
-          action={
-            waiting.length > 1 && (
-              <Button
-                disabled={actions.pending}
-                onClick={() => actions.ignore(waiting.map((asset) => asset.id), true)}
-              >
-                Ignore all {waiting.length}
-              </Button>
-            )
-          }
-        >
-          <ul className="max-w-3xl divide-y divide-line rounded-lg border border-line bg-surface text-sm">
-            {waiting.map((asset) => (
-              <Decision key={asset.id} asset={asset} apps={ownApps} actions={actions} />
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      <Section title="All apps">
-        <AppsOverview apps={apps} assets={assets} />
-      </Section>
-      {ignored.length > 0 && (
-        <Section title="Ignored" intro="Found by an account, but not tracked: old apps, test projects, personal accounts.">
-          <ul className="max-w-3xl divide-y divide-line rounded-lg border border-line bg-surface text-sm">
-            {ignored.map((asset) => (
-              <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
-                <AssetName asset={asset} />
-                <Button disabled={actions.pending} onClick={() => actions.ignore([asset.id], false)}>
-                  Restore
+        {waiting.length > 0 && (
+          <Panel
+            title="Needs a decision"
+            description="Found by your accounts, not tracked yet. Add the ones you want as apps, link them to an app, or ignore them. A suggestion comes from a matching name; check it before linking."
+            actions={
+              waiting.length > 1 && (
+                <Button
+                  size="sm"
+                  disabled={actions.pending}
+                  onClick={() => actions.ignore(waiting.map((asset) => asset.id), true)}
+                >
+                  Ignore all {waiting.length}
                 </Button>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-    </>
-  )
-}
+              )
+            }
+            bodyClassName=""
+          >
+            <ul className="divide-y divide-line">
+              {waiting.map((asset) => (
+                <Decision key={asset.id} asset={asset} apps={ownApps} actions={actions} />
+              ))}
+            </ul>
+          </Panel>
+        )}
 
-function Section(props: { title: string; intro?: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="mt-12">
-      <div className="flex max-w-3xl flex-wrap items-end justify-between gap-3">
-        <h2 className="font-display text-xl font-semibold tracking-tight">{props.title}</h2>
-        {props.action}
-      </div>
-      {props.intro && <p className="mt-2 max-w-prose text-sm text-ink-soft">{props.intro}</p>}
-      <div className="mt-4">{props.children}</div>
-    </section>
+        <Panel title="All apps" description="What feeds each app. Once an app is here, what clearly belongs to it joins by itself, like an Android package equal to its iOS bundle id." bodyClassName="">
+          <AppsOverview apps={apps} assets={assets} />
+        </Panel>
+
+        {ignored.length > 0 && (
+          <Panel
+            title="Ignored"
+            description="Found by an account, but not tracked: old apps, test projects, personal accounts."
+            bodyClassName=""
+          >
+            <ul className="divide-y divide-line">
+              {ignored.map((asset) => (
+                <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3">
+                  <AssetName asset={asset} />
+                  <Button size="sm" disabled={actions.pending} onClick={() => actions.ignore([asset.id], false)}>
+                    Restore
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
+      </PageBody>
+    </>
   )
 }
 
@@ -165,10 +157,10 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
     asset.social ? undefined : app.assets.find((other) => other.kind === asset.kind)
 
   return (
-    <li className="grid gap-3 px-6 py-4 sm:grid-cols-[minmax(0,1fr)_16rem_auto] sm:items-center">
+    <li className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_16rem_auto] sm:items-center">
       <div className="min-w-0">
         <AssetName asset={asset} />
-        {suggested && <span className="mt-1 block text-xs">Looks like {suggested.name}</span>}
+        {suggested && <span className="mt-1 block text-xs text-ink">Looks like {suggested.name}</span>}
       </div>
       <label htmlFor={selectId} className="sr-only">
         App for {asset.name}
@@ -177,7 +169,7 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
         id={selectId}
         value={choice}
         onChange={(event) => setChoice(event.target.value)}
-        className="w-full min-w-0 rounded-md border border-line bg-surface px-3 py-2"
+        className="w-full min-w-0 field"
       >
         <option value="" disabled>
           Choose an app
@@ -197,12 +189,13 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
       <div className="flex gap-2">
         <Button
           variant="primary"
+          size="sm"
           disabled={!choice || actions.pending}
           onClick={() => actions.assign(asset.id, choice)}
         >
           {choice === 'new' ? 'Add app' : 'Link'}
         </Button>
-        <Button disabled={actions.pending} onClick={() => actions.ignore([asset.id], true)}>
+        <Button size="sm" disabled={actions.pending} onClick={() => actions.ignore([asset.id], true)}>
           Ignore
         </Button>
       </div>
@@ -218,7 +211,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
+      <p className="px-5 py-6 text-ink-soft">
         No apps yet. Connect a source on the Accounts page, then add the apps you want to track
         from what it finds, or add one by name with Add app.
       </p>
@@ -226,26 +219,26 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-      <table className="w-full min-w-[680px] border-collapse text-sm">
+    <div className="overflow-x-auto">
+      <table className={`${TABLE} min-w-[680px]`}>
         <thead>
-          <tr className="border-b border-line text-left text-ink-soft">
-            <th scope="col" className="px-4 py-3 font-medium">
+          <tr className={THEAD_ROW}>
+            <th scope="col" className={TH}>
               App
             </th>
-            <th scope="col" className="px-4 py-3 font-medium">
+            <th scope="col" className={TH}>
               iOS
             </th>
-            <th scope="col" className="px-4 py-3 font-medium">
+            <th scope="col" className={TH}>
               Android
             </th>
-            <th scope="col" className="px-4 py-3 font-medium">
+            <th scope="col" className={TH}>
               Revenue
             </th>
-            <th scope="col" className="px-4 py-3 font-medium">
+            <th scope="col" className={TH}>
               Social
             </th>
-            <th scope="col" className="px-4 py-3">
+            <th scope="col" className={TH}>
               <span className="sr-only">Settings</span>
             </th>
           </tr>
@@ -257,13 +250,13 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
             const social = mine.filter((asset) => asset.social)
             const portfolio = app.kind === 'portfolio'
             return (
-              <tr key={app.id} className="border-b border-line align-top last:border-b-0">
-                <th scope="row" className="px-4 py-4 text-left font-medium">
+              <tr key={app.id} className={TR}>
+                <th scope="row" className={`${TD} text-left font-medium`}>
                   <Link
                     to="/apps/$appId"
                     params={{ appId: app.id }}
                     search={{ range: '28d' }}
-                    className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                    className="hover:underline hover:underline-offset-4"
                   >
                     {app.name}
                   </Link>
@@ -274,17 +267,17 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                   )}
                 </th>
                 {portfolio ? (
-                  <td colSpan={3} className="px-4 py-4 text-ink-soft">
+                  <td colSpan={3} className={`${TD} text-ink-soft`}>
                     Social accounts only
                   </td>
                 ) : (
                   <>
-                    <SlotCell asset={one('ios_app')} detail={(asset) => asset.bundleId ?? asset.name} />
-                    <SlotCell asset={one('android_app')} detail={(asset) => asset.externalId} />
+                    <SlotCell asset={one('ios_app')} detail={(asset) => asset.bundleId ?? asset.name} mono />
+                    <SlotCell asset={one('android_app')} detail={(asset) => asset.externalId} mono />
                     <SlotCell asset={one('revenuecat_project')} detail={(asset) => asset.name} />
                   </>
                 )}
-                <td className="px-4 py-4">
+                <td className={TD}>
                   {social.length === 0 ? (
                     <None />
                   ) : (
@@ -299,7 +292,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                     </ul>
                   )}
                 </td>
-                <td className="px-4 py-4 text-right">
+                <td className={`${TD} text-right`}>
                   <Link
                     to="/apps/$appId/settings"
                     params={{ appId: app.id }}
@@ -319,12 +312,12 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   )
 }
 
-function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => string }) {
+function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => string; mono?: boolean }) {
   return (
-    <td className="px-4 py-4 break-words">
+    <td className={`${TD} break-words`}>
       {props.asset ? (
         <>
-          {props.detail(props.asset)}
+          <span className={props.mono ? 'font-mono text-xs' : undefined}>{props.detail(props.asset)}</span>
           <Attention status={props.asset.status} />
         </>
       ) : (

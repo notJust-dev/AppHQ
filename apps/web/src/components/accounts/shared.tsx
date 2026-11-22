@@ -6,6 +6,9 @@ import { takeConnectResultFn } from '../../fns/tiktok'
 import { formatCount, formatMoment } from '../../lib/format'
 import type { AccountFamily } from '../../lib/queries'
 import { sourceLabel } from '../../lib/sources'
+import { PageBody, PageHeader } from '../ui/PageHeader'
+import { Panel } from '../ui/Panel'
+import { Status } from '../ui/Status'
 
 export type ConnectedAccount = AccountFamily['accounts'][number]
 export type FamilyName = AccountFamily['family']
@@ -103,34 +106,29 @@ export function useWatch() {
   }
 }
 
-/** The frame of one source's page: the way back, what it brings, and its parts. */
+/** The frame of one source's page: where it sits, what it brings, and its panels. */
 export function SourcePage(props: { title: string; intro: string; children: ReactNode }) {
   return (
-    <div className="max-w-3xl">
-      <Link to="/accounts" className="text-sm font-medium text-ink-soft hover:text-ink">
-        <span aria-hidden="true">← </span>Accounts
-      </Link>
-      <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">{props.title}</h1>
-      <p className="mt-2 text-ink-soft">{props.intro}</p>
-      {props.children}
-    </div>
+    <>
+      <PageHeader narrow crumbs={[{ label: 'Accounts', to: '/accounts' }]} title={props.title} description={props.intro} />
+      <PageBody narrow>{props.children}</PageBody>
+    </>
   )
 }
 
-export function Section(props: { title: string; intro?: ReactNode; children: ReactNode }) {
+/** A panel on a source page. `flush` lets a list run edge to edge. */
+export function Section(props: { title: string; intro?: ReactNode; flush?: boolean; children: ReactNode }) {
   return (
-    <section className="mt-10">
-      <h2 className="font-display text-xl font-semibold tracking-tight">{props.title}</h2>
-      {props.intro && <p className="mt-2 text-sm text-ink-soft">{props.intro}</p>}
-      <div className="mt-4">{props.children}</div>
-    </section>
+    <Panel title={props.title} description={props.intro} bodyClassName={props.flush ? '' : undefined}>
+      {props.children}
+    </Panel>
   )
 }
 
 /** Numbered instructions for getting a key or setting up an app on the source's side. */
 export function Steps({ children }: { children: ReactNode }) {
   return (
-    <ol className="mb-6 list-decimal space-y-2 pl-5 text-sm marker:font-medium marker:text-ink-soft">
+    <ol className="mb-6 list-decimal space-y-2 pl-5 text-[13px] marker:text-ink-faint">
       {children}
     </ol>
   )
@@ -142,13 +140,13 @@ export function Found(props: { family: AccountFamily }) {
   if (props.family.accounts.length === 0) return null
   const [one, many] = sourceOf(props.family.family).noun
   return (
-    <p className="mt-3 text-sm">
+    <p className="border-t border-line px-5 py-3 text-[13px] text-ink-soft">
       Found {formatCount(total)} {total === 1 ? one : many}: {formatCount(linked)} linked to an app
       {ignored > 0 && `, ${formatCount(ignored)} ignored`}
       {waiting > 0 && (
         <>
           ,{' '}
-          <Link to="/apps" className="font-medium underline underline-offset-4">
+          <Link to="/apps" className="font-medium text-ink underline underline-offset-4">
             {formatCount(waiting)} waiting for a decision
           </Link>
         </>
@@ -161,29 +159,29 @@ export function Found(props: { family: AccountFamily }) {
 /** The sign-ins or keys of a source, with their state. */
 export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (account: ConnectedAccount) => string | null }) {
   if (props.accounts.length === 0) {
-    return (
-      <p className="rounded-lg border border-line bg-surface px-6 py-4 text-sm text-ink-soft">
-        Not connected yet.
-      </p>
-    )
+    return <p className="px-5 py-4 text-ink-soft">Not connected yet.</p>
   }
   return (
-    <ul className="divide-y divide-line rounded-lg border border-line bg-surface text-sm">
+    <ul className="divide-y divide-line">
       {props.accounts.map((account) => {
         const detail = props.detail?.(account)
         return (
-          <li key={account.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-6 py-3">
+          <li key={account.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 py-3">
             <span className="min-w-0 break-words">
               <span className="font-medium">{account.displayName ?? sourceLabel(account.provider)}</span>
               {(account.provider === 'facebook' || account.provider === 'instagram') && (
                 <span className="text-ink-soft"> · {sourceLabel(account.provider)}</span>
               )}
               {detail && <span className="block text-xs text-ink-soft">{detail}</span>}
-              {account.note && <span className="mt-1 block text-xs font-medium">{account.note}</span>}
+              {account.note && <span className="mt-1.5 block max-w-prose text-xs text-warn">{account.note}</span>}
             </span>
-            <span className={`text-xs ${account.status === 'ok' ? 'text-ink-soft' : 'font-medium'}`}>
-              {CONNECTION_STATUS[account.status] ?? account.status}
-              {account.lastSyncedAt && `, synced ${formatMoment(account.lastSyncedAt)}`}
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Status tone={account.status === 'ok' ? 'ok' : account.status === 'needs_reauth' ? 'danger' : 'warn'}>
+                {CONNECTION_STATUS[account.status] ?? account.status}
+              </Status>
+              {account.lastSyncedAt && (
+                <span className="text-xs text-ink-faint">Synced {formatMoment(account.lastSyncedAt)}</span>
+              )}
             </span>
           </li>
         )
@@ -228,7 +226,9 @@ export function ConnectResult(props: {
   return (
     <p
       role="status"
-      className={`mt-6 rounded-lg border bg-surface px-6 py-4 text-sm ${result.ok ? 'border-line' : 'border-ink'}`}
+      className={`rounded-lg border px-4 py-3 text-[13px] ${
+        result.ok ? 'border-line bg-surface' : 'border-transparent bg-danger-soft text-danger'
+      }`}
     >
       <span className="font-medium">
         {PROVIDER_NAMES[result.provider ?? connected ?? 'tiktok']}
@@ -242,11 +242,11 @@ export function ConnectResult(props: {
 /** Where to read about the developer-side setup, folded away from everyday use. */
 export function DeveloperSetup(props: { summary: string; children: ReactNode }) {
   return (
-    <details className="mt-10 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+    <details className="rounded-lg border border-line bg-surface px-5 py-3.5 text-[13px]">
       <summary className="cursor-pointer font-medium">{props.summary}</summary>
-      <div className="mt-3 space-y-3 text-ink-soft">{props.children}</div>
+      <div className="mt-3 space-y-3 text-ink-soft [&_code]:font-mono [&_code]:text-xs [&_code]:text-ink">{props.children}</div>
     </details>
   )
 }
 
-export const inputClass = 'mt-2 block w-full rounded-md border border-line bg-surface px-3 py-2'
+export const inputClass = 'mt-2 block w-full field'

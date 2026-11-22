@@ -35,18 +35,18 @@ function AppStorePage() {
       title="App Store Connect"
       intro="Daily downloads from Apple's sales reports, and store page views and impressions from its analytics reports, for the iOS apps you track. Downloads go back a year, page views to January 2024."
     >
-      <Section title="Account">
+      <Section title="Account" flush>
         <AccountList accounts={family.accounts} />
         <Found family={family} />
         {outcome && (
-          <div role="status" className="mt-4 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+          <div role="status" className="mt-4 rounded-lg border border-line bg-surface px-4 py-3 text-[13px]">
             <Connected result={outcome} />
           </div>
         )}
       </Section>
 
       {account && !replacing ? (
-        <div className="mt-6">
+        <div>
           <Button onClick={() => setReplacing(true)}>Use a different key</Button>
         </div>
       ) : (

@@ -567,6 +567,12 @@ Status on 2026-11-22 (merged to `main` and deployed):
   for reports for every app in the account; the sync asks for the tracked ones. Checked read-only
   against the real account: of ten apps only ZenFit had a report request, and its last days came
   out at 1 to 4 product page views and 50 to 211 impressions a day.
+- Redesign (2026-11-22): a product-dashboard look in the spirit of RevenueCat and Supabase. A
+  left sidebar (sections, the apps for switching, theme and sign out; a menu on phones), a page
+  header band with breadcrumbs and tabs, and bordered panels with settings rows. Light and dark
+  themes follow the system unless picked in the sidebar; the funnel colours have dark variants
+  checked for colour-vision deficiency against the dark panels. One family, IBM Plex Sans, with
+  Plex Mono for identifiers; colour stays reserved for the funnel stages and for problems.
 
 ### Phase 3 — Reviews inbox
 

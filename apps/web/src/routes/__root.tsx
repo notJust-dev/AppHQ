@@ -3,12 +3,14 @@ import {
   HeadContent,
   Link,
   Outlet,
+  ScriptOnce,
   Scripts,
   createRootRouteWithContext,
   type ErrorComponentProps,
 } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { ErrorPage } from '../components/ErrorPage'
+import { THEME_SCRIPT } from '../lib/theme'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -30,11 +32,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function NotFound() {
   return (
-    <main className="mx-auto max-w-xl px-6 py-24">
-      <h1 className="font-display text-2xl font-semibold">This page does not exist</h1>
-      <p className="mt-3 text-ink-soft">
+    <main className="mx-auto max-w-md px-6 py-24">
+      <h1 className="text-xl font-semibold tracking-tight">This page does not exist</h1>
+      <p className="mt-2 text-ink-soft">
         The address may be mistyped, or the page may have moved.{' '}
-        <Link to="/" className="font-medium text-ink underline">
+        <Link to="/" className="font-medium text-ink underline underline-offset-4">
           Go to the portfolio
         </Link>
       </p>
@@ -60,8 +62,10 @@ function RootError(props: ErrorComponentProps) {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    // The theme script may set data-theme before React takes over; that is expected.
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
         <HeadContent />
       </head>
       <body className="min-h-screen">

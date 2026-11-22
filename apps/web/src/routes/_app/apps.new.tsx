@@ -3,6 +3,8 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 import { Button } from '../../components/Button'
+import { PageBody, PageHeader } from '../../components/ui/PageHeader'
+import { Panel } from '../../components/ui/Panel'
 import { createAppFn } from '../../fns/assets'
 import { assetsQuery } from '../../lib/queries'
 
@@ -30,18 +32,16 @@ function NewAppPage() {
   const result = mutation.data
 
   return (
-    <div className="max-w-3xl">
-      <Link to="/apps" className="text-sm font-medium text-ink-soft hover:text-ink">
-        <span aria-hidden="true">← </span>Apps
-      </Link>
-      <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">Add an app</h1>
-      <p className="mt-2 text-ink-soft">
-        Give it a name, then pick what feeds it in its Settings: its iOS and Android apps, its
-        RevenueCat project and the social accounts that promote it.
-      </p>
-
+    <>
+      <PageHeader
+        narrow
+        crumbs={[{ label: 'Apps', to: '/apps' }]}
+        title="Add an app"
+        description="Give it a name, then pick what feeds it in its Settings: its iOS and Android apps, its RevenueCat project and the social accounts that promote it."
+      />
+      <PageBody narrow>
       {waiting.length > 0 && (
-        <p className="mt-6 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+        <p className="rounded-lg border border-line bg-surface px-4 py-3 text-[13px]">
           Your accounts found {waiting.length} {waiting.length === 1 ? 'app or project' : 'apps and projects'} that
           are not tracked yet. To track one of those, add it from{' '}
           <Link to="/apps" className="font-medium underline underline-offset-4">
@@ -51,14 +51,14 @@ function NewAppPage() {
         </p>
       )}
 
+      <Panel>
       <form
-        className="mt-8"
         onSubmit={(event) => {
           event.preventDefault()
           mutation.mutate(name)
         }}
       >
-        <label htmlFor="new-app-name" className="text-sm font-medium">
+        <label htmlFor="new-app-name" className="text-[13px] font-medium">
           App name
         </label>
         <div className="mt-2 flex flex-wrap gap-3">
@@ -70,7 +70,7 @@ function NewAppPage() {
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+            className="min-w-0 flex-1 field"
           />
           <Button type="submit" variant="primary" disabled={mutation.isPending}>
             {mutation.isPending ? 'Adding…' : 'Add app'}
@@ -79,11 +79,13 @@ function NewAppPage() {
         <p className="mt-2 text-xs text-ink-soft">
           For example an app that is only on Android, or one whose store listing does not exist yet.
         </p>
-        <div role="status" className="mt-3 text-sm">
+        <div role="status" className="mt-3 text-[13px] text-danger empty:hidden">
           {mutation.isError && 'Could not reach the dashboard server. Try again.'}
           {result && !result.ok && result.message}
         </div>
       </form>
-    </div>
+      </Panel>
+      </PageBody>
+    </>
   )
 }

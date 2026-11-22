@@ -37,11 +37,11 @@ function GooglePlayPage() {
       title="Google Play"
       intro="Installs and store listing visitors for every Android app in your developer account, from the monthly reports Google Play keeps in a Cloud Storage bucket. Google posts the numbers 3 to 7 days late."
     >
-      <Section title="Account">
+      <Section title="Account" flush>
         <AccountList accounts={family.accounts} detail={(entry) => entry.externalAccountId} />
         <Found family={family} />
         {outcome && (
-          <p role="status" className="mt-4 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+          <p role="status" className="mt-4 rounded-lg border border-line bg-surface px-4 py-3 text-[13px]">
             Connected. {outcome.packages} {outcome.packages === 1 ? 'package' : 'packages'} found
             {outcome.matched > 0 && `, ${outcome.matched} linked to an app`}.
             {outcome.matched < outcome.packages &&
@@ -51,7 +51,7 @@ function GooglePlayPage() {
       </Section>
 
       {account && !replacing ? (
-        <div className="mt-6">
+        <div>
           <Button onClick={() => setReplacing(true)}>Use a different key</Button>
         </div>
       ) : (

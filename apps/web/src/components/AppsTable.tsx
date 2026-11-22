@@ -3,25 +3,26 @@ import { change, formatCount, formatMoney, formatRatio, per } from '../lib/forma
 import type { Overview } from '../lib/queries'
 import type { RangeKey } from '../lib/range'
 import { Delta } from './Delta'
+import { TABLE, TD, TH, THEAD_ROW, TR } from './ui/table'
 
 export function AppsTable({ apps, range }: { apps: Overview['apps']; range: RangeKey }) {
   const rows = [...apps].sort((a, b) => b.totals.revenue - a.totals.revenue)
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-      <table className="w-full min-w-[720px] border-collapse text-sm">
+    <div className="overflow-x-auto">
+      <table className={`${TABLE} min-w-[720px]`}>
         <thead>
-          <tr className="border-b border-line text-left text-ink-soft">
-            <th scope="col" className="px-6 py-3 font-medium">
+          <tr className={THEAD_ROW}>
+            <th scope="col" className={TH}>
               App
             </th>
             <StageHeader swatch="bg-views">Social views</StageHeader>
             <StageHeader swatch="bg-downloads">Downloads</StageHeader>
             <StageHeader swatch="bg-revenue">Revenue</StageHeader>
-            <th scope="col" className="px-6 py-3 text-right font-medium">
+            <th scope="col" className={`${TH} text-right`}>
               Downloads per 1,000 views
             </th>
-            <th scope="col" className="px-6 py-3 text-right font-medium">
+            <th scope="col" className={`${TH} text-right`}>
               Revenue per download
             </th>
           </tr>
@@ -31,11 +32,11 @@ export function AppsTable({ apps, range }: { apps: Overview['apps']; range: Rang
             const downloadsPerThousandViews = per(totals.downloads * 1000, totals.socialViews)
             const revenuePerDownload = per(totals.revenue, totals.downloads)
             return (
-              <tr key={app.id} className="border-b border-line last:border-b-0">
-                <th scope="row" className="px-6 py-4 text-left font-medium">
+              <tr key={app.id} className={`${TR} align-middle`}>
+                <th scope="row" className={`${TD} text-left font-medium`}>
                   <span className="flex items-center gap-3">
                     <span
-                      className="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-paper font-display text-sm font-semibold"
+                      className="grid size-7 shrink-0 place-items-center rounded-md border border-line bg-paper text-xs font-semibold"
                       aria-hidden="true"
                     >
                       {app.name.charAt(0)}
@@ -44,7 +45,7 @@ export function AppsTable({ apps, range }: { apps: Overview['apps']; range: Rang
                       to="/apps/$appId"
                       params={{ appId: app.id }}
                       search={{ range }}
-                      className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                      className="hover:underline hover:underline-offset-4"
                     >
                       {app.name}
                     </Link>
@@ -62,10 +63,10 @@ export function AppsTable({ apps, range }: { apps: Overview['apps']; range: Rang
                   value={formatMoney(totals.revenue)}
                   delta={comparable ? change(totals.revenue, previous.revenue) : 'unknown'}
                 />
-                <td className="figures px-6 py-4 text-right">
+                <td className={`${TD} figures text-right`}>
                   {downloadsPerThousandViews === null ? '–' : formatRatio(downloadsPerThousandViews)}
                 </td>
-                <td className="figures px-6 py-4 text-right">
+                <td className={`${TD} figures text-right`}>
                   {revenuePerDownload === null ? '–' : formatMoney(revenuePerDownload)}
                 </td>
               </tr>
@@ -79,9 +80,9 @@ export function AppsTable({ apps, range }: { apps: Overview['apps']; range: Rang
 
 function StageHeader({ swatch, children }: { swatch: string; children: React.ReactNode }) {
   return (
-    <th scope="col" className="px-6 py-3 text-right font-medium whitespace-nowrap">
+    <th scope="col" className={`${TH} text-right`}>
       <span className="inline-flex items-center gap-2">
-        <span className={`size-2.5 rounded-[3px] ${swatch}`} aria-hidden="true" />
+        <span className={`size-2 rounded-full ${swatch}`} aria-hidden="true" />
         {children}
       </span>
     </th>
@@ -90,7 +91,7 @@ function StageHeader({ swatch, children }: { swatch: string; children: React.Rea
 
 function Metric({ value, delta }: { value: string; delta: ReturnType<typeof change> | 'unknown' }) {
   return (
-    <td className="px-6 py-4 text-right">
+    <td className={`${TD} text-right`}>
       <span className="figures block font-medium">{value}</span>
       <span className="block text-xs">
         {delta === 'unknown' ? (

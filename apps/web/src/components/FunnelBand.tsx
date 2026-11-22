@@ -24,7 +24,7 @@ export function FunnelBand({
   return (
     <section
       aria-label="Funnel totals"
-      className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface lg:flex-row"
+      className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface md:flex-row"
     >
       <Stage
         label="Social views"
@@ -68,15 +68,15 @@ function Stage(props: {
   comparedWith: string
 }) {
   return (
-    <div className="flex-1 px-6 py-5">
-      <p className="flex items-center gap-2 text-sm font-medium">
-        <span className={`size-2.5 rounded-[3px] ${props.swatch}`} aria-hidden="true" />
+    <div className="relative flex-1 px-5 pt-5 pb-4">
+      {/* The stage's colour along its top edge: which part of the funnel this is. */}
+      <span className={`absolute inset-x-0 top-0 h-0.5 ${props.swatch}`} aria-hidden="true" />
+      <p className="flex items-center gap-2 text-[13px] font-medium text-ink-soft">
+        <span className={`size-2 rounded-full ${props.swatch}`} aria-hidden="true" />
         {props.label}
       </p>
-      <p className="figures mt-2 font-display text-4xl font-semibold tracking-tight">
-        {props.value}
-      </p>
-      <p className="mt-1 text-sm text-ink-soft">
+      <p className="figures mt-2 text-[32px] leading-none font-semibold tracking-tight">{props.value}</p>
+      <p className="mt-2 text-xs text-ink-soft">
         {props.change === 'incomparable' ? (
           'Not enough history to compare'
         ) : props.change === null ? (
@@ -93,9 +93,9 @@ function Stage(props: {
 
 function Seam({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex items-center gap-3 border-y border-line bg-paper px-6 py-3 lg:w-36 lg:flex-col lg:justify-center lg:gap-1 lg:border-x lg:border-y-0 lg:px-3 lg:text-center">
-      <span className="figures font-display text-xl font-semibold">{value}</span>
-      <span className="text-xs leading-snug text-ink-soft">{label}</span>
+    <div className="flex items-center gap-3 border-y border-line bg-paper/60 px-5 py-2.5 md:w-32 md:flex-col md:justify-center md:gap-1 md:border-x md:border-y-0 md:px-3 md:text-center">
+      <span className="figures text-[15px] font-semibold">{value}</span>
+      <span className="text-[11px] leading-snug text-ink-soft">{label}</span>
     </div>
   )
 }

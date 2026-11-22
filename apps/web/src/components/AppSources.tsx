@@ -12,6 +12,7 @@ import {
 } from '../lib/assets'
 import type { AppSummary, Asset } from '../lib/queries'
 import { Button } from './Button'
+import { Panel } from './ui/Panel'
 import { useAssetActions, type AssetActions } from './useAssetActions'
 
 /**
@@ -27,21 +28,18 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
   const portfolio = app.kind === 'portfolio'
 
   return (
-    <section id="sources" className="mt-12 scroll-mt-6" aria-labelledby="sources-heading">
-      <h2 id="sources-heading" className="font-display text-xl font-semibold tracking-tight">
-        Sources
-      </h2>
-      <p className="mt-1 max-w-prose text-sm text-ink-soft">
-        {portfolio
+    <Panel
+      id="sources"
+      title="Sources"
+      description={
+        portfolio
           ? 'Social accounts that promote several apps. Their views count toward the portfolio, not toward one app.'
-          : 'What feeds this app. Linking one fetches its history, so the charts fill in a few minutes later.'}
-      </p>
-      {actions.notice && (
-        <p role="status" className={`mt-4 text-sm ${actions.notice.ok ? 'text-ink-soft' : 'font-medium'}`}>
-          {actions.notice.message}
-        </p>
-      )}
-      <ul className="mt-4 max-w-3xl divide-y divide-line rounded-lg border border-line bg-surface text-sm">
+          : 'What feeds this app. Linking one fetches its history, so the charts fill in a few minutes later.'
+      }
+      bodyClassName=""
+      footer={actions.notice ? <span role="status" className={actions.notice.ok ? '' : 'text-danger'}>{actions.notice.message}</span> : undefined}
+    >
+      <ul className="divide-y divide-line">
         {!portfolio &&
           STORE_KINDS.map((kind) => (
             <SlotRow
@@ -73,7 +71,7 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
           actions={actions}
         />
       </ul>
-    </section>
+    </Panel>
   )
 }
 
@@ -105,8 +103,8 @@ function SlotRow(props: {
   const label = KIND_LABEL[kind] ?? kind
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-4">
-      <label htmlFor={selectId} className="w-full font-medium sm:w-40 sm:shrink-0">
+    <li className="flex flex-wrap items-center gap-x-8 gap-y-2 px-5 py-4">
+      <label htmlFor={selectId} className="w-full text-[13px] font-medium sm:w-60 sm:shrink-0">
         {label}
       </label>
       {candidates.length === 0 ? (
@@ -131,7 +129,7 @@ function SlotRow(props: {
                 actions.assign(chosen, appId)
               }
             }}
-            className="w-full max-w-md rounded-md border border-line bg-surface px-3 py-2"
+            className="w-full max-w-md field"
           >
             <option value="">None</option>
             {candidates.map((asset) => {
@@ -171,8 +169,8 @@ function SocialRow(props: {
   const selectId = useId()
 
   return (
-    <li className="flex flex-wrap gap-x-6 gap-y-3 px-6 py-4">
-      <span className="w-full font-medium sm:w-40 sm:shrink-0">Social accounts</span>
+    <li className="flex flex-wrap gap-x-8 gap-y-3 px-5 py-4">
+      <span className="w-full text-[13px] font-medium sm:w-60 sm:shrink-0">Social accounts</span>
       <div className="w-full min-w-0 space-y-3 sm:w-auto sm:flex-1">
         {linked.length > 0 ? (
           <ul className="space-y-2">
@@ -215,7 +213,7 @@ function SocialRow(props: {
               id={selectId}
               value={adding}
               onChange={(event) => setAdding(event.target.value)}
-              className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+              className="min-w-0 flex-1 field"
             >
               <option value="" disabled>
                 Add a social account
@@ -264,8 +262,8 @@ function RevenueCatRow(props: {
   const selectId = useId()
 
   return (
-    <li className="flex flex-wrap gap-x-6 gap-y-3 px-6 py-4">
-      <span className="w-full font-medium sm:w-40 sm:shrink-0">RevenueCat project</span>
+    <li className="flex flex-wrap gap-x-8 gap-y-3 px-5 py-4">
+      <span className="w-full text-[13px] font-medium sm:w-60 sm:shrink-0">RevenueCat project</span>
       <div className="w-full min-w-0 space-y-3 sm:w-auto sm:flex-1">
         {current && (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -320,7 +318,7 @@ function RevenueCatRow(props: {
               id={selectId}
               value={choice}
               onChange={(event) => setChoice(event.target.value)}
-              className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+              className="min-w-0 flex-1 field"
             >
               <option value="" disabled>
                 Choose a project
@@ -400,7 +398,7 @@ function RevenueCatKeyForm(props: {
           placeholder="sk_…"
           value={apiKey}
           onChange={(event) => setApiKey(event.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+          className="min-w-0 flex-1 field"
         />
         <Button type="submit" variant="primary" disabled={mutation.isPending}>
           {mutation.isPending ? 'Connecting…' : props.replacing ? 'Replace key' : 'Connect'}

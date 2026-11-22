@@ -3,6 +3,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 import { PostsTable } from '../../components/PostsTable'
 import { RangeSwitch } from '../../components/RangeSwitch'
 import { Timeline } from '../../components/Timeline'
+import { Panel } from '../../components/ui/Panel'
 import { formatDay } from '../../lib/format'
 import { appsQuery, postsQuery, timelineQuery } from '../../lib/queries'
 import { RANGE_DAYS, rangeToDates } from '../../lib/range'
@@ -41,27 +42,19 @@ function AppOverview() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-sm text-ink-soft">
+        <p className="text-[13px] text-ink-soft">
           {formatDay(data.range.from)} to {formatDay(data.range.to)}, {RANGE_DAYS[range]} days
         </p>
         <RangeSwitch current={range} />
       </div>
-      <div className="mt-6">
-        <Timeline days={data.days} series={data.series} posts={posts} connected={connected} />
-      </div>
-      <section className="mt-12" aria-labelledby="posts-heading">
-        <h2 id="posts-heading" className="font-display text-xl font-semibold tracking-tight">
-          Posts
-        </h2>
-        <p className="mt-1 text-sm text-ink-soft">
-          Published in this range, newest first. Totals are lifetime numbers from the last sync.
-          Download lift compares downloads on the post&apos;s day and the two after with the
-          week before&apos;s pace; posts close together share those days.
-        </p>
-        <div className="mt-4">
-          <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} appId={appId} />
-        </div>
-      </section>
+      <Timeline days={data.days} series={data.series} posts={posts} connected={connected} />
+      <Panel
+        title="Posts"
+        description="Published in this range, newest first. Totals are lifetime numbers from the last sync. Download lift compares downloads on the post's day and the two after with the week before's pace; posts close together share those days."
+        bodyClassName=""
+      >
+        <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} appId={appId} />
+      </Panel>
     </>
   )
 }

@@ -508,7 +508,7 @@ function Track(props: {
           <p className="mt-1 text-sm text-ink-soft">No data yet</p>
         ) : (
           <>
-            <p className="figures mt-1 font-display text-2xl font-semibold tracking-tight">
+            <p className="figures mt-1 text-2xl font-semibold tracking-tight">
               {headline === null ? '–' : formatValue(headline, series.unit)}
             </p>
             <p className="text-xs text-ink-soft">{caption}</p>

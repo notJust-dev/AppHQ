@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet, createFileRoute, notFound } from '@tanstack/react-router'
+import { PageBody, PageHeader, TAB_CLASS } from '../../components/ui/PageHeader'
 import { appsQuery } from '../../lib/queries'
 import { rangeSearchSchema } from '../../lib/range'
 
@@ -19,9 +20,7 @@ export const Route = createFileRoute('/_app/apps/$appId')({
   notFoundComponent: AppNotFound,
 })
 
-const TAB =
-  '-mb-px border-b-2 border-transparent pb-3 text-ink-soft hover:text-ink aria-[current=page]:border-ink aria-[current=page]:text-ink'
-
+/** One app: its name and tabs on top, the tab's content below. */
 function AppLayout() {
   const { appId } = Route.useParams()
   const { data: apps } = useSuspenseQuery(appsQuery())
@@ -31,35 +30,40 @@ function AppLayout() {
 
   return (
     <>
-      <h1 className="font-display text-3xl font-semibold tracking-tight">{app.name}</h1>
-      <nav aria-label="App sections" className="mt-4 flex gap-6 border-b border-line text-sm font-medium">
-        <Link
-          to="/apps/$appId"
-          params={{ appId }}
-          search={(previous) => previous}
-          activeOptions={{ exact: true, includeSearch: false }}
-          className={TAB}
-        >
-          Overview
-        </Link>
-        <Link to="/apps/$appId/settings" params={{ appId }} search={(previous) => previous} className={TAB}>
-          Settings
-        </Link>
-      </nav>
-      <div className="mt-6">
+      <PageHeader
+        crumbs={[{ label: 'Apps', to: '/apps' }]}
+        title={app.name}
+        tabs={
+          <nav aria-label="App sections" className="flex gap-5">
+            <Link
+              to="/apps/$appId"
+              params={{ appId }}
+              search={(previous) => previous}
+              activeOptions={{ exact: true, includeSearch: false }}
+              className={TAB_CLASS}
+            >
+              Overview
+            </Link>
+            <Link to="/apps/$appId/settings" params={{ appId }} search={(previous) => previous} className={TAB_CLASS}>
+              Settings
+            </Link>
+          </nav>
+        }
+      />
+      <PageBody>
         <Outlet />
-      </div>
+      </PageBody>
     </>
   )
 }
 
 function AppNotFound() {
   return (
-    <div className="max-w-xl">
-      <h1 className="font-display text-2xl font-semibold">There is no such app</h1>
-      <p className="mt-3 text-ink-soft">
+    <div className="mx-auto max-w-md px-6 py-24">
+      <h1 className="text-xl font-semibold tracking-tight">There is no such app</h1>
+      <p className="mt-2 text-ink-soft">
         It may have been removed, or the address may be mistyped.{' '}
-        <Link to="/apps" className="font-medium text-ink underline">
+        <Link to="/apps" className="font-medium text-ink underline underline-offset-4">
           Go to the apps
         </Link>
       </p>
