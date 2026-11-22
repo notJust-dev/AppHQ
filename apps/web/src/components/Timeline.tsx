@@ -473,12 +473,24 @@ function Track(props: {
   const shownValue = shownIndex === null ? null : (series.values[shownIndex] ?? null)
   const headline = active === null ? series.summary : (series.values[active] ?? null)
 
+  // Stores report with different delays; the total stops where the slowest one has got to.
+  // `?? null` covers a dashboard briefly newer than the API during a deploy.
+  const completeThrough = series.completeThrough ?? null
+  const waiting = (series.waitingFor ?? []).map(sourceLabel).join(' and ')
   const caption =
     active !== null
-      ? `${formatDay(days[active] ?? '')}${series.values[active] === null ? ', no data' : ''}`
+      ? `${formatDay(days[active] ?? '')}${
+          completeThrough !== null && (days[active] ?? '') > completeThrough
+            ? `, waiting for ${waiting}`
+            : series.values[active] === null
+              ? ', no data'
+              : ''
+        }`
       : series.aggregate === 'last' && lastIndex >= 0
         ? `Latest, ${formatDay(days[lastIndex] ?? '')}`
-        : `Total over ${days.length} days`
+        : completeThrough !== null
+          ? `Total through ${formatDay(completeThrough)}, waiting for ${waiting}`
+          : `Total over ${days.length} days`
 
   return (
     <div className="border-b border-line md:grid md:grid-cols-[13rem_1fr]">

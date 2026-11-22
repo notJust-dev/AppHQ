@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { metricDaily, posts } from '../db/schema.js'
 import { addDays, toIsoDate, type IsoDate } from '../lib/dates.js'
 import { HEADLINE } from '../metrics/catalog.js'
+import { lastCompleteDay } from '../metrics/complete.js'
 import { BASELINE_DAYS, LIFT_DAYS, downloadLift } from '../metrics/post-lift.js'
 import { defineQuery } from './define.js'
 import { checkRange, rangeFields } from './range.js'
@@ -59,7 +60,7 @@ export const listPosts = defineQuery({
       eq(metricDaily.dimension, ''),
       inArray(metricDaily.source, [...DOWNLOADS.sources]),
     )
-    const [downloadRows, [latest]] = await Promise.all([
+    const [downloadRows, latestBySource] = await Promise.all([
       db
         .select({ date: metricDaily.date, value: metricDaily.value })
         .from(metricDaily)
@@ -70,18 +71,27 @@ export const listPosts = defineQuery({
             lte(metricDaily.date, addDays(input.to, LIFT_DAYS - 1)),
           ),
         ),
-      db.select({ day: max(metricDaily.date) }).from(metricDaily).where(downloadFilter),
+      db
+        .select({ source: metricDaily.source, day: max(metricDaily.date) })
+        .from(metricDaily)
+        .where(downloadFilter)
+        .groupBy(metricDaily.source),
     ])
 
-    // Summed over the stores, like the downloads row of the timeline.
+    // Summed over the stores, like the downloads row of the timeline, and only up to the last
+    // day every store still reporting has reached: Google Play posts days after the App Store.
     const byDay = new Map<IsoDate, number>()
     for (const { date, value } of downloadRows) byDay.set(date, (byDay.get(date) ?? 0) + value)
+    const lastDays = new Map(
+      latestBySource.flatMap(({ source, day }) => (day ? [[source, day] as const] : [])),
+    )
+    const lastReportedDay = lastCompleteDay(lastDays).through
 
     return rows.map((row) => ({
       ...row,
       publishedAt: row.publishedAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      downloadLift: downloadLift(byDay, toIsoDate(row.publishedAt), latest?.day ?? null),
+      downloadLift: downloadLift(byDay, toIsoDate(row.publishedAt), lastReportedDay),
     }))
   },
 })

@@ -21,15 +21,38 @@ describe('buildTimeline', () => {
         row('2026-11-17', 'app_store', 'downloads', 10),
         row('2026-11-17', 'google_play', 'downloads', 4),
         row('2026-11-18', 'app_store', 'downloads', 12),
+        row('2026-11-18', 'google_play', 'downloads', 3),
       ],
       'downloads',
     )
-    expect(downloads.values).toEqual([14, 12, null])
-    expect(downloads.summary).toBe(26)
+    expect(downloads.values).toEqual([14, 15, null])
+    expect(downloads.summary).toBe(29)
+    expect(downloads.completeThrough).toBeNull()
     expect(downloads.sources).toEqual([
       { source: 'app_store', values: [10, 12, null], summary: 22 },
-      { source: 'google_play', values: [4, null, null], summary: 4 },
+      { source: 'google_play', values: [4, 3, null], summary: 7 },
     ])
+  })
+
+  it('ends a total where a slower source stops, instead of showing a drop', () => {
+    const downloads = series(
+      [
+        row('2026-11-17', 'app_store', 'downloads', 10),
+        row('2026-11-17', 'google_play', 'downloads', 4),
+        row('2026-11-18', 'app_store', 'downloads', 12),
+        row('2026-11-19', 'app_store', 'downloads', 11),
+      ],
+      'downloads',
+    )
+    expect(downloads.values).toEqual([14, null, null])
+    expect(downloads.summary).toBe(14)
+    expect(downloads.completeThrough).toBe('2026-11-17')
+    expect(downloads.waitingFor).toEqual(['google_play'])
+    // Each store's own days go as far as it reported; its summary covers the total's days.
+    expect(downloads.sources.find((s) => s.source === 'app_store')).toMatchObject({
+      values: [10, 12, 11],
+      summary: 10,
+    })
   })
 
   it('leaves a day nobody reported as a gap, but keeps a reported zero', () => {

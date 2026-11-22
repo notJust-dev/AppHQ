@@ -266,6 +266,10 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   summed over countries (the traffic-source file double counts); `store_acquisitions`. Installs
   are in Pacific days. Posted 3 to 7 days late; the current month keeps changing, so each sync
   re-reads every month its range touches. A first sync takes a year.
+- Sources lag by different amounts (RevenueCat live, App Store a day, Play 3 to 7 days). A
+  timeline total stops at the last day every source still reporting has reached
+  (`completeThrough`, with `waitingFor`), and download lift waits for the same day; a source
+  more than 10 days behind counts as stopped and does not hold the rest back.
 - Since June/July 2026 Play Console leads with click-based store metrics; the CSVs keep the
   acquisition metrics (Google's page contradicts itself on whether clicks are in the CSVs too).
 - App titles from the Reporting API's `apps:search` when that API is enabled in the service

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apps, metricDaily } from '../db/schema.js'
 import { eachDay, type IsoDate } from '../lib/dates.js'
 import { TIMELINE } from '../metrics/catalog.js'
+import { lastCompleteDay } from '../metrics/complete.js'
 import { defineQuery } from './define.js'
 import { checkRange, rangeFields } from './range.js'
 
@@ -54,7 +55,19 @@ export function buildTimeline(rows: MetricRow[], days: IsoDate[]) {
       return [{ source, values: rounded, summary }]
     })
 
-    const values: Values = days.map((_, index) => {
+    // A total stops at the last day every source still reporting has reached, so a store that
+    // reports later does not show up as a drop. Its sources' own values carry on.
+    const lastDays = new Map<string, IsoDate>()
+    for (const { source, values: sourceValues } of sources) {
+      const last = sourceValues.findLastIndex((value) => value !== null)
+      const day = days[last]
+      if (last >= 0 && day) lastDays.set(source, day)
+    }
+    const complete = lastCompleteDay(lastDays)
+    const late = complete.waitingFor.length > 0 ? complete.through : null
+
+    const values: Values = days.map((day, index) => {
+      if (late !== null && day > late) return null
       let total: number | null = null
       for (const { values: sourceValues } of sources) {
         const value = sourceValues[index]
@@ -64,6 +77,18 @@ export function buildTimeline(rows: MetricRow[], days: IsoDate[]) {
     })
 
     const summary = summarize(definition.aggregate, values)
+    // The per-source summaries cover the same days as the total, so they add up to it; the
+    // daily values still show each source as far as it has reported.
+    const sourcesSummed =
+      late === null
+        ? sources
+        : sources.map((part) => ({
+            ...part,
+            summary: summarize(
+              definition.aggregate,
+              part.values.map((value, index) => ((days[index] ?? '') > late ? null : value)),
+            ),
+          }))
     return {
       key: definition.key,
       label: definition.label,
@@ -74,7 +99,11 @@ export function buildTimeline(rows: MetricRow[], days: IsoDate[]) {
       from: [...definition.sources],
       values,
       summary: summary === null ? null : round(summary),
-      sources,
+      sources: sourcesSummed,
+      /** Set when the total ends early because some sources report later than others. */
+      completeThrough: late,
+      /** The sources the days after `completeThrough` are waiting for. */
+      waitingFor: late === null ? [] : complete.waitingFor,
     }
   })
 }
@@ -85,7 +114,10 @@ export const getAppTimeline = defineQuery({
     "One app's funnel as daily series on a shared date axis: social views, store page views, " +
     'downloads, trials started, revenue (USD) and MRR. Each series has one value per day, null ' +
     'where no source reported that day, plus a summary (the total over the range, or for MRR ' +
-    'the latest value) and the same broken down by source. Returns null for an unknown app.',
+    'the latest value) and the same broken down by source. Sources report with different ' +
+    'delays (Google Play up to a week), so a total stops at `completeThrough` when some sources ' +
+    '(`waitingFor`) have not reached the latest days; per-source values go on. Returns null for ' +
+    'an unknown app.',
   input: z
     .object({ appId: z.string().min(1).max(64).describe('The app id from list_apps.'), ...rangeFields })
     .superRefine(checkRange),
