@@ -12,6 +12,7 @@ import { readAnalyticsState, syncStoreAnalytics, type AnalyticsState } from './a
 import { syncAppStoreReviews, type ReviewsState } from './reviews.js'
 import { saveReviews } from '../../reviews/save.js'
 import { AppStoreError, createAppStoreClient } from './client.js'
+import { fetchAppIcons } from './icons.js'
 import { saveAppStoreApps } from './link-apps.js'
 import { summarizeSalesReport } from './sales-report.js'
 import type { AppStoreCredentials } from './token.js'
@@ -41,9 +42,10 @@ export const readAppStoreCredentials = (secrets: Secrets, encrypted: string): Ap
   credentialsSchema.parse(JSON.parse(secrets.decrypt(encrypted)))
 
 /**
- * Downloads, re-downloads and updates per app and day, from Apple's daily Summary Sales Report
- * (one request per day covers every app in the account), then store page views and impressions
- * from each tracked app's analytics reports, then its customer reviews.
+ * The account's apps and their icons, then downloads, re-downloads and updates per app and day,
+ * from Apple's daily Summary Sales Report (one request per day covers every app in the account),
+ * then store page views and impressions from each tracked app's analytics reports, then its
+ * customer reviews.
  */
 export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}): AccountConnector {
   return {
@@ -70,9 +72,14 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
       let reviewsSaved = 0
 
       try {
-        // Picks up apps published since the last run.
+        // Picks up apps published since the last run, and icons changed by a new build.
         const storeApps = await client.listApps()
-        await saveAppStoreApps(db, connection.id, storeApps)
+        const icons = await fetchAppIcons({
+          client,
+          appleIds: storeApps.map((app) => app.appleId),
+          fetch: options.fetch,
+        })
+        await saveAppStoreApps(db, connection.id, storeApps, icons)
 
         // Only this account's iOS apps that belong to an active app. A report says nothing
         // about any other app, so an app from elsewhere (demo data, another account) must not

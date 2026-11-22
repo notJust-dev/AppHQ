@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet, createFileRoute, notFound } from '@tanstack/react-router'
+import { AppIcon } from '@/components/AppIcon'
 import { PageBody, PageHeader, TAB_CLASS } from '@/components/PageHeader'
 import { appsQuery } from '@/lib/queries'
 import { rangeSearchSchema } from '@/lib/range'
@@ -33,6 +34,7 @@ function AppLayout() {
       <PageHeader
         crumbs={[{ label: 'Apps', to: '/apps' }]}
         title={app.name}
+        icon={app.kind === 'portfolio' ? undefined : <AppIcon app={app} className="size-9 text-sm" />}
         tabs={
           <nav aria-label="App sections" className="flex gap-5">
             <Link

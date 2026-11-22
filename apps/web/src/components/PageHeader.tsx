@@ -23,6 +23,8 @@ const WIDTH = { wide: 'max-w-6xl', narrow: 'max-w-4xl' } as const
 export function PageHeader(props: {
   crumbs?: Crumb[]
   title: string
+  /** Drawn before the title, such as an app's icon. */
+  icon?: ReactNode
   description?: ReactNode
   actions?: ReactNode
   tabs?: ReactNode
@@ -56,7 +58,10 @@ export function PageHeader(props: {
       <div className={cn('mx-auto w-full px-5 pt-6 sm:px-8 sm:pt-8', WIDTH[props.narrow ? 'narrow' : 'wide'])}>
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight break-words">{props.title}</h1>
+            <div className="flex items-center gap-3">
+              {props.icon}
+              <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">{props.title}</h1>
+            </div>
             {props.description && <p className="mt-1.5 max-w-2xl text-muted-foreground">{props.description}</p>}
           </div>
           {props.actions && <div className="flex flex-wrap items-center gap-2">{props.actions}</div>}

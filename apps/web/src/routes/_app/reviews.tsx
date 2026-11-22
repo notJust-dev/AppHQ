@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { CheckCheck, ExternalLink, MessageSquareText, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
+import { AppIcon } from '@/components/AppIcon'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -60,6 +61,8 @@ function ReviewsPage() {
   const reviews = useSuspenseInfiniteQuery(reviewsQuery(filters))
   const { data: summary } = useSuspenseQuery(reviewSummaryQuery({ appId: search.app, store: search.store }))
   const list = reviews.data.pages.flatMap((page) => page.reviews)
+  const { data: apps } = useSuspenseQuery(appsQuery())
+  const iconOf = (appId: string) => apps.find((app) => app.id === appId)?.iconUrl ?? null
   const mark = useMark()
   const filtered = search.rating !== undefined || search.unread
 
@@ -91,7 +94,12 @@ function ReviewsPage() {
               <ul className="space-y-3">
                 {list.map((review) => (
                   <li key={review.id}>
-                    <ReviewCard review={review} onMark={(read) => mark.mutate({ ids: [review.id], read })} pending={mark.isPending} />
+                    <ReviewCard
+                      review={review}
+                      iconUrl={iconOf(review.appId)}
+                      onMark={(read) => mark.mutate({ ids: [review.id], read })}
+                      pending={mark.isPending}
+                    />
                   </li>
                 ))}
               </ul>
@@ -211,7 +219,13 @@ function Stars({ rating, className }: { rating: number; className?: string }) {
   )
 }
 
-function ReviewCard({ review, onMark, pending }: { review: Review; onMark: (read: boolean) => void; pending: boolean }) {
+function ReviewCard(props: {
+  review: Review
+  iconUrl: string | null
+  onMark: (read: boolean) => void
+  pending: boolean
+}) {
+  const { review, onMark, pending } = props
   const place = review.territory ?? review.language
   return (
     <Card className={cn('gap-3 px-5 py-4', !review.read && 'ring-foreground/25')}>
@@ -229,6 +243,10 @@ function ReviewCard({ review, onMark, pending }: { review: Review; onMark: (read
         {review.body && <p className="whitespace-pre-line text-pretty">{review.body}</p>}
       </div>
       <p className="text-xs text-muted-foreground">
+        <AppIcon
+          app={{ name: review.appName, iconUrl: props.iconUrl }}
+          className="mr-1.5 inline-grid size-4 align-[-0.25rem] text-[9px]"
+        />
         <Link to="/apps/$appId" params={{ appId: review.appId }} search={{ range: '28d' }} className="font-medium text-foreground hover:underline">
           {review.appName}
         </Link>

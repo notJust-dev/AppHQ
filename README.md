@@ -101,6 +101,10 @@ history back to January 2024) and reads them a day or two later. Only an Admin k
 use one at least the first time; a Sales and Reports key is enough for downloads and for reading
 reports already asked for. Without one, the App Store Connect page says so.
 
+Each sync also reads every app's icon from its newest build, and an app shows the icon of the iOS
+app linked to it. A key that may not read builds falls back to the public App Store listing,
+which knows only apps on sale in the US store; the others keep their first letter.
+
 For Google Play, create a service account in Google Cloud with a JSON key, and invite its email
 in Play Console (Users and permissions) with "View app information and download bulk reports"
 for all apps; access can take up to a day. On the Google Play page, add the key file and the Cloud Storage URI

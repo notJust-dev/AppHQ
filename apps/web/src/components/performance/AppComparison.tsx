@@ -1,12 +1,13 @@
 import { Link } from '@tanstack/react-router'
 import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { useMemo } from 'react'
+import { AppIcon } from '@/components/AppIcon'
 import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
 import { NoData } from '@/components/NoData'
 import type { RangeKey } from '@/lib/range'
 
 export interface ComparisonRow {
-  app: { id: string; name: string; kind: string }
+  app: { id: string; name: string; kind: string; iconUrl?: string | null }
   /** Each column's number for this app, or null when nothing reported it. */
   values: Record<string, number | null>
 }
@@ -39,14 +40,17 @@ export function AppComparison(props: {
           header: 'App',
           sortFn: 'alphanumeric',
           cell: (info) => (
-            <Link
-              to="/apps/$appId"
-              params={{ appId: info.row.original.app.id }}
-              search={{ range }}
-              className="hover:underline hover:underline-offset-4"
-            >
-              {info.getValue()}
-            </Link>
+            <span className="flex items-center gap-2.5">
+              <AppIcon app={{ ...info.row.original.app, name: info.getValue() }} className="size-5 text-[10px]" />
+              <Link
+                to="/apps/$appId"
+                params={{ appId: info.row.original.app.id }}
+                search={{ range }}
+                className="hover:underline hover:underline-offset-4"
+              >
+                {info.getValue()}
+              </Link>
+            </span>
           ),
         }),
         ...props.columns.map((column) =>

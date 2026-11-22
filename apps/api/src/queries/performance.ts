@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, lt, lte, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
+import { appIcons } from '../assets/icons.js'
 import type { Db } from '../db/client.js'
 import { apps, metricDaily, posts } from '../db/schema.js'
 import { addDays, eachDay, previousPeriod, toIsoDate, type DateRange, type IsoDate } from '../lib/dates.js'
@@ -52,7 +53,7 @@ async function loadSection<D extends SeriesDefinition>(db: Db, definitions: read
   const previous = previousPeriod(range)
   const appFilter: SQL | undefined = range.appId ? eq(metricDaily.appId, range.appId) : undefined
 
-  const [rows, appRows] = await Promise.all([
+  const [rows, appRows, icons] = await Promise.all([
     db
       .select({
         appId: metricDaily.appId,
@@ -72,10 +73,11 @@ async function loadSection<D extends SeriesDefinition>(db: Db, definitions: read
         ),
       ),
     db
-      .select({ id: apps.id, name: apps.name, kind: apps.kind })
+      .select({ id: apps.id, name: apps.name, kind: apps.kind, iconUrl: apps.iconUrl })
       .from(apps)
       .where(range.appId ? eq(apps.id, range.appId) : undefined)
       .orderBy(apps.name),
+    appIcons(db),
   ])
 
   const inRange = (row: { date: IsoDate }, { from, to }: DateRange) => row.date >= from && row.date <= to
@@ -113,7 +115,7 @@ async function loadSection<D extends SeriesDefinition>(db: Db, definitions: read
       const now = summarise(own.filter((row) => inRange(row, range)), days)
       const then = summarise(own.filter((row) => inRange(row, previous)), previousDays)
       return {
-        app,
+        app: { ...app, iconUrl: app.iconUrl ?? icons.get(app.id) ?? null },
         totals: now.totals,
         bySource: now.bySource,
         previous: then.totals,

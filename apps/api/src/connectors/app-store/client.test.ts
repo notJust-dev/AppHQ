@@ -126,6 +126,29 @@ describe('App Store Connect client', () => {
     expect(calls[1]?.url.searchParams.get('cursor')).toBe('abc')
   })
 
+  it("reads the icon of the app's newest build that has one", async () => {
+    const build = (templateUrl?: string) => ({ attributes: { iconAssetToken: templateUrl ? { templateUrl } : null } })
+    const { impl, calls } = fakeFetch([
+      {
+        // The newest build is still processing and has no icon yet.
+        body: JSON.stringify({
+          data: [build(), build('https://is1-ssl.mzstatic.com/image/thumb/Purple/v4/ab/AppIcon/{w}x{h}bb.{f}')],
+        }),
+      },
+      { body: JSON.stringify({ data: [] }) },
+    ])
+    const client = createAppStoreClient({ credentials, fetch: impl })
+
+    expect(await client.latestBuildIcon('111')).toBe(
+      'https://is1-ssl.mzstatic.com/image/thumb/Purple/v4/ab/AppIcon/256x256bb.png',
+    )
+    expect(calls[0]?.url.pathname).toBe('/v1/builds')
+    expect(calls[0]?.url.searchParams.get('filter[app]')).toBe('111')
+    expect(calls[0]?.url.searchParams.get('sort')).toBe('-uploadedDate')
+    // An app with no build has no icon to give.
+    expect(await client.latestBuildIcon('222')).toBeNull()
+  })
+
   it('asks for ongoing or history analytics reports for an app', async () => {
     const { impl, calls } = fakeFetch([{ status: 201, body: '{}' }, { status: 409, body: '{}' }])
     const client = createAppStoreClient({ credentials, fetch: impl })

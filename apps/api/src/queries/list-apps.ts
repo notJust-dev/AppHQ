@@ -1,5 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { appIcons } from '../assets/icons.js'
 import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
 import { apps, assets, connections, metricDaily } from '../db/schema.js'
 import { defineQuery } from './define.js'
@@ -13,7 +14,7 @@ export const listApps = defineQuery({
     'kind "portfolio" holds accounts shared by several apps.',
   input: z.void(),
   async handler({ db }) {
-    const [rows, sourceRows, assetRows] = await Promise.all([
+    const [rows, sourceRows, assetRows, icons] = await Promise.all([
       db.select().from(apps).where(eq(apps.isActive, true)).orderBy(asc(apps.name)),
       db
         .select({ appId: metricDaily.appId, source: metricDaily.source })
@@ -34,6 +35,7 @@ export const listApps = defineQuery({
         .from(assets)
         .leftJoin(connections, eq(connections.id, assets.connectionId))
         .orderBy(asc(assets.kind), asc(assets.name)),
+      appIcons(db),
     ])
 
     const sourcesByApp = new Map<string, string[]>()
@@ -47,7 +49,8 @@ export const listApps = defineQuery({
       id: app.id,
       name: app.name,
       kind: app.kind,
-      iconUrl: app.iconUrl,
+      // An icon set on the app itself wins over its iOS app's.
+      iconUrl: app.iconUrl ?? icons.get(app.id) ?? null,
       sources: (sourcesByApp.get(app.id) ?? []).sort(),
       assets: assetRows
         .filter((asset) => asset.appId === app.id)

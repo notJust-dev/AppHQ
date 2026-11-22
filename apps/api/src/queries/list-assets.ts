@@ -1,5 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { iconOf } from '../assets/icons.js'
 import { ASSET_KINDS, type AssetKind } from '../assets/kinds.js'
 import { suggestApp } from '../assets/store.js'
 import { apps, assets, connections } from '../db/schema.js'
@@ -47,6 +48,7 @@ export const listAssets = defineQuery({
         label: kind?.label ?? row.kind,
         social: kind?.social ?? false,
         bundleId: (details as { bundleId?: string } | null)?.bundleId ?? null,
+        iconUrl: iconOf(details),
         status: row.status ?? 'ok',
         lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
         // A suggestion is only worth making if the app has room for it.

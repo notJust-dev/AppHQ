@@ -130,6 +130,22 @@ const segmentsPage = z.object({
   links: z.object({ next: z.string().nullish() }).nullish(),
 })
 
+const buildsPage = z.object({
+  data: z.array(
+    z.object({
+      attributes: z
+        .object({
+          // An image template on Apple's public image server, e.g. `.../{w}x{h}bb.{f}`.
+          iconAssetToken: z.object({ templateUrl: z.string() }).nullish(),
+        })
+        .nullish(),
+    }),
+  ),
+})
+
+/** Icons are fetched this many pixels square: sharp at twice the largest size the dashboard draws. */
+export const ICON_SIZE = 256
+
 /** The report with daily impressions and product page views. Its Detailed twin adds noise. */
 export const ENGAGEMENT_REPORT = 'App Store Discovery and Engagement Standard'
 
@@ -341,6 +357,28 @@ export function createAppStoreClient(options: {
         next = parsed.links?.next
       }
       return found
+    },
+
+    /**
+     * The icon of the app's newest build that has one, as a link to a public PNG, or null for
+     * an app with no build. It is the icon inside the binary, so a new icon shows once its
+     * build is uploaded, before that version is on sale.
+     */
+    async latestBuildIcon(appleId: string): Promise<string | null> {
+      const query = new URLSearchParams({
+        'filter[app]': appleId,
+        sort: '-uploadedDate',
+        // A build still processing may not have its icon yet.
+        limit: '3',
+        'fields[builds]': 'iconAssetToken',
+      })
+      const parsed = buildsPage.parse(await getJson(`/v1/builds?${query}`))
+      const template = parsed.data.map((build) => build.attributes?.iconAssetToken?.templateUrl).find(Boolean)
+      if (!template) return null
+      return template
+        .replace('{w}', String(ICON_SIZE))
+        .replace('{h}', String(ICON_SIZE))
+        .replace('{f}', 'png')
     },
 
     /** The files of one instance, unzipped: tab-separated text with a header row. */

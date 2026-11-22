@@ -3,6 +3,7 @@ import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { AppWindow, LayoutDashboard, LogOut, Megaphone, MessageSquareText, Monitor, Moon, Plug, Plus, Search, Store, Sun, Wallet } from 'lucide-react'
 import { useEffect } from 'react'
+import { AppIcon } from '@/components/AppIcon'
 import { BrandMark } from '@/components/Brand'
 import {
   DropdownMenu,
@@ -152,12 +153,7 @@ export function AppSidebar() {
                       search={{ range: '28d' }}
                       activeOptions={{ includeSearch: false }}
                     >
-                      <span
-                        className="grid size-4 shrink-0 place-items-center rounded-[4px] border bg-card text-[10px] leading-none font-semibold"
-                        aria-hidden="true"
-                      >
-                        {app.name.charAt(0)}
-                      </span>
+                      <AppIcon app={app} className="size-4 text-[10px]" />
                       <span>{app.name}</span>
                     </Link>
                   </SidebarMenuButton>

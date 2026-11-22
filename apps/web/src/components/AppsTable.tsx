@@ -4,6 +4,7 @@ import { useMemo, type ReactNode } from 'react'
 import { change, formatCount, formatMoney, formatRatio, per } from '@/lib/format'
 import { reportingOf, type Overview } from '@/lib/queries'
 import type { RangeKey } from '@/lib/range'
+import { AppIcon } from './AppIcon'
 import { Delta } from './Delta'
 import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
 import { NoData } from '@/components/NoData'
@@ -117,12 +118,7 @@ function ratioColumn(
 function AppName({ app, range }: { app: AppRow['app']; range: RangeKey }) {
   return (
     <span className="flex items-center gap-3">
-      <span
-        className="grid size-7 shrink-0 place-items-center rounded-md border bg-muted text-xs font-semibold"
-        aria-hidden="true"
-      >
-        {app.name.charAt(0)}
-      </span>
+      <AppIcon app={app} className="size-7 text-xs" />
       <Link
         to="/apps/$appId"
         params={{ appId: app.id }}

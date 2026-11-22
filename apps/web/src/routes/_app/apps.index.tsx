@@ -2,6 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useId, useState } from 'react'
+import { AppIcon } from '@/components/AppIcon'
 import { NoData } from '@/components/NoData'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
@@ -27,6 +28,7 @@ import {
   assetDetail,
 } from '@/lib/assets'
 import { appsQuery, assetsQuery, type AppSummary, type Asset } from '@/lib/queries'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_app/apps/')({
   loader: ({ context }) =>
@@ -136,12 +138,16 @@ function AppsPage() {
 function AssetName({ asset }: { asset: Asset }) {
   const detail = assetDetail(asset)
   return (
-    <span className="min-w-0">
-      <span className="block font-medium break-words">{asset.name}</span>
-      <span className="block text-xs text-muted-foreground">
-        {KIND_LABEL[asset.kind] ?? asset.label}
-        {detail && <> · {detail}</>}
-        {asset.account && asset.account !== asset.name && <> · via {asset.account}</>}
+    <span className="flex min-w-0 items-center gap-3">
+      {/* Store apps whose account gave an icon; it helps tell an app from its old twin. */}
+      {asset.iconUrl && <AppIcon app={asset} className="size-8 text-xs" />}
+      <span className="min-w-0">
+        <span className="block font-medium break-words">{asset.name}</span>
+        <span className="block text-xs text-muted-foreground">
+          {KIND_LABEL[asset.kind] ?? asset.label}
+          {detail && <> · {detail}</>}
+          {asset.account && asset.account !== asset.name && <> · via {asset.account}</>}
+        </span>
       </span>
     </span>
   )
@@ -163,7 +169,12 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
     <li className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_16rem_auto] sm:items-center">
       <div className="min-w-0">
         <AssetName asset={asset} />
-        {suggested && <span className="mt-1 block text-xs text-foreground">Looks like {suggested.name}</span>}
+        {suggested && (
+          // Under the name, past the icon when there is one.
+          <span className={cn('mt-1 block text-xs text-foreground', asset.iconUrl && 'pl-11')}>
+            Looks like {suggested.name}
+          </span>
+        )}
       </div>
       <Label htmlFor={selectId} className="sr-only">
         App for {asset.name}
@@ -237,19 +248,24 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
           return (
             <TableRow key={app.id} className="align-top">
               <TableRowHead className="align-top">
-                <Link
-                  to="/apps/$appId"
-                  params={{ appId: app.id }}
-                  search={{ range: '28d' }}
-                  className="hover:underline hover:underline-offset-4"
-                >
-                  {app.name}
-                </Link>
-                {portfolio && (
-                  <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                    Accounts that promote several apps
+                <span className="flex items-start gap-2.5">
+                  {!portfolio && <AppIcon app={app} className="size-6 text-[11px]" />}
+                  <span className="min-w-0 pt-0.5">
+                    <Link
+                      to="/apps/$appId"
+                      params={{ appId: app.id }}
+                      search={{ range: '28d' }}
+                      className="hover:underline hover:underline-offset-4"
+                    >
+                      {app.name}
+                    </Link>
+                    {portfolio && (
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        Accounts that promote several apps
+                      </span>
+                    )}
                   </span>
-                )}
+                </span>
               </TableRowHead>
               {portfolio ? (
                 <TableCell colSpan={4} className="align-top text-muted-foreground">

@@ -1,5 +1,6 @@
 import { and, asc, eq, gte, inArray, lte, min, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { appIcons } from '../assets/icons.js'
 import { apps, metricDaily } from '../db/schema.js'
 import { eachDay, previousPeriod, type DateRange } from '../lib/dates.js'
 import { HEADLINE, type HeadlineKey } from '../metrics/catalog.js'
@@ -49,7 +50,7 @@ export const getOverview = defineQuery({
     const range: DateRange = { from: input.from, to: input.to }
     const previousRange = previousPeriod(range)
 
-    const [appRows, firstDays, rows] = await Promise.all([
+    const [appRows, firstDays, rows, icons] = await Promise.all([
       db.select().from(apps).where(eq(apps.isActive, true)).orderBy(asc(apps.name)),
       db
         .select({ appId: metricDaily.appId, firstDay: min(metricDaily.date) })
@@ -69,6 +70,7 @@ export const getOverview = defineQuery({
         .from(metricDaily)
         .where(and(gte(metricDaily.date, previousRange.from), lte(metricDaily.date, range.to)))
         .groupBy(metricDaily.appId, metricDaily.date),
+      appIcons(db),
     ])
 
     const byAppAndDay = new Map<string, HeadlineTotals>()
@@ -121,7 +123,7 @@ export const getOverview = defineQuery({
     // Shared accounts count toward the totals, but only show as a row once they have numbers.
     const shown = appRows.filter((app) => app.kind !== 'portfolio' || firstDayByApp.has(app.id))
     const perApp = shown.map((app) => ({
-      app: { id: app.id, name: app.name, kind: app.kind, iconUrl: app.iconUrl },
+      app: { id: app.id, name: app.name, kind: app.kind, iconUrl: app.iconUrl ?? icons.get(app.id) ?? null },
       totals: sumOver(app.id, days),
       previous: sumOver(app.id, previousDays),
       /** Which totals rest on reported numbers; false means no data, not zero. */

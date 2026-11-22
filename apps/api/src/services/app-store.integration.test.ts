@@ -12,6 +12,7 @@ import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
 import { apps, assets, connections, metricDaily, reviews } from '../db/schema.js'
 import { assignAsset } from '../assets/store.js'
+import { listApps } from '../queries/list-apps.js'
 import { assetOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
@@ -66,6 +67,20 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       if (pathname === '/v1/salesReports') {
         const report = reports[searchParams.get('filter[reportDate]') ?? '']
         return report ? new Response(gzipSync(report)) : refuse(404)
+      }
+      if (pathname === '/v1/builds') {
+        // A key with fewer rights may not read builds.
+        if (options.admin === false) return refuse(403)
+        if (searchParams.get('filter[app]') !== first.id) return json({ data: [] })
+        return json({
+          data: [{ attributes: { iconAssetToken: { templateUrl: `https://is1-ssl.mzstatic.com/${run}/one/{w}x{h}bb.{f}` } } }],
+        })
+      }
+      if (pathname === '/lookup') {
+        // The public App Store listing, which knows the second app.
+        return json({
+          results: [{ trackId: Number(second.id), artworkUrl512: `https://is1-ssl.mzstatic.com/${run}/two/512x512bb.jpg` }],
+        })
       }
       if (pathname.endsWith('/analyticsReportRequests')) {
         if (init?.method === 'POST') return options.admin === false ? refuse(403) : json({}, 201)
@@ -218,6 +233,23 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       },
     ])
     expect((await findAppStoreConnection(db))?.details).toMatchObject({ reviews: { access: 'ok' } })
+  })
+
+  it("shows each app's icon from its newest build, else from its store listing, and keeps it", async () => {
+    const iconOf = async (appId: string | undefined) =>
+      (await listApps.handler({ db }, undefined)).find((app) => app.id === appId)?.iconUrl
+    const [one, two] = await ourApps()
+    const firstIcon = `https://is1-ssl.mzstatic.com/${run}/one/256x256bb.png`
+
+    // Saved by the sync of the test before.
+    expect(await iconOf(one?.id)).toBe(firstIcon)
+    expect(await iconOf(two?.id)).toBe(`https://is1-ssl.mzstatic.com/${run}/two/256x256bb.jpg`)
+
+    // A key that may not read builds: the first app's icon is not in its listing, yet it stays.
+    const limited = createAppStoreConnector({ fetch: appStore({ admin: false }) })
+    await limited.sync({ db, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
+    expect(await iconOf(one?.id)).toBe(firstIcon)
+    expect((await findAppStoreConnection(db))?.status).toBe('ok')
   })
 
   it('leaves an app from outside the account alone', async () => {
