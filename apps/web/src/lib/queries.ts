@@ -40,6 +40,14 @@ export const syncStatusQuery = () =>
   queryOptions({ queryKey: ['sync-status'], queryFn: () => getSyncStatusFn() })
 
 export type Overview = Awaited<ReturnType<typeof getOverviewFn>>
+
+/**
+ * Which headline totals rest on reported numbers. An API from before this field existed (for a
+ * moment during a deploy, when the dashboard is newer) sends none; every total then counts as
+ * reported, as it did before.
+ */
+export const reportingOf = (value: Overview['reporting'] | undefined): Overview['reporting'] =>
+  value ?? { downloads: true, revenue: true, socialViews: true }
 export type Timeline = NonNullable<Awaited<ReturnType<typeof getAppTimelineFn>>>
 export type AppSummary = Awaited<ReturnType<typeof listAppsFn>>[number]
 export type SyncRun = Awaited<ReturnType<typeof getSyncStatusFn>>[number]

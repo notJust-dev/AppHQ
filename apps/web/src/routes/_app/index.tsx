@@ -7,7 +7,7 @@ import { RangeSwitch } from '../../components/RangeSwitch'
 import { PageBody, PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
 import { formatDay } from '../../lib/format'
-import { overviewQuery } from '../../lib/queries'
+import { overviewQuery, reportingOf } from '../../lib/queries'
 import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '../../lib/range'
 
 export const Route = createFileRoute('/_app/')({
@@ -51,10 +51,10 @@ function PortfolioPage() {
             <FunnelBand
               totals={data.totals}
               previous={data.comparable ? data.previousTotals : null}
-              reporting={data.reporting}
+              reporting={reportingOf(data.reporting)}
               comparedWith={`vs previous ${days} days`}
             />
-            <Panel title="Apps" description="Each app's funnel over the same days, most revenue first." bodyClassName="">
+            <Panel title="Apps" description="Each app's funnel over the same days. Select a column heading to sort by it." bodyClassName="">
               <AppsTable apps={data.apps} range={range} />
             </Panel>
           </>
