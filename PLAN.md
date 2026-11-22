@@ -133,7 +133,9 @@ Env variables set: `INTERNAL_API_TOKEN` on both apps, `ENCRYPTION_KEY` on `api`,
 `SESSION_SECRET` and `DASHBOARD_PASSWORD` on `web`, as private random values; `API_URL` on `web`. The dashboard
 password is also recorded locally in the git-ignored `apps/web/.env.velocity`.
 `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` (the sandbox's pair) are private variables on
-`api` since 2026-11-22, copied from the git-ignored `apps/api/.env.velocity`.
+`api` since 2026-11-22, copied from the git-ignored `apps/api/.env.velocity`. So are
+`META_APP_ID`, `META_APP_SECRET` and `META_LOGIN_CONFIG_ID` (the Unified login configuration,
+with Pages and Instagram accounts as assets).
 
 Both apps answer `GET /health`. The dashboard's reports `configured` (all its variables are
 valid) and `api` (it can reach the API), so a deployment can be checked without signing in.
@@ -454,11 +456,11 @@ Status on 2026-11-22 (merged to `main` and deployed):
   users; more, or other people's accounts, need the app to pass TikTok's review.
 - Open: an account that posts about several apps (build in public) can only be connected to
   one. Splitting its posts across apps would need a per-post app, set by hand or by hashtag.
-- Steps 1 and 3, plus step 7 (branch `phase-2-meta`, not merged): "Connect Facebook and
+- Steps 1 and 3, plus step 7 (merged and deployed 2026-11-22): "Connect Facebook and
   Instagram" in Settings and the two connectors described under Data sources. Tested with unit
   tests, database tests and a browser run against a stand-in Graph API (connect, pick apps,
-  backfill, cancel). Not yet run against Meta. Needs `META_APP_ID`, `META_APP_SECRET` and
-  `META_LOGIN_CONFIG_ID` on the `api` app.
+  backfill, cancel). Not yet run against Meta. The Meta app uses Unified login, and its
+  configuration offers Pages and Instagram accounts as assets, so one sign-in covers both.
 
 ### Phase 3 — Reviews inbox
 
