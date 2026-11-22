@@ -11,29 +11,39 @@ import {
   removeDemoDataFn,
   runSyncFn,
 } from '../../fns/settings'
+import { assignMetaAccountFn, startMetaConnectFn } from '../../fns/meta'
 import { startTikTokConnectFn, takeConnectResultFn } from '../../fns/tiktok'
-import { formatCount, formatMoment } from '../../lib/format'
+import { formatCount, formatDay, formatMoment } from '../../lib/format'
 import {
   accountsQuery,
   appsQuery,
+  metaAccountsQuery,
+  metaSetupQuery,
   syncStatusQuery,
   tiktokSetupQuery,
   type Account,
   type AppSummary,
+  type MetaAccount,
+  type MetaSetup,
   type SyncRun,
   type TikTokSetup,
 } from '../../lib/queries'
 import { sourceLabel } from '../../lib/sources'
 
+/** Providers whose account names are worth showing next to the source. */
+const NAMED = new Set(['tiktok', 'facebook', 'instagram'])
+
 export const Route = createFileRoute('/_app/settings')({
-  // Set by the TikTok sign-in when it sends the browser back here.
-  validateSearch: z.object({ connected: z.enum(['tiktok']).optional().catch(undefined) }),
+  // Set by a TikTok or Facebook sign-in when it sends the browser back here.
+  validateSearch: z.object({ connected: z.enum(['tiktok', 'meta']).optional().catch(undefined) }),
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(appsQuery()),
       context.queryClient.ensureQueryData(accountsQuery()),
       context.queryClient.ensureQueryData(syncStatusQuery()),
       context.queryClient.ensureQueryData(tiktokSetupQuery()),
+      context.queryClient.ensureQueryData(metaSetupQuery()),
+      context.queryClient.ensureQueryData(metaAccountsQuery()),
     ]),
   component: SettingsPage,
 })
@@ -59,6 +69,8 @@ function SettingsPage() {
   const { data: accounts } = useSuspenseQuery({ ...accountsQuery(), refetchInterval })
   const { data: runs } = useSuspenseQuery({ ...syncStatusQuery(), refetchInterval })
   const { data: tiktokSetup } = useSuspenseQuery(tiktokSetupQuery())
+  const { data: metaSetup } = useSuspenseQuery(metaSetupQuery())
+  const { data: metaAccounts } = useSuspenseQuery({ ...metaAccountsQuery(), refetchInterval })
 
   const dataChanged = () => {
     setWatching(true)
@@ -100,6 +112,13 @@ function SettingsPage() {
       </Section>
 
       <Section
+        title="Connect Facebook and Instagram"
+        intro="One Facebook sign-in finds the Pages you manage and the Instagram accounts linked to them. Then choose the app each one promotes. Facebook brings up to a year of daily views, reach and followers; Instagram brings 90 days of daily views. Both bring posts and reels with their views."
+      >
+        <ConnectMeta apps={apps} setup={metaSetup} accounts={metaAccounts} onChanged={dataChanged} />
+      </Section>
+
+      <Section
         title="Sync"
         intro="Every connected source is fetched on a schedule. A sync re-reads the last seven days, so late corrections are picked up."
       >
@@ -132,12 +151,18 @@ const CONNECTION_STATUS: Record<string, string> = {
   error: 'Last sync failed',
 }
 
-/** The outcome of a TikTok sign-in, read once when the browser comes back from TikTok. */
+const PROVIDER_NAMES = { tiktok: 'TikTok', meta: 'Facebook and Instagram' } as const
+
+/** The outcome of a sign-in, read once when the browser comes back from the provider. */
 function ConnectResult({ onConnected }: { onConnected: () => void }) {
   const { connected } = Route.useSearch()
   const navigate = useNavigate()
   const take = useServerFn(takeConnectResultFn)
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [result, setResult] = useState<{
+    ok: boolean
+    message: string
+    provider?: keyof typeof PROVIDER_NAMES
+  } | null>(null)
   const started = useRef(false)
 
   useEffect(() => {
@@ -161,9 +186,155 @@ function ConnectResult({ onConnected }: { onConnected: () => void }) {
         result.ok ? 'border-line bg-surface' : 'border-ink bg-surface'
       }`}
     >
-      <span className="font-medium">{result.ok ? 'TikTok connected. ' : 'TikTok not connected. '}</span>
+      <span className="font-medium">
+        {PROVIDER_NAMES[result.provider ?? connected ?? 'tiktok']}
+        {result.ok ? ' connected. ' : ' not connected. '}
+      </span>
       {result.message}
     </p>
+  )
+}
+
+const META_PLATFORM = { facebook: 'Facebook Page', instagram: 'Instagram' } as const
+/** Warn this long before the Facebook sign-in, and with it Instagram, stops working. */
+const RENEW_WARNING_MS = 10 * 86_400_000
+
+function ConnectMeta(props: {
+  apps: AppSummary[]
+  setup: MetaSetup
+  accounts: MetaAccount[]
+  onChanged: () => void
+}) {
+  const start = useServerFn(startMetaConnectFn)
+  const assign = useServerFn(assignMetaAccountFn)
+  const connect = useMutation({
+    mutationFn: () => start(),
+    onSuccess: (result) => {
+      if (result.ok) window.location.assign(result.url)
+    },
+  })
+  const choose = useMutation({
+    mutationFn: (input: { connectionId: string; appId: string | null }) => assign({ data: input }),
+    onSuccess: (result) => {
+      if (result.ok) props.onChanged()
+    },
+  })
+  const leaving = connect.isPending || connect.data?.ok === true
+
+  const renewBy = props.accounts
+    .filter((account) => account.provider === 'instagram' && account.expiresAt)
+    .map((account) => account.expiresAt ?? '')
+    .sort()[0]
+  const renewSoon = renewBy !== undefined && Date.parse(renewBy) - Date.now() < RENEW_WARNING_MS
+
+  return (
+    <>
+      {props.accounts.length > 0 && (
+        <div className="mb-5 overflow-x-auto rounded-lg border border-line bg-surface">
+          <table className="w-full min-w-[560px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-ink-soft">
+                <th scope="col" className="px-6 py-3 font-medium">
+                  Account
+                </th>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  Promotes
+                </th>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  State
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.accounts.map((account) => {
+                const selectId = `meta-app-${account.id}`
+                const platform =
+                  META_PLATFORM[account.provider as keyof typeof META_PLATFORM] ?? account.provider
+                return (
+                  <tr key={account.id} className="border-b border-line align-top last:border-b-0">
+                    <th scope="row" className="px-6 py-4 text-left font-medium">
+                      <label htmlFor={selectId}>{account.displayName ?? platform}</label>
+                      <span className="block text-xs font-normal text-ink-soft">{platform}</span>
+                    </th>
+                    <td className="px-6 py-4">
+                      <select
+                        id={selectId}
+                        value={account.appId ?? ''}
+                        disabled={choose.isPending}
+                        onChange={(event) =>
+                          choose.mutate({
+                            connectionId: account.id,
+                            appId: event.target.value === '' ? null : event.target.value,
+                          })
+                        }
+                        className="w-full max-w-56 rounded-md border border-line bg-surface px-3 py-2"
+                      >
+                        <option value="">Not tracked</option>
+                        {props.apps.map((app) => (
+                          <option key={app.id} value={app.id}>
+                            {app.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4">
+                      {account.appId === null
+                        ? 'Not tracked'
+                        : (CONNECTION_STATUS[account.status] ?? account.status)}
+                      {account.appId !== null && account.lastSyncedAt && (
+                        <span className="block text-xs text-ink-soft">
+                          Synced {formatMoment(account.lastSyncedAt)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {choose.data && !choose.data.ok && (
+        <p role="status" className="mb-4 text-sm">
+          {choose.data.message}
+        </p>
+      )}
+
+      {renewBy && (
+        <p className={`mb-4 text-sm ${renewSoon ? 'font-medium' : 'text-ink-soft'}`}>
+          Meta lets the sign-in last about 60 days. Connect again by {formatDay(renewBy.slice(0, 10))}{' '}
+          so Instagram keeps syncing; Facebook Pages keep working either way.
+        </p>
+      )}
+
+      {!props.setup.configured ? (
+        <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm">
+          Facebook and Instagram are not set up on the API yet. Add <code>META_APP_ID</code>,{' '}
+          <code>META_APP_SECRET</code> and <code>META_LOGIN_CONFIG_ID</code> from your Meta app to
+          the api app&apos;s environment variables, then reload this page.
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="primary" onClick={() => connect.mutate()} disabled={leaving}>
+            {leaving
+              ? 'Opening Facebook…'
+              : props.accounts.length > 0
+                ? 'Connect again'
+                : 'Connect Facebook and Instagram'}
+          </Button>
+          <span role="status" className="text-sm">
+            {connect.isError && 'Could not reach the dashboard server. Try again.'}
+            {connect.data && !connect.data.ok && connect.data.message}
+          </span>
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-ink-soft">
+        Valid OAuth Redirect URI to add in the Meta app, exactly as written:{' '}
+        <code className="break-all text-ink">{props.setup.redirectUri}</code>
+      </p>
+    </>
   )
 }
 
@@ -311,7 +482,7 @@ function AppsList({ apps }: { apps: AppSummary[] }) {
                   app.connections.map((connection) => (
                     <span key={connection.id} className="block">
                       {sourceLabel(connection.provider)}
-                      {connection.provider === 'tiktok' && connection.displayName
+                      {NAMED.has(connection.provider) && connection.displayName
                         ? ` ${connection.displayName}`
                         : ''}
                       : {CONNECTION_STATUS[connection.status] ?? connection.status}

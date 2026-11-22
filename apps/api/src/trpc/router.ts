@@ -5,6 +5,8 @@ import { APP_STORE, APP_STORE_HISTORY_DAYS } from '../connectors/app-store/conne
 import { connectors } from '../connectors/registry.js'
 import { RevenueCatError } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
+import { MetaError, createMetaClient } from '../connectors/meta/client.js'
+import { FACEBOOK, MetaNotConfiguredError, metaConfig } from '../connectors/meta/config.js'
 import { TikTokError, createTikTokClient } from '../connectors/tiktok/client.js'
 import { TIKTOK, TikTokNotConfiguredError, tiktokConfig } from '../connectors/tiktok/config.js'
 import type { Sql } from '../db/client.js'
@@ -17,10 +19,12 @@ import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
 import { listAccounts } from '../queries/list-accounts.js'
 import { listApps } from '../queries/list-apps.js'
+import { listMetaAccounts } from '../queries/list-meta-accounts.js'
 import { listPosts } from '../queries/list-posts.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
+import { assignMetaAccount, connectMeta } from '../services/connect-meta.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 
@@ -44,8 +48,26 @@ function connectError(err: unknown): TRPCError {
   if (err instanceof ConnectInputError) {
     return new TRPCError({ code: 'BAD_REQUEST', message: err.message })
   }
-  if (err instanceof TikTokNotConfiguredError) {
+  if (err instanceof TikTokNotConfiguredError || err instanceof MetaNotConfiguredError) {
     return new TRPCError({ code: 'PRECONDITION_FAILED', message: err.message })
+  }
+  if (err instanceof MetaError) {
+    if (err.code === 101 || err.code === 1) {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Facebook did not accept the app credentials. Check META_APP_ID and META_APP_SECRET on the api app.',
+      })
+    }
+    if (err.code === 100 && /code|verification/i.test(err.message)) {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The Facebook sign-in expired or was already used. Connect again.',
+      })
+    }
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Facebook rejected the connection (${err.code}): ${err.message}`,
+    })
   }
   if (err instanceof TikTokError) {
     if (err.code === 'invalid_client' || err.code === 'unauthorized_client') {
@@ -219,6 +241,52 @@ export const appRouter = t.router({
           appIds: [result.appId],
           range: trailingRange(7),
         })
+        return result
+      }),
+  }),
+  /**
+   * Facebook Pages and their linked Instagram accounts, through one Facebook sign-in. Like
+   * TikTok, the dashboard owns the browser side and the API owns the app secret and tokens.
+   */
+  meta: t.router({
+    setup: t.procedure.query(() => ({ configured: metaConfig() !== null })),
+
+    authorizeUrl: t.procedure
+      .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
+      .query(({ input }) => {
+        const config = metaConfig()
+        if (!config) throw connectError(new MetaNotConfiguredError())
+        return { url: createMetaClient({ config }).authorizeUrl(input) }
+      }),
+
+    /** Finishes the sign-in and saves every Page and Instagram account it can see. */
+    connect: t.procedure
+      .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url() }))
+      .mutation(({ ctx, input }) =>
+        connectMeta(ctx, input).catch((err: unknown) => {
+          ctx.log.error(`connect Meta failed: ${err instanceof Error ? err.message : err}`)
+          throw connectError(err)
+        }),
+      ),
+
+    accounts: t.procedure.query(({ ctx }) => listMetaAccounts.handler(ctx)),
+
+    /** Says which app an account promotes, and fetches its history when it gets one. */
+    assign: t.procedure
+      .input(z.object({ connectionId: z.uuid(), appId: z.string().min(1).max(64).nullable() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await assignMetaAccount(ctx.db, input).catch((err: unknown) => {
+          throw connectError(err)
+        })
+        if (result.appId) {
+          // Facebook keeps two years of Page insights; Instagram keeps 90 days.
+          startSync(ctx, {
+            connectors,
+            sources: [result.provider],
+            appIds: [result.appId],
+            range: trailingRange(result.provider === FACEBOOK ? 365 : 90),
+          })
+        }
         return result
       }),
   }),

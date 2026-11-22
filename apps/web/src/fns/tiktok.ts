@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { TRPCClientError } from '@trpc/client'
 import { z } from 'zod'
 import { api } from '../server/api'
-import { getOAuthSession, tiktokRedirectUri } from '../server/oauth'
+import { beginOAuth, getOAuthSession, tiktokRedirectUri } from '../server/oauth'
 import { requireSession } from './auth'
 
 /** Whether the API has TikTok credentials, and the redirect URI to register with TikTok. */
@@ -28,12 +28,7 @@ export const startTikTokConnectFn = createServerFn({ method: 'POST' })
         redirectUri: tiktokRedirectUri(),
         state,
       })
-      const oauth = await getOAuthSession()
-      oauth.state = state
-      oauth.appId = data.appId
-      oauth.startedAt = Date.now()
-      oauth.result = undefined
-      await oauth.save()
+      await beginOAuth('tiktok', state, data.appId)
       return { ok: true as const, url }
     } catch (err) {
       const message =

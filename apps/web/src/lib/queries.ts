@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAppTimelineFn, getOverviewFn, listPostsFn } from '../fns/portfolio'
 import { getSyncStatusFn, listAccountsFn, listAppsFn } from '../fns/settings'
+import { metaAccountsFn, metaSetupFn } from '../fns/meta'
 import { tiktokSetupFn } from '../fns/tiktok'
 
 export const overviewQuery = (dates: { from: string; to: string }) =>
@@ -24,6 +25,12 @@ export const postsQuery = (appId: string, dates: { from: string; to: string }) =
 export const tiktokSetupQuery = () =>
   queryOptions({ queryKey: ['tiktok-setup'], queryFn: () => tiktokSetupFn() })
 
+export const metaSetupQuery = () =>
+  queryOptions({ queryKey: ['meta-setup'], queryFn: () => metaSetupFn() })
+
+export const metaAccountsQuery = () =>
+  queryOptions({ queryKey: ['meta-accounts'], queryFn: () => metaAccountsFn() })
+
 export const appsQuery = () => queryOptions({ queryKey: ['apps'], queryFn: () => listAppsFn() })
 
 export const accountsQuery = () =>
@@ -39,3 +46,5 @@ export type SyncRun = Awaited<ReturnType<typeof getSyncStatusFn>>[number]
 export type Account = Awaited<ReturnType<typeof listAccountsFn>>[number]
 export type Post = Awaited<ReturnType<typeof listPostsFn>>[number]
 export type TikTokSetup = Awaited<ReturnType<typeof tiktokSetupFn>>
+export type MetaSetup = Awaited<ReturnType<typeof metaSetupFn>>
+export type MetaAccount = Awaited<ReturnType<typeof metaAccountsFn>>[number]

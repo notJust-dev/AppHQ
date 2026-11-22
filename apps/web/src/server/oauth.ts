@@ -3,14 +3,18 @@ import { getCookie, getRequestUrl, setCookie } from '@tanstack/react-start/serve
 import { getIronSession } from 'iron-session'
 import { serverEnv } from './env'
 
+export type OAuthProvider = 'tiktok' | 'meta'
+
 interface OAuthData {
+  /** Which sign-in this is, so one provider's callback cannot finish another's. */
+  provider?: OAuthProvider
   /** The one-time value sent to the provider and checked when it sends the browser back. */
   state?: string
   /** The app the account will be connected to. */
   appId?: string
   startedAt?: number
   /** Shown once on the Settings page after the redirect back, then cleared. */
-  result?: { ok: boolean; message: string }
+  result?: { ok: boolean; message: string; provider?: OAuthProvider }
 }
 
 /** A sign-in has this long to come back before its state is refused. */
@@ -49,3 +53,42 @@ export function publicOrigin(): string {
 
 /** Must match, character for character, a redirect URI registered in the TikTok app. */
 export const tiktokRedirectUri = () => `${publicOrigin()}/connect/tiktok/callback`
+
+/** Must match a Valid OAuth Redirect URI of the Meta app's Facebook Login for Business. */
+export const metaRedirectUri = () => `${publicOrigin()}/connect/meta/callback`
+
+/** Remembers a sign-in that is about to leave for the provider. */
+export async function beginOAuth(provider: OAuthProvider, state: string, appId?: string) {
+  const oauth = await getOAuthSession()
+  oauth.provider = provider
+  oauth.state = state
+  oauth.appId = appId
+  oauth.startedAt = Date.now()
+  oauth.result = undefined
+  await oauth.save()
+}
+
+/**
+ * Checks a provider's redirect against the sign-in that started it, then forgets the attempt.
+ * Returns the app chosen at the start when it matches, or null when it does not (expired, from
+ * another browser, or another provider's).
+ */
+export async function finishOAuth(provider: OAuthProvider, returnedState: string | null) {
+  const oauth = await getOAuthSession()
+  const { state, appId, startedAt } = oauth
+  const fresh = startedAt !== undefined && Date.now() - startedAt < OAUTH_WINDOW_MS
+  const matches = oauth.provider === provider && !!state && returnedState === state && fresh
+  oauth.provider = undefined
+  oauth.state = undefined
+  oauth.appId = undefined
+  oauth.startedAt = undefined
+  return {
+    matches,
+    appId: appId ?? null,
+    /** Stores the message Settings shows once, and saves the cookie. */
+    async report(ok: boolean, message: string) {
+      oauth.result = { ok, message, provider }
+      await oauth.save()
+    },
+  }
+}

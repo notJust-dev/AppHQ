@@ -54,7 +54,7 @@ const STAGE = {
 
 /** Where each row's numbers come from, for a row whose sources have sent nothing at all. */
 const WHERE_FROM: Record<string, string> = {
-  socialViews: 'Comes from TikTok and Instagram, which are not connected yet.',
+  socialViews: 'Comes from TikTok, Instagram and Facebook, which are not connected yet.',
   pageViews: 'Comes from App Store and Google Play analytics, which are not connected yet.',
   downloads: 'Connect App Store Connect in Settings.',
   trials: 'Connect RevenueCat in Settings.',

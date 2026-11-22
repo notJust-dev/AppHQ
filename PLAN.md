@@ -281,20 +281,43 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   redirect URI built from Velocity's forwarded headers matched the registered one (no
   `PUBLIC_URL` needed).
 
-### Instagram (verified against Meta's docs)
+### Facebook Pages and Instagram (built; Meta docs checked 2026-11-22; tested against a stand-in)
 
-- An app that only serves accounts you own or manage uses Standard Access; App Review is not
-  required. Accounts must be professional (business or creator).
-- Account insights per day: `views`, `reach`, `accounts_engaged`, `likes`, `comments`, `shares`,
-  `saves`, `total_interactions`, `follows_and_unfollows`. Stored for 90 days, so the first sync
-  can backfill 90 days.
-- Media insights (lifetime totals): `views`, `reach`, `likes`, `comments`, `shares`, `saved`,
-  `ig_reels_avg_watch_time`. Can lag up to 48 hours.
-- Tokens: long-lived token valid 60 days, refreshable once it is at least 24 hours old.
+One connector pair behind one Facebook sign-in, because the Instagram accounts are linked to
+Pages. Graph API v27.0 (out 2026-11-04).
 
-### Facebook Pages
-
-Unverified: the Page insights reference did not load. Treated as optional in Phase 2.
+- Login: Facebook Login for Business with a configuration (`config_id`, token type "User access
+  token") holding `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`,
+  `read_insights`, `instagram_basic`, `instagram_manage_insights`, `business_management`.
+  Without `META_LOGIN_CONFIG_ID` the same list is sent as `scope`. People with a role on the app
+  get Standard Access: no App Review, no Business Verification. Redirect URIs: HTTPS, exact match.
+- Tokens: code → short-lived user token → long-lived user token (about 60 days, no server-side
+  refresh; signing in again renews it). `/me/accounts` returns a Page token per Page, which does
+  not expire. Instagram accounts keep both; the connector tries the Page token and falls back to
+  the user token (Meta documents the user token). So after ~60 days Instagram may stop until the
+  next sign-in, while Facebook keeps going; Settings shows the date. Every call carries an
+  `appsecret_proof`.
+- Accounts: the sign-in saves every Page and linked Instagram account unassigned; Settings picks
+  the app each promotes (or "Not tracked"). Signing in again keeps those choices.
+- Facebook daily (Page insights, `period=day`, at most 90 days per request, two years kept):
+  `page_media_view` → `views`, `page_total_media_view_unique` → `reach`, `page_post_engagements`
+  → `engagements`, `page_follows` → `followers`. `page_impressions*` and `page_fans` were removed
+  on 2025-11-15 and `page_impressions_unique` on 2026-06-15. Insights need 100+ Page likes.
+- Facebook posts: `/published_posts` with reaction, comment and share counts, and views from
+  `post_media_view`; reels from `/video_reels` with `blue_reels_play_count`. Open: whether reels
+  also appear in `/published_posts` (they would then show twice).
+- Instagram daily: `views` comes only as `total_value`, so one request per day; Meta keeps 90
+  days. Followers from the account's `followers_count`, once per sync.
+- Instagram media: `/media` with likes and comments, plus `views`, `shares`, `saved` insights.
+  `impressions`, `plays` and `video_views` were removed in 2025. Insights lag up to 48 hours.
+- Media and posts younger than 30 days are re-read every sync; older ones keep their totals.
+- Days: Meta's are Pacific (`end_time` is the next midnight in Los Angeles); values are stored
+  under the Pacific day they cover, so they sit a few hours off the UTC sources.
+- Rate limits: 4,800 × engaged users (Pages) or impressions (Instagram) per 24 hours; error codes
+  4, 17, 32, 613, 80001, 80002 fail the run rather than being retried.
+- Unconfirmed until the first real sign-in: whether a Page token works for Instagram calls,
+  whether `instagram_manage_insights` is offered by the Instagram use case's Facebook-login
+  setup, and the Instagram day boundary.
 
 ## 7. Query layer
 
@@ -426,6 +449,11 @@ Status on 2026-11-22 (merged to `main` and deployed):
   users; more, or other people's accounts, need the app to pass TikTok's review.
 - Open: an account that posts about several apps (build in public) can only be connected to
   one. Splitting its posts across apps would need a per-post app, set by hand or by hashtag.
+- Steps 1 and 3, plus step 7 (branch `phase-2-meta`, not merged): "Connect Facebook and
+  Instagram" in Settings and the two connectors described under Data sources. Tested with unit
+  tests, database tests and a browser run against a stand-in Graph API (connect, pick apps,
+  backfill, cancel). Not yet run against Meta. Needs `META_APP_ID`, `META_APP_SECRET` and
+  `META_LOGIN_CONFIG_ID` on the `api` app.
 
 ### Phase 3 — Reviews inbox
 

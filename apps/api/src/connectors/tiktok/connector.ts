@@ -1,9 +1,10 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { Db } from '../../db/client.js'
 import { connections, postSnapshots, posts, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { todayUtc, toIsoDate, type IsoDate } from '../../lib/dates.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
+import { savePosts, type PostReading } from '../../posts/save.js'
 import type { AppConnector } from '../types.js'
 import { TikTokError, createTikTokClient, type TikTokClient, type TikTokVideo } from './client.js'
 import { TIKTOK, requireTikTokConfig, tiktokConfig } from './config.js'
@@ -11,7 +12,6 @@ import { dailyViews, type PostHistory } from './daily-views.js'
 
 /** Refresh a little early, so a token never expires halfway through a sync. */
 const REFRESH_MARGIN_MS = 5 * 60_000
-const CHUNK = 500
 
 const tiktokConnections = (db: Db, appId: string) =>
   db
@@ -74,7 +74,7 @@ function tokenKeeper(deps: {
   }
 }
 
-const postRow = (video: TikTokVideo, appId: string, connectionId: string) => ({
+const postRow = (video: TikTokVideo, appId: string, connectionId: string): PostReading => ({
   platform: TIKTOK,
   externalId: video.id,
   appId,
@@ -89,52 +89,6 @@ const postRow = (video: TikTokVideo, appId: string, connectionId: string) => ({
   shares: video.share_count ?? 0,
 })
 
-/** Saves the videos' latest totals, and the same totals as today's snapshot. */
-async function savePosts(db: Db, videos: TikTokVideo[], appId: string, connectionId: string, today: IsoDate) {
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < videos.length; i += CHUNK) {
-      const saved = await tx
-        .insert(posts)
-        .values(videos.slice(i, i + CHUNK).map((video) => postRow(video, appId, connectionId)))
-        .onConflictDoUpdate({
-          target: [posts.platform, posts.externalId],
-          set: {
-            appId: sql`excluded.app_id`,
-            connectionId: sql`excluded.connection_id`,
-            url: sql`excluded.url`,
-            caption: sql`excluded.caption`,
-            durationSeconds: sql`excluded.duration_seconds`,
-            views: sql`excluded.views`,
-            likes: sql`excluded.likes`,
-            comments: sql`excluded.comments`,
-            shares: sql`excluded.shares`,
-            updatedAt: sql`now()`,
-          },
-        })
-        .returning({
-          postId: posts.id,
-          views: posts.views,
-          likes: posts.likes,
-          comments: posts.comments,
-          shares: posts.shares,
-        })
-
-      await tx
-        .insert(postSnapshots)
-        .values(saved.map((post) => ({ ...post, date: today })))
-        .onConflictDoUpdate({
-          target: [postSnapshots.postId, postSnapshots.date],
-          set: {
-            views: sql`excluded.views`,
-            likes: sql`excluded.likes`,
-            comments: sql`excluded.comments`,
-            shares: sql`excluded.shares`,
-            capturedAt: sql`now()`,
-          },
-        })
-    }
-  })
-}
 
 /**
  * Recomputes the app's daily TikTok views from every snapshot, per account, and writes them to
@@ -239,7 +193,11 @@ export function createTikTokConnector(
           const user = await keeper.use((token) => client.getUser(token, scopes))
           const videos = await keeper.use((token) => client.listVideos(token))
 
-          await savePosts(db, videos, app.id, account.id, today)
+          await savePosts(
+            db,
+            videos.map((video) => postRow(video, app.id, account.id)),
+            today,
+          )
           rowsWritten += videos.length
           if (typeof user.follower_count === 'number') {
             followers = (followers ?? 0) + user.follower_count

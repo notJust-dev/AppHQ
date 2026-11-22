@@ -26,6 +26,10 @@ const schema = z
     // dashboard explains what to set instead of offering "Connect TikTok".
     TIKTOK_CLIENT_KEY: z.string().optional(),
     TIKTOK_CLIENT_SECRET: z.string().optional(),
+    // From the Meta app (App settings, Basic) and its Facebook Login for Business configuration.
+    META_APP_ID: z.string().optional(),
+    META_APP_SECRET: z.string().optional(),
+    META_LOGIN_CONFIG_ID: z.string().optional(),
   })
   .refine((env) => env.DATABASE_URL || (env.PGHOST && env.PGDATABASE && env.PGUSER), {
     path: ['DATABASE_URL'],

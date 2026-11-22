@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { TRPCClientError } from '@trpc/client'
 import { api } from '../server/api'
-import { OAUTH_WINDOW_MS, getOAuthSession, tiktokRedirectUri } from '../server/oauth'
+import { finishOAuth, tiktokRedirectUri } from '../server/oauth'
 import { getAppSession } from '../server/session'
-
-const redirectTo = (path: string) => new Response(null, { status: 302, headers: { location: path } })
+import { callbackError, providerErrorMessage, redirectTo } from '../server/oauth-callback'
 
 /**
  * Where TikTok sends the browser after sign-in. It checks the session and the state from the
@@ -20,44 +18,25 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
         if (!session.signedIn) return redirectTo('/login')
 
         const params = new URL(request.url).searchParams
-        const oauth = await getOAuthSession()
-        const { state, appId, startedAt } = oauth
-
+        const attempt = await finishOAuth('tiktok', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
-          oauth.state = undefined
-          oauth.appId = undefined
-          oauth.startedAt = undefined
-          oauth.result = { ok, message }
-          await oauth.save()
+          await attempt.report(ok, message)
           return redirectTo('/settings?connected=tiktok')
         }
 
         const error = params.get('error')
-        if (error) {
-          const code = /^[a-z_]{1,40}$/.test(error) ? error : 'unknown'
-          return finish(
-            false,
-            code === 'access_denied'
-              ? 'The TikTok sign-in was cancelled, so nothing was connected.'
-              : `TikTok could not complete the sign-in (${code}). Try again.`,
-          )
-        }
+        if (error) return finish(false, providerErrorMessage('TikTok', error))
 
         const code = params.get('code')
-        const returnedState = params.get('state')
-        const fresh = startedAt !== undefined && Date.now() - startedAt < OAUTH_WINDOW_MS
-        if (!code || !returnedState || !state || !appId || returnedState !== state || !fresh) {
-          return finish(
-            false,
-            'This sign-in expired or was started in another browser. Start it again here.',
-          )
+        if (!code || !attempt.matches || !attempt.appId) {
+          return finish(false, 'This sign-in expired or was started in another browser. Start it again here.')
         }
 
         try {
           const result = await api().tiktok.connect.mutate({
             code,
             redirectUri: tiktokRedirectUri(),
-            appId,
+            appId: attempt.appId,
           })
           return finish(
             true,
@@ -66,12 +45,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
               'reports totals, so a day is the difference between two readings.',
           )
         } catch (err) {
-          const code: unknown = err instanceof TRPCClientError ? err.data?.code : undefined
-          const passOn = code === 'BAD_REQUEST' || code === 'PRECONDITION_FAILED'
-          return finish(
-            false,
-            passOn && err instanceof Error ? err.message : 'Could not reach the API. Try again.',
-          )
+          return finish(false, callbackError(err))
         }
       },
     },

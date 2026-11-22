@@ -68,6 +68,17 @@ can sign in.
 To try the flow without TikTok, point the API at a stand-in with `TIKTOK_API_URL` and
 `TIKTOK_AUTH_URL`.
 
+For Facebook Pages and Instagram, create a Business app at developers.facebook.com with Facebook
+Login for Business. Add the redirect URI that Settings shows under "Connect Facebook and
+Instagram", and create a login configuration (user access token) with `pages_show_list`,
+`pages_read_engagement`, `pages_read_user_content`, `read_insights`, `instagram_basic`,
+`instagram_manage_insights` and `business_management`. Set `META_APP_ID`, `META_APP_SECRET` and
+`META_LOGIN_CONFIG_ID` on the API. One sign-in finds every Page you manage and the Instagram
+accounts linked to them; then pick the app each one promotes. Facebook brings a year of daily
+Page insights, Instagram 90 days. Meta's sign-in lasts about 60 days and cannot be renewed by the
+server, so connect again before the date Settings shows (Facebook Pages keep working without).
+`META_GRAPH_URL` and `META_DIALOG_URL` point the API at a stand-in.
+
 ## Commands
 
 | Where | Command | What it does |
@@ -93,7 +104,7 @@ Both apps deploy from this repository to the same server. Settings that work:
 | Build command | `npm run build` | `npm run build` |
 | Start command | `npm run start` | `npm run start` |
 | Database | Attach PostgreSQL here | None |
-| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD`, optional `PUBLIC_URL` |
+| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD`, optional `PUBLIC_URL` |
 | Cron | `node dist/cli.js sync` | None |
 
 Things to know:
