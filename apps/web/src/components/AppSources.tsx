@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/Panel'
+import { Private } from '@/components/Private'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -97,9 +98,15 @@ const ROW_LABEL = 'w-full pt-1.5 text-sm font-medium sm:w-56 sm:shrink-0'
 const ROW_BODY = 'w-full min-w-0 space-y-3 sm:w-auto sm:flex-1'
 
 /** Where an asset belongs now, said next to it in a list of choices. */
-function whereNow(asset: Asset, appName: (appId: string) => string) {
+function whereNow(asset: Asset, appName: (appId: string) => string): ReactNode {
   if (asset.appId === null) return ''
-  return asset.appId === 'portfolio' ? ' (in Shared accounts)' : ` (now in ${appName(asset.appId)})`
+  if (asset.appId === 'portfolio') return ' (in Shared accounts)'
+  return (
+    <>
+      {' (now in '}
+      <Private>{appName(asset.appId)}</Private>)
+    </>
+  )
 }
 
 function SlotRow(props: {
@@ -150,8 +157,10 @@ function SlotRow(props: {
                   const detail = assetDetail(asset)
                   return (
                     <SelectItem key={asset.id} value={asset.id}>
-                      {asset.name}
-                      {detail ? ` · ${detail}` : ''}
+                      <Private>
+                        {asset.name}
+                        {detail ? ` · ${detail}` : ''}
+                      </Private>
                       {asset.appId === appId ? '' : whereNow(asset, appName)}
                     </SelectItem>
                   )
@@ -193,7 +202,8 @@ function SocialRow(props: {
             {linked.map((asset) => (
               <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2">
                 <span className="min-w-0 break-words">
-                  <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span> {asset.name}
+                  <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span>{' '}
+                  <Private>{asset.name}</Private>
                   {ATTENTION[asset.status] && (
                     <span className="block text-xs font-medium text-warning">The account {ATTENTION[asset.status]}.</span>
                   )}
@@ -233,7 +243,7 @@ function SocialRow(props: {
               <SelectContent>
                 {candidates.map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
-                    {PLATFORM_OF_KIND[asset.kind]} {asset.name}
+                    {PLATFORM_OF_KIND[asset.kind]} <Private>{asset.name}</Private>
                     {whereNow(asset, appName)}
                   </SelectItem>
                 ))}
@@ -280,9 +290,9 @@ function RevenueCatRow(props: {
         {current && (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border px-3 py-2">
             <span className="min-w-0 break-words">
-              {current.name}
+              <Private>{current.name}</Private>
               <span className="block text-xs text-muted-foreground">
-                {current.bundleId ?? current.externalId}
+                <Private>{current.bundleId ?? current.externalId}</Private>
                 {ATTENTION[current.status] && (
                   <span className="font-medium text-warning"> · The key {ATTENTION[current.status]}; replace it.</span>
                 )}
@@ -326,7 +336,7 @@ function RevenueCatRow(props: {
               <SelectContent>
                 {others.map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
-                    {asset.name}
+                    <Private>{asset.name}</Private>
                     {whereNow(asset, appName)}
                   </SelectItem>
                 ))}
@@ -359,16 +369,26 @@ function RevenueCatKeyForm(props: {
       setApiKey('')
       const project = result.projects[0]
       toast.success(
-        project
-          ? [
-              `Connected ${project.name}.`,
-              project.movedFrom ? `It fed ${project.movedFrom} until now.` : '',
-              project.replaced ? `${project.replaced} now waits on the Apps page.` : '',
-              'Its history is being fetched; the numbers appear within a minute.',
-            ]
-              .filter(Boolean)
-              .join(' ')
-          : 'Connected.',
+        project ? (
+          <span>
+            Connected <Private>{project.name}</Private>.
+            {project.movedFrom && (
+              <>
+                {' It fed '}
+                <Private>{project.movedFrom}</Private> until now.
+              </>
+            )}
+            {project.replaced && (
+              <>
+                {' '}
+                <Private>{project.replaced}</Private> now waits on the Apps page.
+              </>
+            )}{' '}
+            Its history is being fetched; the numbers appear within a minute.
+          </span>
+        ) : (
+          'Connected.'
+        ),
         { duration: 8000 },
       )
       props.onConnected()
@@ -386,7 +406,7 @@ function RevenueCatKeyForm(props: {
       }}
     >
       <p className="text-xs text-muted-foreground">
-        In RevenueCat, open the project for {props.app.name}, then Project settings, API keys.
+        In RevenueCat, open the project for <Private>{props.app.name}</Private>, then Project settings, API keys.
         Create a secret API key, version 2, with read access to Charts &amp; metrics and to Project
         configuration, and paste it here. It is stored encrypted and never shown again.
       </p>

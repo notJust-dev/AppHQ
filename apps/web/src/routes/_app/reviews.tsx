@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { AppIcon } from '@/components/AppIcon'
 import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Private } from '@/components/Private'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -149,7 +150,7 @@ function Filters({ search }: { search: Search }) {
     <div className="flex flex-wrap gap-2">
       <Select value={search.app ?? ANY} onValueChange={(value) => set({ app: value === ANY ? undefined : value })}>
         <SelectTrigger aria-label="App" className="w-56 bg-card">
-          <SelectValue>{appName ?? 'All apps'}</SelectValue>
+          <SelectValue>{appName ? <Private>{appName}</Private> : 'All apps'}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ANY}>All apps</SelectItem>
@@ -157,7 +158,7 @@ function Filters({ search }: { search: Search }) {
             .filter((app) => app.kind !== 'portfolio')
             .map((app) => (
               <SelectItem key={app.id} value={app.id}>
-                {app.name}
+                <Private>{app.name}</Private>
               </SelectItem>
             ))}
         </SelectContent>
@@ -238,9 +239,18 @@ function ReviewCard(props: {
           {formatDay(review.createdAt.slice(0, 10))}
         </time>
       </div>
+      {/* Reviews often name the app, so privacy mode blurs their words; the stars stay. */}
       <div className="space-y-1">
-        {review.title && <h2 className="font-medium">{review.title}</h2>}
-        {review.body && <p className="whitespace-pre-line text-pretty">{review.body}</p>}
+        {review.title && (
+          <h2 data-private="" className="font-medium">
+            {review.title}
+          </h2>
+        )}
+        {review.body && (
+          <p data-private="" className="whitespace-pre-line text-pretty">
+            {review.body}
+          </p>
+        )}
       </div>
       <p className="text-xs text-muted-foreground">
         <AppIcon
@@ -248,12 +258,19 @@ function ReviewCard(props: {
           className="mr-1.5 inline-grid size-4 align-[-0.25rem] text-[9px]"
         />
         <Link to="/apps/$appId" params={{ appId: review.appId }} search={{ range: '28d' }} className="font-medium text-foreground hover:underline">
-          {review.appName}
+          <Private>{review.appName}</Private>
         </Link>
-        {[sourceLabel(review.store), place, review.appVersion && `version ${review.appVersion}`, review.author, review.device]
+        {[sourceLabel(review.store), place, review.appVersion && `version ${review.appVersion}`]
           .filter(Boolean)
           .map((part) => ` · ${part}`)
           .join('')}
+        {review.author && (
+          <>
+            {' · '}
+            <Private>{review.author}</Private>
+          </>
+        )}
+        {review.device && ` · ${review.device}`}
         {review.editedAt && review.editedAt.slice(0, 10) !== review.createdAt.slice(0, 10) && ` · edited ${formatDay(review.editedAt.slice(0, 10))}`}
       </p>
       {review.reply && (
@@ -261,7 +278,9 @@ function ReviewCard(props: {
           <p className="text-xs font-medium text-muted-foreground">
             Your reply{review.repliedAt ? `, ${formatDay(review.repliedAt.slice(0, 10))}` : ''}
           </p>
-          <p className="mt-0.5 whitespace-pre-line">{review.reply}</p>
+          <p data-private="" className="mt-0.5 whitespace-pre-line">
+            {review.reply}
+          </p>
         </div>
       )}
       <div className="-mx-2 -mb-1 flex flex-wrap gap-1">

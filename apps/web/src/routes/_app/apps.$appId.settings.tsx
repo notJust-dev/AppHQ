@@ -69,6 +69,7 @@ function Rename(props: { appId: string; name: string }) {
             required
             maxLength={80}
             value={name}
+            data-private=""
             onChange={(event) => setName(event.target.value)}
             className="min-w-0 flex-1 basis-48"
           />

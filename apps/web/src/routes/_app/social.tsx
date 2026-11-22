@@ -3,6 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Megaphone } from 'lucide-react'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
+import { Private } from '@/components/Private'
 import { AppComparison } from '@/components/performance/AppComparison'
 import { ChartRow, ChartStack } from '@/components/performance/ChartStack'
 import { DailyChart } from '@/components/performance/DailyChart'
@@ -261,12 +262,15 @@ function TopPosts({ posts, range }: { posts: SocialPerformance['posts']['top']; 
                   href={post.url}
                   target="_blank"
                   rel="noreferrer"
+                  data-private=""
                   className="line-clamp-2 underline decoration-border underline-offset-4 hover:decoration-foreground"
                 >
                   {post.caption || 'Untitled post'}
                 </a>
               ) : (
-                <span className="line-clamp-2">{post.caption || 'Untitled post'}</span>
+                <span data-private="" className="line-clamp-2">
+                  {post.caption || 'Untitled post'}
+                </span>
               )}
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 {sourceLabel(post.platform)} ·{' '}
@@ -276,7 +280,7 @@ function TopPosts({ posts, range }: { posts: SocialPerformance['posts']['top']; 
                   search={{ range }}
                   className="hover:text-foreground"
                 >
-                  {post.appName}
+                  <Private>{post.appName}</Private>
                 </Link>{' '}
                 · {formatDay(post.publishedAt.slice(0, 10))}
               </span>

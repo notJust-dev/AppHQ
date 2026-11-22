@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { useMemo } from 'react'
 import { AppIcon } from '@/components/AppIcon'
+import { Private } from '@/components/Private'
 import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
 import { NoData } from '@/components/NoData'
 import type { RangeKey } from '@/lib/range'
@@ -48,7 +49,7 @@ export function AppComparison(props: {
                 search={{ range }}
                 className="hover:underline hover:underline-offset-4"
               >
-                {info.getValue()}
+                {info.row.original.app.kind === 'portfolio' ? info.getValue() : <Private>{info.getValue()}</Private>}
               </Link>
             </span>
           ),

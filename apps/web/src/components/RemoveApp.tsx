@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
+import { Private } from '@/components/Private'
 import { removeAppFn } from '@/fns/assets'
 
 /** Stops tracking an app, after saying plainly what goes and what stays. */
@@ -30,7 +31,11 @@ export function RemoveApp(props: { appId: string; name: string }) {
       if (!result.ok) return
       setOpen(false)
       await navigate({ to: '/apps' })
-      toast.success(`Removed ${result.name}. What fed it waits on the Apps page, to add again or ignore.`)
+      toast.success(
+        <span>
+          Removed <Private>{result.name}</Private>. What fed it waits on the Apps page, to add again or ignore.
+        </span>,
+      )
       void queryClient.invalidateQueries()
     },
   })
@@ -48,7 +53,7 @@ export function RemoveApp(props: { appId: string; name: string }) {
           <h2 id="remove-heading">Stop tracking</h2>
         </CardTitle>
         <CardDescription className="max-w-prose">
-          Removes {props.name} from the dashboard, with its numbers and posts. Its store apps,
+          Removes <Private>{props.name}</Private> from the dashboard, with its numbers and posts. Its store apps,
           project and accounts stay connected and wait on the Apps page, so you can add it again
           later. Its history is fetched again then, except TikTok&apos;s daily views, which TikTok
           does not keep.
@@ -68,7 +73,9 @@ export function RemoveApp(props: { appId: string; name: string }) {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remove {props.name}?</AlertDialogTitle>
+              <AlertDialogTitle>
+                Remove <Private>{props.name}</Private>?
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 Its numbers and posts leave the dashboard. What feeds it stays connected and waits on
                 the Apps page.

@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback, useState } from 'react'
 import { z } from 'zod'
+import { Private } from '@/components/Private'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -134,7 +135,7 @@ function ConnectTikTok(props: { apps: AppSummary[]; setup: TikTokSetup }) {
           <SelectContent>
             {props.apps.map((app) => (
               <SelectItem key={app.id} value={app.id}>
-                {app.kind === 'portfolio' ? 'Shared accounts (promotes several apps)' : app.name}
+                {app.kind === 'portfolio' ? 'Shared accounts (promotes several apps)' : <Private>{app.name}</Private>}
               </SelectItem>
             ))}
           </SelectContent>

@@ -34,6 +34,7 @@ function AppLayout() {
       <PageHeader
         crumbs={[{ label: 'Apps', to: '/apps' }]}
         title={app.name}
+        privateTitle={app.kind !== 'portfolio'}
         icon={app.kind === 'portfolio' ? undefined : <AppIcon app={app} className="size-9 text-sm" />}
         tabs={
           <nav aria-label="App sections" className="flex gap-5">

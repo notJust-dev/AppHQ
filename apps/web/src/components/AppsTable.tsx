@@ -5,6 +5,7 @@ import { change, formatCount, formatMoney, formatRatio, per } from '@/lib/format
 import { reportingOf, type Overview } from '@/lib/queries'
 import type { RangeKey } from '@/lib/range'
 import { AppIcon } from './AppIcon'
+import { Private } from './Private'
 import { Delta } from './Delta'
 import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
 import { NoData } from '@/components/NoData'
@@ -125,7 +126,7 @@ function AppName({ app, range }: { app: AppRow['app']; range: RangeKey }) {
         search={{ range }}
         className="hover:underline hover:underline-offset-4"
       >
-        {app.name}
+        {app.kind === 'portfolio' ? app.name : <Private>{app.name}</Private>}
       </Link>
     </span>
   )

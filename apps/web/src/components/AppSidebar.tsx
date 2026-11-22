@@ -1,10 +1,27 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AppWindow, LayoutDashboard, LogOut, Megaphone, MessageSquareText, Monitor, Moon, Plug, Plus, Search, Store, Sun, Wallet } from 'lucide-react'
+import {
+  AppWindow,
+  Eye,
+  EyeOff,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  MessageSquareText,
+  Monitor,
+  Moon,
+  Plug,
+  Plus,
+  Search,
+  Store,
+  Sun,
+  Wallet,
+} from 'lucide-react'
 import { useEffect } from 'react'
 import { AppIcon } from '@/components/AppIcon'
 import { BrandMark } from '@/components/Brand'
+import { Private } from '@/components/Private'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +46,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { signOutFn } from '@/fns/auth'
+import { setPrivacy, usePrivacy } from '@/lib/privacy'
 import { appsQuery, unreadReviewsQuery } from '@/lib/queries'
 import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
 
@@ -146,7 +164,7 @@ export function AppSidebar() {
             <SidebarMenu aria-label="Your apps">
               {own.slice(0, APPS_SHOWN).map((app) => (
                 <SidebarMenuItem key={app.id}>
-                  <SidebarMenuButton asChild tooltip={app.name} className={ACTIVE}>
+                  <SidebarMenuButton asChild tooltip={{ children: <Private>{app.name}</Private> }} className={ACTIVE}>
                     <Link
                       to="/apps/$appId"
                       params={{ appId: app.id }}
@@ -154,7 +172,7 @@ export function AppSidebar() {
                       activeOptions={{ includeSearch: false }}
                     >
                       <AppIcon app={app} className="size-4 text-[10px]" />
-                      <span>{app.name}</span>
+                      <Private className="truncate">{app.name}</Private>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -182,6 +200,9 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
+            <PrivacyToggle />
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <ThemeMenu />
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -191,6 +212,22 @@ export function AppSidebar() {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  )
+}
+
+/** Blurs app and account names everywhere, for recording or sharing the screen. */
+function PrivacyToggle() {
+  const on = usePrivacy()
+  return (
+    <SidebarMenuButton
+      tooltip={on ? 'Privacy mode is on: names are blurred' : 'Privacy mode: blur app and account names'}
+      aria-pressed={on}
+      onClick={() => setPrivacy(!on)}
+    >
+      {on ? <EyeOff /> : <Eye />}
+      <span>Privacy mode</span>
+      <span className="ml-auto text-xs text-muted-foreground">{on ? 'On' : 'Off'}</span>
+    </SidebarMenuButton>
   )
 }
 

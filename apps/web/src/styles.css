@@ -277,3 +277,12 @@
   --ts-chart-1: var(--store-ios);
   --ts-chart-2: var(--store-android);
 }
+
+/*
+ * Privacy mode (lib/privacy.ts): whatever names an app or account is blurred past reading, in
+ * proportion to its text, so a heading and a table cell are equally unreadable. The numbers stay.
+ */
+:root[data-privacy='on'] [data-private] {
+  filter: blur(0.55em);
+  user-select: none;
+}

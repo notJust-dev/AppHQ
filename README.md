@@ -79,6 +79,13 @@ already connected: App Store reviews need a key with the Admin, App Manager or C
 role, and Google Play's come from the same bucket as the installs. Reviews more than two weeks
 old when first imported arrive already read.
 
+Privacy mode, at the bottom of the sidebar, blurs whatever could tell someone which apps and
+accounts these are, for recording or sharing the screen: app names and icons, bundle ids, social
+handles, websites, search terms, post captions, reviews and account names. The numbers stay
+readable. It is remembered in that browser and applies from the first paint, so a reload never
+flashes a name. It blurs the page only: the address bar still shows each app's id, which is made
+from its name, and copying the page's text still copies the names.
+
 For SEO, connect Google Search Console on the Accounts page with a Google Cloud service account:
 the one Google Play uses works, or another key. Enable the Google Search Console API in that
 service account's project, and in Search Console add its email to each website (Settings, Users

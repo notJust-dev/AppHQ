@@ -12,6 +12,7 @@ import type { ReactNode } from 'react'
 import { ErrorPage } from '@/components/ErrorPage'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { PRIVACY_SCRIPT } from '@/lib/privacy'
 import { THEME_SCRIPT } from '@/lib/theme'
 import appCss from '../styles.css?url'
 
@@ -64,10 +65,10 @@ function RootError(props: ErrorComponentProps) {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    // The theme script may set data-theme before React takes over; that is expected.
+    // The head script may set data-theme and data-privacy before React takes over; that is expected.
     <html lang="en" suppressHydrationWarning>
       <head>
-        <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
+        <ScriptOnce>{THEME_SCRIPT + PRIVACY_SCRIPT}</ScriptOnce>
         <HeadContent />
       </head>
       <body className="min-h-screen">

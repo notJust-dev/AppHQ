@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { Private } from '@/components/Private'
 import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/accounts/KeyFileField'
 import {
   AccountList,
@@ -136,7 +137,7 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
       />
       {email && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Play Console must have invited <span className="break-all font-medium text-foreground">{email}</span>.
+          Play Console must have invited <Private className="break-all font-medium text-foreground">{email}</Private>.
         </p>
       )}
       <Field className="mt-4">
@@ -149,6 +150,8 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
         required
         placeholder="gs://pubsite_prod_rev_01234567890987654321/stats/installs/"
         value={fields.storageUri}
+        // The bucket is named after the developer account.
+        data-private=""
         onChange={(event) => setFields((current) => ({ ...current, storageUri: event.target.value }))}
         />
       </Field>

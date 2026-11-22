@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { PageHeader } from '@/components/PageHeader'
+import { Private } from '@/components/Private'
 import { RangeSwitch } from '@/components/RangeSwitch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDay } from '@/lib/format'
@@ -46,7 +47,7 @@ function AppFilter({ value }: { value: string | undefined }) {
   const { data: apps = [] } = useQuery(appsQuery())
   const navigate = useNavigate()
   const chosen = apps.find((app) => app.id === value)
-  const label = !chosen ? 'All apps' : chosen.kind === 'portfolio' ? 'Shared accounts' : chosen.name
+  const label = !chosen ? 'All apps' : chosen.kind === 'portfolio' ? 'Shared accounts' : <Private>{chosen.name}</Private>
 
   return (
     <Select
@@ -66,7 +67,7 @@ function AppFilter({ value }: { value: string | undefined }) {
         <SelectItem value={ALL}>All apps</SelectItem>
         {apps.map((app) => (
           <SelectItem key={app.id} value={app.id}>
-            {app.kind === 'portfolio' ? 'Shared accounts' : app.name}
+            {app.kind === 'portfolio' ? 'Shared accounts' : <Private>{app.name}</Private>}
           </SelectItem>
         ))}
       </SelectContent>

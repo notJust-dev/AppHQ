@@ -5,6 +5,7 @@ import { useId, useState } from 'react'
 import { AppIcon } from '@/components/AppIcon'
 import { NoData } from '@/components/NoData'
 import { PageBody, PageHeader } from '@/components/PageHeader'
+import { Private } from '@/components/Private'
 import { Panel } from '@/components/Panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -142,11 +143,21 @@ function AssetName({ asset }: { asset: Asset }) {
       {/* Store apps whose account gave an icon; it helps tell an app from its old twin. */}
       {asset.iconUrl && <AppIcon app={asset} className="size-8 text-xs" />}
       <span className="min-w-0">
-        <span className="block font-medium break-words">{asset.name}</span>
+        <Private className="block font-medium break-words">{asset.name}</Private>
         <span className="block text-xs text-muted-foreground">
           {KIND_LABEL[asset.kind] ?? asset.label}
-          {detail && <> · {detail}</>}
-          {asset.account && asset.account !== asset.name && <> · via {asset.account}</>}
+          {detail && (
+            <>
+              {' · '}
+              <Private>{detail}</Private>
+            </>
+          )}
+          {asset.account && asset.account !== asset.name && (
+            <>
+              {' · via '}
+              <Private>{asset.account}</Private>
+            </>
+          )}
         </span>
       </span>
     </span>
@@ -172,7 +183,7 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
         {suggested && (
           // Under the name, past the icon when there is one.
           <span className={cn('mt-1 block text-xs text-foreground', asset.iconUrl && 'pl-11')}>
-            Looks like {suggested.name}
+            Looks like <Private>{suggested.name}</Private>
           </span>
         )}
       </div>
@@ -189,7 +200,7 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
             const current = holder(app)
             return (
               <SelectItem key={app.id} value={app.id}>
-                {app.name}
+                <Private>{app.name}</Private>
                 {current ? ` (replaces its ${label})` : ''}
               </SelectItem>
             )
@@ -257,7 +268,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                       search={{ range: '28d' }}
                       className="hover:underline hover:underline-offset-4"
                     >
-                      {app.name}
+                      {portfolio ? app.name : <Private>{app.name}</Private>}
                     </Link>
                     {portfolio && (
                       <span className="mt-1 block text-xs font-normal text-muted-foreground">
@@ -287,7 +298,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                     {social.map((asset) => (
                       <li key={asset.id}>
                         <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span>{' '}
-                        <span className="whitespace-nowrap">{asset.name}</span>
+                        <Private className="whitespace-nowrap">{asset.name}</Private>
                         <Attention status={asset.status} />
                       </li>
                     ))}
@@ -319,7 +330,7 @@ function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => s
     <TableCell className="align-top break-words">
       {props.asset ? (
         <>
-          <span className={props.mono ? 'font-mono text-xs' : undefined}>{props.detail(props.asset)}</span>
+          <Private className={props.mono ? 'font-mono text-xs' : undefined}>{props.detail(props.asset)}</Private>
           <Attention status={props.asset.status} />
         </>
       ) : (

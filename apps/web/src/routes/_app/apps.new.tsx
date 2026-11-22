@@ -80,6 +80,7 @@ function NewAppPage() {
                   maxLength={80}
                   autoFocus
                   value={name}
+                  data-private=""
                   onChange={(event) => setName(event.target.value)}
                   aria-invalid={problem !== null}
                   className="min-w-0 flex-1 basis-56"

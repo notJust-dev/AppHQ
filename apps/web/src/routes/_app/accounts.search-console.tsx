@@ -3,6 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { CircleCheck } from 'lucide-react'
 import { useState } from 'react'
+import { Private } from '@/components/Private'
 import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/accounts/KeyFileField'
 import { AccountList, Found, Section, SourcePage, Steps, emptyFamily, useWatch } from '@/components/accounts/shared'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -115,7 +116,7 @@ function ConnectForm(props: { playAccount: string | null; onConnected: (result: 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
           <p className="min-w-0 text-sm">
             Use the Google Play service account,{' '}
-            <span className="font-medium break-all">{props.playAccount}</span>
+            <Private className="font-medium break-all">{props.playAccount}</Private>
           </p>
           <Button disabled={mutation.isPending} onClick={() => mutation.mutate({ usePlayKey: true })}>
             {mutation.isPending && mutation.variables?.usePlayKey && <Spinner />}
@@ -140,7 +141,7 @@ function ConnectForm(props: { playAccount: string | null; onConnected: (result: 
         />
         {email && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Search Console must have added <span className="font-medium break-all text-foreground">{email}</span>.
+            Search Console must have added <Private className="font-medium break-all text-foreground">{email}</Private>.
           </p>
         )}
         <div className="mt-4">

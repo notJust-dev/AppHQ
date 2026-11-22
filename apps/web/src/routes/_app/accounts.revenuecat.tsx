@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { Private } from '@/components/Private'
 import { Button } from '@/components/ui/button'
 import { Section, SourcePage } from '@/components/accounts/shared'
 import { ATTENTION } from '@/lib/assets'
@@ -47,17 +48,22 @@ function RevenueCatPage() {
               return (
                 <li key={app.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3">
                   <span className="min-w-0 break-words">
-                    <span className="font-medium">{app.name}</span>
+                    <Private className="font-medium">{app.name}</Private>
                     <span className={`block text-xs ${attention ? 'font-medium text-warning' : 'text-muted-foreground'}`}>
-                      {project
-                        ? [
-                            project.name,
+                      {project ? (
+                        <>
+                          <Private>{project.name}</Private>
+                          {[
                             attention ? `key ${attention}` : 'connected',
                             project.lastSyncedAt ? `synced ${formatMoment(project.lastSyncedAt)}` : null,
                           ]
                             .filter(Boolean)
-                            .join(' · ')
-                        : 'No project connected'}
+                            .map((part) => ` · ${part}`)
+                            .join('')}
+                        </>
+                      ) : (
+                        'No project connected'
+                      )}
                     </span>
                   </span>
                   <Button asChild variant={project ? 'outline' : 'default'} size="sm">
@@ -80,7 +86,7 @@ function RevenueCatPage() {
       {waiting.length > 0 && (
         <Section title="Not in an app">
           <p className="text-sm">
-            {waiting.map((asset) => asset.name).join(', ')} {waiting.length === 1 ? 'is' : 'are'} connected
+            <Private>{waiting.map((asset) => asset.name).join(', ')}</Private> {waiting.length === 1 ? 'is' : 'are'} connected
             but not part of an app.{' '}
             <Link to="/apps" className="font-medium underline underline-offset-4">
               Link {waiting.length === 1 ? 'it' : 'them'} on the Apps page

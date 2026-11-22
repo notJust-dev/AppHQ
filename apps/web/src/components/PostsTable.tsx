@@ -73,12 +73,16 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean; ap
                   href={post.url}
                   target="_blank"
                   rel="noreferrer"
+                  // Captions name the app and its account: privacy mode blurs them.
+                  data-private=""
                   className="line-clamp-2 underline decoration-border underline-offset-4 hover:decoration-foreground"
                 >
                   {post.caption || 'Untitled post'}
                 </a>
               ) : (
-                <span className="line-clamp-2">{post.caption || 'Untitled post'}</span>
+                <span data-private="" className="line-clamp-2">
+                  {post.caption || 'Untitled post'}
+                </span>
               )}
             </TableCell>
             {[post.views, post.likes, post.comments, post.shares].map((value, index) => (

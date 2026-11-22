@@ -370,7 +370,9 @@ function PostsLane(props: {
                 : `, ${sourceLabel(tip.posts[0]?.platform ?? '')}`}
             </span>
             {tip.posts[0]?.caption && (
-              <span className="mt-1 line-clamp-2 block text-foreground">{tip.posts[0].caption}</span>
+              <span data-private="" className="mt-1 line-clamp-2 block text-foreground">
+                {tip.posts[0].caption}
+              </span>
             )}
           </span>
         )}
@@ -417,7 +419,7 @@ function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void })
       <ul className="mt-2 space-y-3">
         {group.posts.map((post) => (
           <li key={post.id}>
-            <p className="font-medium">
+            <p data-private="" className="font-medium">
               {post.url ? (
                 <a
                   href={post.url}

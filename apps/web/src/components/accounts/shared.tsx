@@ -9,6 +9,7 @@ import { sourceLabel } from '@/lib/sources'
 import { CircleAlert, CircleCheck } from 'lucide-react'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
+import { Private } from '@/components/Private'
 import { Status } from '@/components/Status'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
@@ -186,11 +187,15 @@ export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (acc
         return (
           <li key={account.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 py-3">
             <span className="min-w-0 break-words">
-              <span className="font-medium">{account.displayName ?? sourceLabel(account.provider)}</span>
+              {account.displayName ? (
+                <Private className="font-medium">{account.displayName}</Private>
+              ) : (
+                <span className="font-medium">{sourceLabel(account.provider)}</span>
+              )}
               {(account.provider === 'facebook' || account.provider === 'instagram') && (
                 <span className="text-muted-foreground"> · {sourceLabel(account.provider)}</span>
               )}
-              {detail && <span className="block text-xs text-muted-foreground">{detail}</span>}
+              {detail && <Private className="block text-xs text-muted-foreground">{detail}</Private>}
               {account.note && <span className="mt-1.5 block max-w-prose text-xs text-warning">{account.note}</span>}
             </span>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -246,7 +251,8 @@ export function ConnectResult(props: {
     <Alert variant={result.ok ? 'default' : 'destructive'} role="status">
       {result.ok ? <CircleCheck aria-hidden="true" /> : <CircleAlert aria-hidden="true" />}
       <AlertTitle>{result.ok ? `${provider} connected` : `${provider} not connected`}</AlertTitle>
-      <AlertDescription>{result.message}</AlertDescription>
+      {/* A success names the account and the app it went to. */}
+      <AlertDescription data-private={result.ok ? '' : undefined}>{result.message}</AlertDescription>
     </Alert>
   )
 }

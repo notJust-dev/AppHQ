@@ -3,6 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
+import { Private } from '@/components/Private'
 import { AppComparison } from '@/components/performance/AppComparison'
 import { ChartRow, ChartStack } from '@/components/performance/ChartStack'
 import { DailyChart } from '@/components/performance/DailyChart'
@@ -13,6 +14,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table'
 import { formatCompact, formatCount, formatDay } from '@/lib/format'
+import { usePrivacy } from '@/lib/privacy'
 import { searchPerformanceQuery, searchTopQuery, type PerformanceSeries } from '@/lib/queries'
 import { performanceSearchSchema, rangeToDates } from '@/lib/range'
 
@@ -153,6 +155,7 @@ function TopPanel(props: {
   app: string | undefined
 }) {
   const { data, isPending } = useQuery(searchTopQuery({ ...props.dates, appId: props.app, dimension: props.dimension }))
+  const privacy = usePrivacy()
   const label = (key: string) => {
     if (props.dimension === 'query') return key
     try {
@@ -202,13 +205,14 @@ function TopPanel(props: {
           <TableBody>
             {data.rows.map((row) => (
               <TableRow key={row.key}>
-                <TableRowHead className="truncate font-normal" title={row.key}>
+                {/* A search term or page names the site; a native tooltip could not be blurred. */}
+                <TableRowHead className="truncate font-normal" title={privacy ? undefined : row.key}>
                   {props.dimension === 'page' ? (
-                    <a href={row.key} target="_blank" rel="noreferrer" className="hover:underline">
+                    <a href={row.key} target="_blank" rel="noreferrer" data-private="" className="hover:underline">
                       {label(row.key)}
                     </a>
                   ) : (
-                    label(row.key)
+                    <Private>{label(row.key)}</Private>
                   )}
                 </TableRowHead>
                 <TableCell className="figures text-right">{formatCount(row.clicks)}</TableCell>

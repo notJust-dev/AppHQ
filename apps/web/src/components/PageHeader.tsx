@@ -8,6 +8,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { Private } from '@/components/Private'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,8 @@ const WIDTH = { wide: 'max-w-6xl', narrow: 'max-w-4xl' } as const
 export function PageHeader(props: {
   crumbs?: Crumb[]
   title: string
+  /** The title names an app: privacy mode blurs it. */
+  privateTitle?: boolean
   /** Drawn before the title, such as an app's icon. */
   icon?: ReactNode
   description?: ReactNode
@@ -31,6 +34,7 @@ export function PageHeader(props: {
   /** For settings and forms: a narrower column, matched by the page body. */
   narrow?: boolean
 }) {
+  const title = props.privateTitle ? <Private>{props.title}</Private> : props.title
   return (
     <>
       <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur sm:px-4">
@@ -49,7 +53,7 @@ export function PageHeader(props: {
               </Fragment>
             ))}
             <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="truncate">{props.title}</BreadcrumbPage>
+              <BreadcrumbPage className="truncate">{title}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -60,7 +64,7 @@ export function PageHeader(props: {
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               {props.icon}
-              <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">{props.title}</h1>
+              <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">{title}</h1>
             </div>
             {props.description && <p className="mt-1.5 max-w-2xl text-muted-foreground">{props.description}</p>}
           </div>

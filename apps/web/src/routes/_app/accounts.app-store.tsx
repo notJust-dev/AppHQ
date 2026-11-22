@@ -180,6 +180,7 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
             pattern="[0-9]{4,15}"
             title="Digits only. It is shown in Payments and Financial Reports."
             value={fields.vendorNumber}
+            data-private=""
             onChange={set('vendorNumber')}
           />
         </Field>
