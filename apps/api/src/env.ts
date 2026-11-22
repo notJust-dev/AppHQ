@@ -22,6 +22,10 @@ const schema = z
       .string()
       .regex(/^[0-9a-f]{64}$/i, 'must be 64 hex characters')
       .optional(),
+    // From the TikTok app, or its sandbox, which has its own pair. Optional: without them the
+    // dashboard explains what to set instead of offering "Connect TikTok".
+    TIKTOK_CLIENT_KEY: z.string().optional(),
+    TIKTOK_CLIENT_SECRET: z.string().optional(),
   })
   .refine((env) => env.DATABASE_URL || (env.PGHOST && env.PGDATABASE && env.PGUSER), {
     path: ['DATABASE_URL'],

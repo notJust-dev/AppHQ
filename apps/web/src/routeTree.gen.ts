@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
+import { Route as ConnectTiktokCallbackRouteImport } from './routes/connect.tiktok.callback'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -45,6 +46,11 @@ const AppAppsAppIdRoute = AppAppsAppIdRouteImport.update({
   path: '/apps/$appId',
   getParentRoute: () => AppRoute,
 } as any)
+const ConnectTiktokCallbackRoute = ConnectTiktokCallbackRouteImport.update({
+  id: '/connect/tiktok/callback',
+  path: '/connect/tiktok/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/settings': typeof AppSettingsRoute
   '/apps/$appId': typeof AppAppsAppIdRoute
+  '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
 }
 export interface FileRoutesByTo {
   '/health': typeof HealthRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
   '/apps/$appId': typeof AppAppsAppIdRoute
+  '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +76,25 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/apps/$appId': typeof AppAppsAppIdRoute
+  '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/health' | '/login' | '/settings' | '/apps/$appId'
+  fullPaths:
+    | '/'
+    | '/health'
+    | '/login'
+    | '/settings'
+    | '/apps/$appId'
+    | '/connect/tiktok/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/health' | '/login' | '/settings' | '/' | '/apps/$appId'
+  to:
+    | '/health'
+    | '/login'
+    | '/settings'
+    | '/'
+    | '/apps/$appId'
+    | '/connect/tiktok/callback'
   id:
     | '__root__'
     | '/_app'
@@ -82,12 +103,14 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/'
     | '/_app/apps/$appId'
+    | '/connect/tiktok/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
+  ConnectTiktokCallbackRoute: typeof ConnectTiktokCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -134,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppsAppIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/connect/tiktok/callback': {
+      id: '/connect/tiktok/callback'
+      path: '/connect/tiktok/callback'
+      fullPath: '/connect/tiktok/callback'
+      preLoaderRoute: typeof ConnectTiktokCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -155,6 +185,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
+  ConnectTiktokCallbackRoute: ConnectTiktokCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

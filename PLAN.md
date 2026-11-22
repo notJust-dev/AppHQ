@@ -249,20 +249,33 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - Reviews: the Android Publisher reviews endpoint only returns reviews from the last week, so
   syncing must start early; older reviews come from the bucket's review CSVs.
 
-### TikTok (verified against TikTok's docs, except the two items below)
+### TikTok (built; docs re-checked 2026-11-22; tested against a stand-in, not yet real TikTok)
 
-- Sandbox app: no app review, up to 10 of your own accounts as target users per sandbox.
-- OAuth: authorize at `https://www.tiktok.com/v2/auth/authorize/`, token exchange at
-  `https://open.tiktokapis.com/v2/oauth/token/`. Redirect URIs must be HTTPS, static and an exact
-  match, so the connect flow runs against the deployed API.
-- Tokens: access token 2 hours, refresh token 180 days and rotating. Each refresh returns a new
-  refresh token that must be saved; only one environment can own an account's token.
-- Data: `/v2/video/list/` (20 per page, cursor) gives per video `view_count`, `like_count`,
-  `comment_count`, `share_count`, `create_time`, `title`, `share_url`, `duration`.
-  `/v2/user/info/` with `user.info.stats` gives `follower_count`, `likes_count`, `video_count`.
+- Sandbox app: no app review, up to 5 sandboxes per app and 10 target users per sandbox. Not
+  available in a sandbox: Content Posting for public videos, Data Portability.
+- OAuth (web): authorize at `https://www.tiktok.com/v2/auth/authorize/` with `client_key`,
+  comma-separated `scope`, `response_type=code`, `redirect_uri`, `state`. No PKCE for web.
+  Token exchange: form-encoded POST to `https://open.tiktokapis.com/v2/oauth/token/`. Redirect
+  URIs must be HTTPS, static (no query string) and an exact match; up to 10.
+- The callback lands on the dashboard (`/connect/tiktok/callback`), which holds the session and
+  checks the state from a short-lived encrypted cookie; the API holds the client secret and
+  trades the code. The redirect URI is shown in Settings.
+- Tokens: access token 2 hours, refresh token 180 days and rotating: the old refresh token stops
+  working once a new one is issued, so the new pair is saved before use. Only one environment
+  can own an account's token. `invalid_grant` on refresh means connect again.
+- Data: `POST /v2/video/list/` (20 per page, cursor in ms) gives public videos only, with
+  `view_count`, `like_count`, `comment_count`, `share_count`, `create_time`,
+  `video_description`, `share_url`, `duration`. `GET /v2/user/info/` with `user.info.stats`
+  gives `follower_count`. Asking for a field whose scope was not granted fails the call, so
+  fields follow the granted scopes. Rate limit 600 per minute per endpoint.
+- Storage: `posts` (latest lifetime totals) and `post_snapshots` (the totals as last read each
+  UTC day). Daily `views` in `metric_daily` are the gains between days, per account, from the
+  day after it was connected to its last successful sync. A post published since connecting
+  counts in full, spread from its publish day to its first reading; a gap between readings is
+  shared out evenly. `followers` is written when every account of the app synced.
 - Not available: daily series, reach, watch time, traffic sources.
 - **Unverified:** that the sandbox returns real data for target users, and that `video.list` and
-  `user.info.stats` are grantable in a sandbox. Test with one account before building.
+  `user.info.stats` are grantable in a sandbox. The first real connection settles both.
 
 ### Instagram (verified against Meta's docs)
 
@@ -386,6 +399,19 @@ Status on 2026-11-20 (merged to `main` and deployed):
 
 Done when: you open an app, see a views spike next to the downloads line, click it, and get the
 post and its download lift.
+
+Status on 2026-11-22 (branch `phase-2-tiktok`, not merged):
+
+- Steps 1 and 2 for TikTok: "Connect TikTok" in Settings (pick the app, sign in on TikTok, come
+  back), encrypted rotating tokens, `needs_reauth` when TikTok rejects the refresh token, and a
+  connector that saves posts and daily snapshots on every sync and derives daily views.
+- The app page lists its posts with lifetime totals. Step 5's post markers are not built yet.
+- Tested with unit tests, database tests and a browser run against a stand-in TikTok: cancel,
+  missing permission, connect, revoked account, reconnect. Not yet run against TikTok itself.
+- Snapshots happen on every sync, so the 6-hour sync cron covers step 4; no separate
+  `snapshot` command is needed.
+- Before the first real connection: the sandbox's client key and secret on the `api` app, and
+  the redirect URI registered in the sandbox.
 
 ### Phase 3 — Reviews inbox
 

@@ -34,11 +34,21 @@ const WHERE_FROM: Record<string, string> = {
  * Why a row is empty. If one of its sources reported other rows for this app, the source is
  * connected and simply had nothing for this one in the range; otherwise it is not connected.
  */
-function emptyReason(series: Series, reporting: ReadonlySet<string>): string {
+function emptyReason(
+  series: Series,
+  reporting: ReadonlySet<string>,
+  connected: ReadonlySet<string>,
+): string {
   // `from` can be missing for a moment during a deploy, when the dashboard is newer than the API.
-  const connected = (series.from ?? []).filter((source) => reporting.has(source))
-  if (connected.length === 0) return WHERE_FROM[series.key] ?? 'Not connected yet.'
-  return `${connected.map(sourceLabel).join(' and ')} reported none in this range.`
+  const from = series.from ?? []
+  const reported = from.filter((source) => reporting.has(source))
+  if (reported.length > 0) return `${reported.map(sourceLabel).join(' and ')} reported none in this range.`
+  const linked = from.filter((source) => connected.has(source))
+  if (linked.includes('tiktok')) {
+    return 'TikTok is connected. Daily views start the day after connecting, once there are two readings to compare.'
+  }
+  if (linked.length > 0) return `${linked.map(sourceLabel).join(' and ')} connected, with nothing reported in this range yet.`
+  return WHERE_FROM[series.key] ?? 'Not connected yet.'
 }
 
 // The plot is drawn in a fixed coordinate space and stretched to fit, with strokes that do not
@@ -51,7 +61,16 @@ const PLOT_INSET = 'mr-6 ml-16'
 
 const lastIndexOf = (values: Values) => values.findLastIndex((value) => value !== null)
 
-export function Timeline({ days, series }: { days: string[]; series: Series[] }) {
+export function Timeline({
+  days,
+  series,
+  connected = new Set(),
+}: {
+  days: string[]
+  series: Series[]
+  /** Providers with an account connected to this app, so an empty row can say why it is empty. */
+  connected?: ReadonlySet<string>
+}) {
   const [active, setActive] = useState<number | null>(null)
   const [showTable, setShowTable] = useState(false)
   const count = days.length
@@ -115,6 +134,7 @@ export function Timeline({ days, series }: { days: string[]; series: Series[] })
             percent={percent}
             onPoint={pointAt}
             reporting={reporting}
+            connected={connected}
           />
         ))}
         <DateAxis days={days} percent={percent} />
@@ -152,6 +172,7 @@ function Track(props: {
   onPoint: (event: PointerEvent<HTMLElement>) => void
   /** Sources that reported anything for this app in the range. */
   reporting: ReadonlySet<string>
+  connected: ReadonlySet<string>
 }) {
   const { series, days, active, percent } = props
   const stage = STAGE[series.stage]
@@ -211,7 +232,7 @@ function Track(props: {
 
       {empty ? (
         <p className="px-6 pt-1 pb-4 text-sm text-ink-soft md:self-center md:py-4">
-          {emptyReason(series, props.reporting)}
+          {emptyReason(series, props.reporting, props.connected)}
         </p>
       ) : (
         <div

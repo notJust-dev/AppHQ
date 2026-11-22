@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import { Button } from '../../components/Button'
 import {
   connectAppStoreFn,
@@ -10,23 +11,29 @@ import {
   removeDemoDataFn,
   runSyncFn,
 } from '../../fns/settings'
+import { startTikTokConnectFn, takeConnectResultFn } from '../../fns/tiktok'
 import { formatCount, formatMoment } from '../../lib/format'
 import {
   accountsQuery,
   appsQuery,
   syncStatusQuery,
+  tiktokSetupQuery,
   type Account,
   type AppSummary,
   type SyncRun,
+  type TikTokSetup,
 } from '../../lib/queries'
 import { sourceLabel } from '../../lib/sources'
 
 export const Route = createFileRoute('/_app/settings')({
+  // Set by the TikTok sign-in when it sends the browser back here.
+  validateSearch: z.object({ connected: z.enum(['tiktok']).optional().catch(undefined) }),
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(appsQuery()),
       context.queryClient.ensureQueryData(accountsQuery()),
       context.queryClient.ensureQueryData(syncStatusQuery()),
+      context.queryClient.ensureQueryData(tiktokSetupQuery()),
     ]),
   component: SettingsPage,
 })
@@ -51,6 +58,7 @@ function SettingsPage() {
   const { data: apps } = useSuspenseQuery({ ...appsQuery(), refetchInterval })
   const { data: accounts } = useSuspenseQuery({ ...accountsQuery(), refetchInterval })
   const { data: runs } = useSuspenseQuery({ ...syncStatusQuery(), refetchInterval })
+  const { data: tiktokSetup } = useSuspenseQuery(tiktokSetupQuery())
 
   const dataChanged = () => {
     setWatching(true)
@@ -61,6 +69,7 @@ function SettingsPage() {
   return (
     <div className="max-w-3xl">
       <h1 className="font-display text-3xl font-semibold tracking-tight">Settings</h1>
+      <ConnectResult onConnected={dataChanged} />
 
       <Section title="Apps">
         <AppsList apps={apps} />
@@ -81,6 +90,13 @@ function SettingsPage() {
           account={accounts.find((account) => account.provider === 'app_store')}
           onConnected={dataChanged}
         />
+      </Section>
+
+      <Section
+        title="Connect TikTok"
+        intro="Connect each TikTok account to the app it promotes. Every sync reads the account's public videos and their totals. TikTok keeps no daily history, so daily views start the day after an account is connected: the sooner it is connected, the more history the charts have."
+      >
+        <ConnectTikTok apps={apps} setup={tiktokSetup} />
       </Section>
 
       <Section
@@ -112,8 +128,135 @@ function Section(props: { title: string; intro?: string; children: ReactNode }) 
 
 const CONNECTION_STATUS: Record<string, string> = {
   ok: 'Connected',
-  needs_reauth: 'Needs a new key',
+  needs_reauth: 'Needs connecting again',
   error: 'Last sync failed',
+}
+
+/** The outcome of a TikTok sign-in, read once when the browser comes back from TikTok. */
+function ConnectResult({ onConnected }: { onConnected: () => void }) {
+  const { connected } = Route.useSearch()
+  const navigate = useNavigate()
+  const take = useServerFn(takeConnectResultFn)
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const started = useRef(false)
+
+  useEffect(() => {
+    if (!connected || started.current) return
+    started.current = true
+    take()
+      .then((outcome) => {
+        setResult(outcome)
+        if (outcome?.ok) onConnected()
+      })
+      .catch(() => setResult({ ok: false, message: 'Could not read how the sign-in went. Check the apps list.' }))
+    // So a reload does not try to read it again.
+    void navigate({ to: '/settings', search: {}, replace: true })
+  }, [connected, navigate, onConnected, take])
+
+  if (!result) return null
+  return (
+    <p
+      role="status"
+      className={`mt-6 rounded-lg border px-6 py-4 text-sm ${
+        result.ok ? 'border-line bg-surface' : 'border-ink bg-surface'
+      }`}
+    >
+      <span className="font-medium">{result.ok ? 'TikTok connected. ' : 'TikTok not connected. '}</span>
+      {result.message}
+    </p>
+  )
+}
+
+function ConnectTikTok(props: { apps: AppSummary[]; setup: TikTokSetup }) {
+  const start = useServerFn(startTikTokConnectFn)
+  const [appId, setAppId] = useState(props.apps[0]?.id ?? '')
+  const mutation = useMutation({
+    mutationFn: () => start({ data: { appId } }),
+    onSuccess: (result) => {
+      if (result.ok) window.location.assign(result.url)
+    },
+  })
+  const result = mutation.data
+  const leaving = mutation.isPending || result?.ok === true
+
+  const accounts = props.apps.flatMap((app) =>
+    app.connections
+      .filter((connection) => connection.provider === 'tiktok')
+      .map((connection) => ({ ...connection, appName: app.name })),
+  )
+
+  return (
+    <>
+      {accounts.length > 0 && (
+        <ul className="mb-5 divide-y divide-line rounded-lg border border-line bg-surface text-sm">
+          {accounts.map((account) => (
+            <li key={account.id} className="px-6 py-4">
+              <span className="font-medium">{account.displayName ?? 'TikTok account'}</span> for{' '}
+              {account.appName}: {CONNECTION_STATUS[account.status] ?? account.status}
+              {account.lastSyncedAt && (
+                <span className="block text-xs text-ink-soft">
+                  Synced {formatMoment(account.lastSyncedAt)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!props.setup.configured ? (
+        <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm">
+          TikTok is not set up on the API yet. Add <code>TIKTOK_CLIENT_KEY</code> and{' '}
+          <code>TIKTOK_CLIENT_SECRET</code> from your TikTok app (a sandbox has its own pair) to the
+          api app&apos;s environment variables, then reload this page.
+        </p>
+      ) : props.apps.length === 0 ? (
+        <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
+          Add an app first: a TikTok account is always connected to the app it promotes.
+        </p>
+      ) : (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            mutation.mutate()
+          }}
+        >
+          <label htmlFor="tiktok-app" className="text-sm font-medium">
+            App this account promotes
+          </label>
+          <div className="mt-2 flex flex-wrap gap-3">
+            <select
+              id="tiktok-app"
+              value={appId}
+              onChange={(event) => setAppId(event.target.value)}
+              className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+            >
+              {props.apps.map((app) => (
+                <option key={app.id} value={app.id}>
+                  {app.name}
+                </option>
+              ))}
+            </select>
+            <Button type="submit" variant="primary" disabled={leaving}>
+              {leaving ? 'Opening TikTok…' : 'Connect TikTok'}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-ink-soft">
+            You sign in on TikTok itself and come back here. With a sandbox app, sign in with an
+            account added to the sandbox as a target user.
+          </p>
+          <div role="status" className="mt-3 text-sm">
+            {mutation.isError && 'Could not reach the dashboard server. Try again.'}
+            {result && !result.ok && result.message}
+          </div>
+        </form>
+      )}
+
+      <p className="mt-4 text-xs text-ink-soft">
+        Redirect URI to register in the TikTok app, exactly as written:{' '}
+        <code className="break-all text-ink">{props.setup.redirectUri}</code>
+      </p>
+    </>
+  )
 }
 
 function AppsList({ apps }: { apps: AppSummary[] }) {
@@ -166,9 +309,12 @@ function AppsList({ apps }: { apps: AppSummary[] }) {
                   <span className="text-ink-soft">None</span>
                 ) : (
                   app.connections.map((connection) => (
-                    <span key={connection.provider} className="block">
-                      {sourceLabel(connection.provider)}:{' '}
-                      {CONNECTION_STATUS[connection.status] ?? connection.status}
+                    <span key={connection.id} className="block">
+                      {sourceLabel(connection.provider)}
+                      {connection.provider === 'tiktok' && connection.displayName
+                        ? ` ${connection.displayName}`
+                        : ''}
+                      : {CONNECTION_STATUS[connection.status] ?? connection.status}
                       {connection.lastSyncedAt && (
                         <span className="block text-xs text-ink-soft">
                           Synced {formatMoment(connection.lastSyncedAt)}

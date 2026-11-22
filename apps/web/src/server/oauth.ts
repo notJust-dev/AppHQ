@@ -1,0 +1,51 @@
+import '@tanstack/react-start/server-only'
+import { getCookie, getRequestUrl, setCookie } from '@tanstack/react-start/server'
+import { getIronSession } from 'iron-session'
+import { serverEnv } from './env'
+
+interface OAuthData {
+  /** The one-time value sent to the provider and checked when it sends the browser back. */
+  state?: string
+  /** The app the account will be connected to. */
+  appId?: string
+  startedAt?: number
+  /** Shown once on the Settings page after the redirect back, then cleared. */
+  result?: { ok: boolean; message: string }
+}
+
+/** A sign-in has this long to come back before its state is refused. */
+export const OAUTH_WINDOW_MS = 15 * 60_000
+
+/**
+ * A short-lived encrypted cookie for one sign-in attempt, separate from the session cookie.
+ * SameSite=Lax is what lets it come back on the provider's redirect, which is a top-level GET.
+ */
+export function getOAuthSession() {
+  return getIronSession<OAuthData>(
+    { read: getCookie, write: setCookie },
+    {
+      cookieName: 'appdashboard-oauth',
+      password: serverEnv().SESSION_SECRET,
+      ttl: OAUTH_WINDOW_MS / 1000,
+      cookieOptions: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  )
+}
+
+/**
+ * This dashboard's public address. PUBLIC_URL wins when set; otherwise it comes from the
+ * request, using the proxy's forwarded host and protocol, as Velocity's Nginx sends them.
+ */
+export function publicOrigin(): string {
+  const configured = process.env.PUBLIC_URL?.trim()
+  if (configured) return new URL(configured).origin
+  return getRequestUrl({ xForwardedHost: true, xForwardedProto: true }).origin
+}
+
+/** Must match, character for character, a redirect URI registered in the TikTok app. */
+export const tiktokRedirectUri = () => `${publicOrigin()}/connect/tiktok/callback`

@@ -5,6 +5,8 @@ import { APP_STORE, APP_STORE_HISTORY_DAYS } from '../connectors/app-store/conne
 import { connectors } from '../connectors/registry.js'
 import { RevenueCatError } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
+import { TikTokError, createTikTokClient } from '../connectors/tiktok/client.js'
+import { TIKTOK, TikTokNotConfiguredError, tiktokConfig } from '../connectors/tiktok/config.js'
 import type { Sql } from '../db/client.js'
 import { MissingEncryptionKeyError, type Secrets } from '../lib/crypto.js'
 import { trailingRange } from '../lib/dates.js'
@@ -15,9 +17,11 @@ import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
 import { listAccounts } from '../queries/list-accounts.js'
 import { listApps } from '../queries/list-apps.js'
+import { listPosts } from '../queries/list-posts.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
+import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 
 /** Everything a procedure can use. Read-only queries only need the `db` part. */
@@ -39,6 +43,29 @@ function connectError(err: unknown): TRPCError {
   }
   if (err instanceof ConnectInputError) {
     return new TRPCError({ code: 'BAD_REQUEST', message: err.message })
+  }
+  if (err instanceof TikTokNotConfiguredError) {
+    return new TRPCError({ code: 'PRECONDITION_FAILED', message: err.message })
+  }
+  if (err instanceof TikTokError) {
+    if (err.code === 'invalid_client' || err.code === 'unauthorized_client') {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'TikTok did not accept the app credentials. Check TIKTOK_CLIENT_KEY and ' +
+          'TIKTOK_CLIENT_SECRET on the api app; a sandbox has its own pair.',
+      })
+    }
+    if (err.code === 'invalid_grant') {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The TikTok sign-in expired or was already used. Connect again.',
+      })
+    }
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `TikTok rejected the connection (${err.code}): ${err.message}`,
+    })
   }
   if (err instanceof AppStoreError) {
     if (err.status === 401) {
@@ -103,6 +130,8 @@ export const appRouter = t.router({
       return timeline
     }),
 
+    posts: t.procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
+
     /** Registers the app behind a RevenueCat secret key and starts fetching its history. */
     connectRevenueCat: t.procedure
       .input(z.object({ apiKey: z.string().trim().min(8).max(500) }))
@@ -151,6 +180,44 @@ export const appRouter = t.router({
           connectors,
           sources: [APP_STORE],
           range: trailingRange(APP_STORE_HISTORY_DAYS),
+        })
+        return result
+      }),
+  }),
+  /**
+   * TikTok sign-in. The dashboard owns the browser side (the session, the state cookie and the
+   * redirect); the API owns the client secret and the tokens.
+   */
+  tiktok: t.router({
+    setup: t.procedure.query(() => ({ configured: tiktokConfig() !== null })),
+
+    authorizeUrl: t.procedure
+      .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
+      .query(({ input }) => {
+        const config = tiktokConfig()
+        if (!config) throw connectError(new TikTokNotConfiguredError())
+        return { url: createTikTokClient({ config }).authorizeUrl(input) }
+      }),
+
+    /** Finishes the sign-in and starts reading the account's videos. */
+    connect: t.procedure
+      .input(
+        z.object({
+          code: z.string().min(1).max(2000),
+          redirectUri: z.url(),
+          appId: z.string().min(1).max(64),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await connectTikTok(ctx, input).catch((err: unknown) => {
+          ctx.log.error(`connect TikTok failed: ${err instanceof Error ? err.message : err}`)
+          throw connectError(err)
+        })
+        startSync(ctx, {
+          connectors,
+          sources: [TIKTOK],
+          appIds: [result.appId],
+          range: trailingRange(7),
         })
         return result
       }),

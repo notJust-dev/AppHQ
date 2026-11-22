@@ -42,7 +42,10 @@ export const connections = pgTable(
     displayName: text('display_name'),
     accessTokenEnc: text('access_token_enc'),
     refreshTokenEnc: text('refresh_token_enc'),
+    /** When the access token stops working. */
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** When the refresh token stops working, so the account has to be connected again. */
+    refreshExpiresAt: timestamp('refresh_expires_at', { withTimezone: true }),
     scopes: text('scopes'),
     /** 'ok' | 'needs_reauth' | 'error' */
     status: text('status').notNull().default('ok'),
@@ -77,6 +80,58 @@ export const metricDaily = pgTable(
   ],
 )
 
+/**
+ * Social posts, with their latest lifetime totals. A post belongs to the app its account
+ * promotes. The totals are overwritten on every sync; the history lives in `post_snapshots`.
+ */
+export const posts = pgTable(
+  'posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    platform: text('platform').notNull(),
+    externalId: text('external_id').notNull(),
+    appId: text('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
+    connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'set null' }),
+    url: text('url'),
+    caption: text('caption'),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+    durationSeconds: integer('duration_seconds'),
+    views: bigint('views', { mode: 'number' }).notNull().default(0),
+    likes: bigint('likes', { mode: 'number' }).notNull().default(0),
+    comments: bigint('comments', { mode: 'number' }).notNull().default(0),
+    shares: bigint('shares', { mode: 'number' }).notNull().default(0),
+    /** The first sync that saw this post. */
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('posts_platform_external_idx').on(t.platform, t.externalId),
+    index('posts_app_published_idx').on(t.appId, t.publishedAt),
+  ],
+)
+
+/**
+ * A post's lifetime totals as last read on each UTC day. Platforms such as TikTok only report
+ * totals, so daily views are the difference between consecutive days.
+ */
+export const postSnapshots = pgTable(
+  'post_snapshots',
+  {
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    date: date('date', { mode: 'string' }).notNull(),
+    views: bigint('views', { mode: 'number' }).notNull(),
+    likes: bigint('likes', { mode: 'number' }).notNull(),
+    comments: bigint('comments', { mode: 'number' }).notNull(),
+    shares: bigint('shares', { mode: 'number' }).notNull(),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.date] })],
+)
+
 /** One row per connector run, so failures are visible in the dashboard and to the bot. */
 export const syncRuns = pgTable(
   'sync_runs',
@@ -100,3 +155,5 @@ export type App = typeof apps.$inferSelect
 export type NewApp = typeof apps.$inferInsert
 export type NewMetric = typeof metricDaily.$inferInsert
 export type SyncRun = typeof syncRuns.$inferSelect
+export type Connection = typeof connections.$inferSelect
+export type Post = typeof posts.$inferSelect

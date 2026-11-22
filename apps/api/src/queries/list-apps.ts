@@ -19,12 +19,15 @@ export const listApps = defineQuery({
       // Never the token columns: credentials do not leave the API.
       db
         .select({
+          id: connections.id,
           appId: connections.appId,
           provider: connections.provider,
+          displayName: connections.displayName,
           status: connections.status,
           lastSyncedAt: connections.lastSyncedAt,
         })
-        .from(connections),
+        .from(connections)
+        .orderBy(asc(connections.createdAt)),
     ])
 
     const sourcesByApp = new Map<string, string[]>()
@@ -41,8 +44,10 @@ export const listApps = defineQuery({
       sources: (sourcesByApp.get(app.id) ?? []).sort(),
       connections: connectionRows
         .filter((connection) => connection.appId === app.id)
-        .map(({ provider, status, lastSyncedAt }) => ({
+        .map(({ id, provider, displayName, status, lastSyncedAt }) => ({
+          id,
           provider,
+          displayName,
           status,
           lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
         })),

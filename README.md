@@ -56,6 +56,18 @@ ID, the `.p8` file) and your vendor number. The Sales and Reports role is enough
 apps are added, matched to existing ones by bundle id, and a year of daily downloads is fetched.
 With an Admin key the dashboard also asks Apple to start analytics reports for each app.
 
+For TikTok, create an app (or a sandbox of one) at developers.tiktok.com with Login Kit for web
+and the scopes `user.info.basic`, `user.info.profile`, `user.info.stats` and `video.list`.
+Register the redirect URI that Settings shows under "Connect TikTok", exactly as written, and
+set `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` on the API (a sandbox has its own pair). Then
+pick the app an account promotes and press Connect TikTok. Every sync saves each video's
+lifetime totals as that day's snapshot; daily views are the gains between days, so they start
+the day after an account is connected. With a sandbox, only the accounts added as target users
+can sign in.
+
+To try the flow without TikTok, point the API at a stand-in with `TIKTOK_API_URL` and
+`TIKTOK_AUTH_URL`.
+
 ## Commands
 
 | Where | Command | What it does |
@@ -81,7 +93,7 @@ Both apps deploy from this repository to the same server. Settings that work:
 | Build command | `npm run build` | `npm run build` |
 | Start command | `npm run start` | `npm run start` |
 | Database | Attach PostgreSQL here | None |
-| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD` |
+| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD`, optional `PUBLIC_URL` |
 | Cron | `node dist/cli.js sync` | None |
 
 Things to know:
@@ -104,4 +116,7 @@ Things to know:
 - **Demo data without a shell.** `POST /trpc/demo.seed` and `POST /trpc/demo.clear` on the API,
   sent with the internal token, load and remove the generated demo apps. They only touch apps
   whose id starts with `demo-`.
+- **The TikTok redirect URI comes from the request** (the proxy's forwarded host and
+  protocol). If Settings shows the wrong address, set `PUBLIC_URL` on the dashboard, for
+  example `https://app.example.com`.
 - Both apps listen on `PORT` when it is set and on 3000 otherwise, over IPv4.

@@ -1,18 +1,24 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, notFound } from '@tanstack/react-router'
+import { PostsTable } from '../../components/PostsTable'
 import { RangeSwitch } from '../../components/RangeSwitch'
 import { Timeline } from '../../components/Timeline'
 import { formatDay } from '../../lib/format'
-import { timelineQuery } from '../../lib/queries'
+import { appsQuery, postsQuery, timelineQuery } from '../../lib/queries'
 import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '../../lib/range'
+
+const SOCIAL = new Set(['tiktok', 'instagram', 'facebook'])
 
 export const Route = createFileRoute('/_app/apps/$appId')({
   validateSearch: rangeSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range }),
   loader: async ({ context, params, deps }) => {
-    const timeline = await context.queryClient.ensureQueryData(
-      timelineQuery(params.appId, rangeToDates(deps.range)),
-    )
+    const dates = rangeToDates(deps.range)
+    const [timeline] = await Promise.all([
+      context.queryClient.ensureQueryData(timelineQuery(params.appId, dates)),
+      context.queryClient.ensureQueryData(postsQuery(params.appId, dates)),
+      context.queryClient.ensureQueryData(appsQuery()),
+    ])
     if (!timeline) throw notFound()
   },
   component: AppPage,
@@ -22,9 +28,16 @@ export const Route = createFileRoute('/_app/apps/$appId')({
 function AppPage() {
   const { appId } = Route.useParams()
   const { range } = Route.useSearch()
-  const { data } = useSuspenseQuery(timelineQuery(appId, rangeToDates(range)))
+  const dates = rangeToDates(range)
+  const { data } = useSuspenseQuery(timelineQuery(appId, dates))
+  const { data: posts } = useSuspenseQuery(postsQuery(appId, dates))
+  const { data: apps } = useSuspenseQuery(appsQuery())
   // The loader has already turned a missing app into the not-found page.
   if (!data) return null
+  const connected = new Set(
+    apps.find((app) => app.id === appId)?.connections.map((connection) => connection.provider),
+  )
+  const hasSocialAccount = [...connected].some((provider) => SOCIAL.has(provider))
 
   return (
     <>
@@ -38,8 +51,19 @@ function AppPage() {
         <RangeSwitch current={range} />
       </div>
       <div className="mt-8">
-        <Timeline days={data.days} series={data.series} />
+        <Timeline days={data.days} series={data.series} connected={connected} />
       </div>
+      <section className="mt-12" aria-labelledby="posts-heading">
+        <h2 id="posts-heading" className="font-display text-xl font-semibold tracking-tight">
+          Posts
+        </h2>
+        <p className="mt-1 text-sm text-ink-soft">
+          Published in this range, newest first. Totals are lifetime numbers from the last sync.
+        </p>
+        <div className="mt-4">
+          <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} />
+        </div>
+      </section>
     </>
   )
 }
