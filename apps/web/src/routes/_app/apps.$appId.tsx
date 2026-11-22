@@ -1,80 +1,54 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, notFound } from '@tanstack/react-router'
-import { AppSources } from '../../components/AppSources'
-import { PostsTable } from '../../components/PostsTable'
-import { RemoveApp } from '../../components/RemoveApp'
-import { RangeSwitch } from '../../components/RangeSwitch'
-import { Timeline } from '../../components/Timeline'
-import { formatDay } from '../../lib/format'
-import { appsQuery, assetsQuery, postsQuery, timelineQuery } from '../../lib/queries'
-import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '../../lib/range'
+import { Link, Outlet, createFileRoute, notFound } from '@tanstack/react-router'
+import { appsQuery } from '../../lib/queries'
+import { rangeSearchSchema } from '../../lib/range'
 
-const SOCIAL = new Set(['tiktok', 'instagram', 'facebook'])
-
+/**
+ * One app: its name and two tabs, Overview (`apps.$appId.index.tsx`, the numbers) and Settings
+ * (`apps.$appId.settings.tsx`, what feeds it). The range stays in the address across both.
+ */
 export const Route = createFileRoute('/_app/apps/$appId')({
   validateSearch: rangeSearchSchema,
-  loaderDeps: ({ search }) => ({ range: search.range }),
-  loader: async ({ context, params, deps }) => {
-    const dates = rangeToDates(deps.range)
-    const [timeline] = await Promise.all([
-      context.queryClient.ensureQueryData(timelineQuery(params.appId, dates)),
-      context.queryClient.ensureQueryData(postsQuery(params.appId, dates)),
-      context.queryClient.ensureQueryData(appsQuery()),
-      context.queryClient.ensureQueryData(assetsQuery()),
-    ])
-    if (!timeline) throw notFound()
+  loader: async ({ context, params }) => {
+    const known = (list: { id: string }[]) => list.some((app) => app.id === params.appId)
+    // The list may be cached from before the app was added, so ask again before giving up.
+    if (known(await context.queryClient.ensureQueryData(appsQuery()))) return
+    if (!known(await context.queryClient.fetchQuery({ ...appsQuery(), staleTime: 0 }))) throw notFound()
   },
-  component: AppPage,
+  component: AppLayout,
   notFoundComponent: AppNotFound,
 })
 
-function AppPage() {
+const TAB =
+  '-mb-px border-b-2 border-transparent pb-3 text-ink-soft hover:text-ink aria-[current=page]:border-ink aria-[current=page]:text-ink'
+
+function AppLayout() {
   const { appId } = Route.useParams()
-  const { range } = Route.useSearch()
-  const dates = rangeToDates(range)
-  const { data } = useSuspenseQuery(timelineQuery(appId, dates))
-  const { data: posts } = useSuspenseQuery(postsQuery(appId, dates))
   const { data: apps } = useSuspenseQuery(appsQuery())
-  const { data: assets } = useSuspenseQuery(assetsQuery())
-  // The loader has already turned a missing app into the not-found page.
-  if (!data) return null
   const app = apps.find((entry) => entry.id === appId)
-  // The sources something feeds this app from, e.g. `app_store` or `tiktok`.
-  const connected = new Set(app?.assets.map((asset) => asset.source))
-  const hasSocialAccount = [...connected].some((source) => SOCIAL.has(source))
+  // Gone for a moment after it is removed, while the page moves on to the Apps list.
+  if (!app) return null
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">{data.app.name}</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            {formatDay(data.range.from)} to {formatDay(data.range.to)}, {RANGE_DAYS[range]} days ·{' '}
-            <a href="#sources" className="underline underline-offset-4 hover:text-ink">
-              Sources
-            </a>
-          </p>
-        </div>
-        <RangeSwitch current={range} />
+      <h1 className="font-display text-3xl font-semibold tracking-tight">{app.name}</h1>
+      <nav aria-label="App sections" className="mt-4 flex gap-6 border-b border-line text-sm font-medium">
+        <Link
+          to="/apps/$appId"
+          params={{ appId }}
+          search={(previous) => previous}
+          activeOptions={{ exact: true, includeSearch: false }}
+          className={TAB}
+        >
+          Overview
+        </Link>
+        <Link to="/apps/$appId/settings" params={{ appId }} search={(previous) => previous} className={TAB}>
+          Settings
+        </Link>
+      </nav>
+      <div className="mt-6">
+        <Outlet />
       </div>
-      <div className="mt-8">
-        <Timeline days={data.days} series={data.series} posts={posts} connected={connected} />
-      </div>
-      <section className="mt-12" aria-labelledby="posts-heading">
-        <h2 id="posts-heading" className="font-display text-xl font-semibold tracking-tight">
-          Posts
-        </h2>
-        <p className="mt-1 text-sm text-ink-soft">
-          Published in this range, newest first. Totals are lifetime numbers from the last sync.
-          Download lift compares downloads on the post&apos;s day and the two after with the
-          week before&apos;s pace; posts close together share those days.
-        </p>
-        <div className="mt-4">
-          <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} />
-        </div>
-      </section>
-      {app && <AppSources app={app} apps={apps} assets={assets} />}
-      {app && app.kind !== 'portfolio' && <RemoveApp appId={app.id} name={app.name} />}
     </>
   )
 }
@@ -85,8 +59,8 @@ function AppNotFound() {
       <h1 className="font-display text-2xl font-semibold">There is no such app</h1>
       <p className="mt-3 text-ink-soft">
         It may have been removed, or the address may be mistyped.{' '}
-        <Link to="/" className="font-medium text-ink underline">
-          Go to the portfolio
+        <Link to="/apps" className="font-medium text-ink underline">
+          Go to the apps
         </Link>
       </p>
     </div>

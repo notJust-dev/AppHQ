@@ -21,4 +21,10 @@ describe('uniqueSlug', () => {
   it('keeps real apps out of the demo namespace', () => {
     expect(uniqueSlug('Demo App', new Set())).toBe('app-demo-app')
   })
+
+  it('keeps ids the dashboard uses for itself free', () => {
+    expect(uniqueSlug('New', new Set())).toBe('app-new')
+    expect(uniqueSlug('Portfolio', new Set())).toBe('app-portfolio')
+    expect(uniqueSlug('New Habit', new Set())).toBe('new-habit')
+  })
 })

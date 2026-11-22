@@ -7,7 +7,7 @@ import { apps, assets, metricDaily } from '../db/schema.js'
 import { ConnectInputError } from '../services/errors.js'
 import { assetOf } from '../test/assets.js'
 import { testDatabaseUrl } from '../test/database.js'
-import { assignAsset, autoLink, removeApp, setIgnored } from './store.js'
+import { assignAsset, autoLink, removeApp, renameApp, setIgnored } from './store.js'
 import { PORTFOLIO_APP_ID } from './kinds.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
@@ -34,6 +34,20 @@ describe.skipIf(!url)('Apps and assets, against a real database', () => {
     if (createdApps.length > 0) await db.delete(apps).where(inArray(apps.id, createdApps))
     await db.delete(assets).where(inArray(assets.externalId, Object.values(ids)))
     await sql.end({ timeout: 5 })
+  })
+
+  it('renames an app and keeps its id, but not Shared accounts', async () => {
+    const third = await assetOf(db, 'ios_app', ids.third)
+    const { appId } = await assignAsset(db, { assetId: third.id, appId: 'new' })
+    if (!appId) throw new Error('no app')
+    createdApps.push(appId)
+
+    expect(await renameApp(db, appId, `Renamed ${run}`)).toBe(`Renamed ${run}`)
+    const [app] = await db.select().from(apps).where(eq(apps.id, appId))
+    expect(app?.name).toBe(`Renamed ${run}`)
+    await expect(renameApp(db, PORTFOLIO_APP_ID, 'Mine')).rejects.toBeInstanceOf(ConnectInputError)
+
+    await assignAsset(db, { assetId: third.id, appId: null })
   })
 
   it('removes an app with its numbers, and leaves what fed it waiting', async () => {

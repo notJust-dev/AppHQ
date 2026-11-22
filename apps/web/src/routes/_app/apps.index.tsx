@@ -1,10 +1,8 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Button } from '../../components/Button'
 import { useAssetActions, type AssetActions } from '../../components/useAssetActions'
-import { createAppFn } from '../../fns/assets'
 import {
   ATTENTION,
   KIND_LABEL,
@@ -31,8 +29,17 @@ function AppsPage() {
   const { data: apps } = useSuspenseQuery(appsQuery())
   const { data: assets } = useSuspenseQuery(assetsQuery())
   const actions = useAssetActions()
-  // Set by the app page after removing an app; history state, so a link cannot set it.
-  const removedApp = useRouterState({ select: (state) => state.location.state.removedApp })
+  // Set by the app page after removing an app; history state, so a link cannot set it. Read
+  // after hydration (the server never sees history state), then cleared so a reload does not
+  // repeat it.
+  const removedState = useRouterState({ select: (state) => state.location.state.removedApp })
+  const navigate = useNavigate()
+  const [removedApp, setRemovedApp] = useState<string | null>(null)
+  useEffect(() => {
+    if (!removedState) return
+    setRemovedApp(removedState)
+    void navigate({ to: '/apps', replace: true, state: {} })
+  }, [removedState, navigate])
 
   const waiting = assets.filter((asset) => asset.appId === null && !asset.ignored)
   const ignored = assets.filter((asset) => asset.ignored)
@@ -40,7 +47,12 @@ function AppsPage() {
 
   return (
     <>
-      <h1 className="font-display text-3xl font-semibold tracking-tight">Apps</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Apps</h1>
+        <Link to="/apps/new" className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-surface">
+          Add app
+        </Link>
+      </div>
       <p className="mt-2 max-w-prose text-ink-soft">
         An app gathers its iOS and Android apps, its RevenueCat project and the social accounts that
         promote it. The accounts you sign in to on the{' '}
@@ -94,14 +106,6 @@ function AppsPage() {
       <Section title="All apps">
         <AppsOverview apps={apps} assets={assets} />
       </Section>
-
-      <Section
-        title="Add an app"
-        intro="For an app that is only on Android, or one whose store listing does not exist yet. Its page lets you pick what feeds it."
-      >
-        <NewApp />
-      </Section>
-
       {ignored.length > 0 && (
         <Section title="Ignored" intro="Found by an account, but not tracked: old apps, test projects, personal accounts.">
           <ul className="max-w-3xl divide-y divide-line rounded-lg border border-line bg-surface text-sm">
@@ -216,7 +220,7 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
     return (
       <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
         No apps yet. Connect a source on the Accounts page, then add the apps you want to track
-        from what it finds, or add one by name below.
+        from what it finds, or add one by name with Add app.
       </p>
     )
   }
@@ -240,6 +244,9 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
               Social
+            </th>
+            <th scope="col" className="px-4 py-3">
+              <span className="sr-only">Settings</span>
             </th>
           </tr>
         </thead>
@@ -292,6 +299,17 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                     </ul>
                   )}
                 </td>
+                <td className="px-4 py-4 text-right">
+                  <Link
+                    to="/apps/$appId/settings"
+                    params={{ appId: app.id }}
+                    search={{ range: '28d' }}
+                    aria-label={`Settings for ${app.name}`}
+                    className="font-medium text-ink-soft underline decoration-line underline-offset-4 hover:text-ink"
+                  >
+                    Settings
+                  </Link>
+                </td>
               </tr>
             )
           })}
@@ -330,52 +348,4 @@ function Attention({ status }: { status: string }) {
   const note = ATTENTION[status]
   if (!note) return null
   return <span className="block text-xs font-medium">Account {note}</span>
-}
-
-function NewApp() {
-  const create = useServerFn(createAppFn)
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const [name, setName] = useState('')
-  const mutation = useMutation({
-    mutationFn: (appName: string) => create({ data: { name: appName } }),
-    onSuccess: async (result) => {
-      if (!result.ok) return
-      await queryClient.invalidateQueries()
-      await navigate({ to: '/apps/$appId', params: { appId: result.appId }, search: { range: '28d' }, hash: 'sources' })
-    },
-  })
-  const result = mutation.data
-
-  return (
-    <form
-      className="max-w-3xl"
-      onSubmit={(event) => {
-        event.preventDefault()
-        mutation.mutate(name)
-      }}
-    >
-      <label htmlFor="new-app-name" className="text-sm font-medium">
-        App name
-      </label>
-      <div className="mt-2 flex flex-wrap gap-3">
-        <input
-          id="new-app-name"
-          name="new-app-name"
-          required
-          maxLength={80}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
-        />
-        <Button type="submit" variant="primary" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Adding…' : 'Add app'}
-        </Button>
-      </div>
-      <div role="status" className="mt-3 text-sm">
-        {mutation.isError && 'Could not reach the dashboard server. Try again.'}
-        {result && !result.ok && result.message}
-      </div>
-    </form>
-  )
 }

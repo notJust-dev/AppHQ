@@ -125,6 +125,18 @@ export async function setIgnored(db: Db, assetIds: string[], ignored: boolean) {
   return updated.length
 }
 
+/** Renames an app. Its id, and so its address, stays the same. */
+export async function renameApp(db: Db, appId: string, name: string) {
+  if (appId === PORTFOLIO_APP_ID) throw new ConnectInputError('Shared accounts keep their name.')
+  const renamed = await db
+    .update(apps)
+    .set({ name })
+    .where(eq(apps.id, appId))
+    .returning({ name: apps.name })
+  if (renamed.length === 0) throw new ConnectInputError('That app no longer exists. Reload the page.')
+  return renamed[0]!.name
+}
+
 /**
  * Removes an app the person no longer wants to track. Its numbers and posts go with it; what fed
  * it (store apps, projects, social accounts) stays, without an app, on the Apps page.

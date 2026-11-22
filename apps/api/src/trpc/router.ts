@@ -31,7 +31,7 @@ import {
 import { connectGooglePlay } from '../services/connect-google-play.js'
 import { connectMeta } from '../services/connect-meta.js'
 import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
-import { assignAsset, createApp, removeApp, setIgnored } from '../assets/store.js'
+import { assignAsset, createApp, removeApp, renameApp, setIgnored } from '../assets/store.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 
@@ -160,6 +160,15 @@ export const appRouter = t.router({
     }),
 
     posts: t.procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
+
+    /** Renames an app; its id and address stay the same. */
+    rename: t.procedure
+      .input(z.object({ appId: z.string().min(1).max(64), name: z.string().trim().min(1).max(80) }))
+      .mutation(async ({ ctx, input }) => ({
+        name: await renameApp(ctx.db, input.appId, input.name).catch((err: unknown) => {
+          throw connectError(err)
+        }),
+      })),
 
     /**
      * Stops tracking an app: deletes it with its numbers and posts. What fed it stays, without an

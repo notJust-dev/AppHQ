@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { formatCount, formatDay } from '../lib/format'
 import { liftSentence, liftShort } from '../lib/lift'
 import type { Post } from '../lib/queries'
@@ -7,7 +8,7 @@ import { sourceLabel } from '../lib/sources'
  * The app's posts published in the range, newest first. The totals are lifetime numbers from
  * the last sync, so a post from yesterday has had far less time than one from last month.
  */
-export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean }) {
+export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean; appId: string }) {
   if (props.posts.length === 0) {
     return (
       <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
@@ -16,9 +17,14 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean }) 
         ) : (
           <>
             No social account is linked to this app yet.{' '}
-            <a href="#sources" className="font-medium text-ink underline">
-              Link one under Sources
-            </a>
+            <Link
+              to="/apps/$appId/settings"
+              params={{ appId: props.appId }}
+              search={(previous) => previous}
+              className="font-medium text-ink underline"
+            >
+              Link one in Settings
+            </Link>
           </>
         )}
       </p>

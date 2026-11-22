@@ -54,8 +54,10 @@ Instagram and TikTok accounts) lands on the Apps page under "Needs a decision". 
 app on its own: add the ones you want to track (one click for a store app), link the others to an
 app or to Shared accounts (for a social account that promotes several apps), and ignore the rest,
 one by one or all at once. Once an app exists, what exact evidence ties to it joins by itself,
-like an Android package equal to its iOS bundle id. Each app's page has a Sources panel to change
-what feeds it, and a button to stop tracking it. Linking something fetches its history.
+like an Android package equal to its iOS bundle id. Each app has two tabs: Overview, with its
+numbers and posts, and Settings, with its name, what feeds it, and a button to stop tracking it.
+To add an app by name (one only on Android, say), use Add app on the Apps page. Linking
+something fetches its history.
 
 For revenue, paste a RevenueCat v2 secret key from each project. The key needs read access to
 charts and metrics, and to project configuration. The project joins the app with the same bundle

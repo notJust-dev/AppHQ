@@ -11,12 +11,15 @@ export function slugify(name: string): string {
   return slug || 'app'
 }
 
+const RESERVED = new Set(['portfolio', 'new'])
+
 /** The slug itself if it is free, otherwise the first of slug-2, slug-3, ... that is. */
 export function uniqueSlug(name: string, taken: ReadonlySet<string>): string {
   let base = slugify(name)
-  // The demo- prefix is reserved for generated demo apps, which are removed in bulk, and
-  // `portfolio` is the row that holds accounts shared by several apps.
-  if (base.startsWith('demo-') || base === 'portfolio') base = `app-${base}`
+  // The demo- prefix is reserved for generated demo apps, which are removed in bulk;
+  // `portfolio` is the row that holds accounts shared by several apps; `new` is the dashboard's
+  // page for adding an app, and what linking an asset to a new app is asked with.
+  if (base.startsWith('demo-') || RESERVED.has(base)) base = `app-${base}`
   if (!taken.has(base)) return base
   for (let n = 2; ; n++) {
     const candidate = `${base}-${n}`

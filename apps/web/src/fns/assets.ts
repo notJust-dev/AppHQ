@@ -60,3 +60,15 @@ export const createAppFn = createServerFn({ method: 'POST' })
       return { ok: false as const, message: messageFrom(err, 'Could not add the app. Try again.') }
     }
   })
+
+/** Renames an app; its address stays the same. */
+export const renameAppFn = createServerFn({ method: 'POST' })
+  .middleware([requireSession])
+  .validator(z.object({ appId: z.string().min(1).max(64), name: z.string().trim().min(1).max(80) }))
+  .handler(async ({ data }) => {
+    try {
+      return { ok: true as const, ...(await api().apps.rename.mutate(data)) }
+    } catch (err) {
+      return { ok: false as const, message: messageFrom(err, 'Could not rename the app. Try again.') }
+    }
+  })

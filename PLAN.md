@@ -543,6 +543,9 @@ Status on 2026-11-22 (merged to `main` and deployed):
 - No automatic apps (2026-11-22): connecting App Store Connect or RevenueCat used to create an app
   for every iOS app or unmatched project. Now everything found waits on the Apps page, where a
   store app is one click to add, the rest can be ignored at once, and an app's page can remove it.
+- App settings (2026-11-22): each app has Overview and Settings tabs (`/apps/<id>` and
+  `/apps/<id>/settings`); Settings holds the name (renamable, the id stays), the sources and Stop
+  tracking. Adding an app by name moved to `/apps/new`; the id `new` is reserved.
 
 ### Phase 3 — Reviews inbox
 
