@@ -251,7 +251,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - Reviews: the Android Publisher reviews endpoint only returns reviews from the last week, so
   syncing must start early; older reviews come from the bucket's review CSVs.
 
-### TikTok (built; docs re-checked 2026-11-22; tested against a stand-in, not yet real TikTok)
+### TikTok (built and running against a real sandbox account since 2026-11-22)
 
 - Sandbox app: no app review, up to 5 sandboxes per app and 10 target users per sandbox. Not
   available in a sandbox: Content Posting for public videos, Data Portability.
@@ -276,8 +276,10 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   counts in full, spread from its publish day to its first reading; a gap between readings is
   shared out evenly. `followers` is written when every account of the app synced.
 - Not available: daily series, reach, watch time, traffic sources.
-- **Unverified:** that the sandbox returns real data for target users, and that `video.list` and
-  `user.info.stats` are grantable in a sandbox. The first real connection settles both.
+- Confirmed on 2026-11-22 with a real target user: the sandbox returns the account's real public
+  videos and counts, all four scopes are grantable, paging through 55 videos works, and the
+  redirect URI built from Velocity's forwarded headers matched the registered one (no
+  `PUBLIC_URL` needed).
 
 ### Instagram (verified against Meta's docs)
 
@@ -409,12 +411,14 @@ Status on 2026-11-22 (merged to `main` and deployed):
   connector that saves posts and daily snapshots on every sync and derives daily views.
 - The app page lists its posts with lifetime totals. Step 5's post markers are not built yet.
 - Tested with unit tests, database tests and a browser run against a stand-in TikTok: cancel,
-  missing permission, connect, revoked account, reconnect. Not yet run against TikTok itself.
+  missing permission, connect, revoked account, reconnect. Then against TikTok itself:
+  @vadimnotjustdev connected to TinyKicks, 55 videos (2019 to 2026-09-25), real counts.
 - Snapshots happen on every sync, so the 6-hour sync cron covers step 4; no separate
   `snapshot` command is needed.
-- The sandbox's client key and secret are on the `api` app. Still to do before the first real
-  connection: register the redirect URI that Settings shows, and add the four scopes and the
-  target users in the sandbox.
+- The sandbox's client key and secret are on the `api` app. Up to 10 accounts can be target
+  users; more, or other people's accounts, need the app to pass TikTok's review.
+- Open: an account that posts about several apps (build in public) can only be connected to
+  one. Splitting its posts across apps would need a per-post app, set by hand or by hashtag.
 
 ### Phase 3 — Reviews inbox
 
@@ -480,8 +484,8 @@ Segments 3, 4, 5 and 9 plus the returns in 6 and 8 are how the 30% is reached.
 
 ## 11. Risks
 
-1. **TikTok sandbox may not return real data.** Mitigation: the Phase 0 spike. Fallback: submit
-   the app for review, or enter TikTok numbers through another route for the video.
+1. ~~TikTok sandbox may not return real data.~~ Resolved 2026-11-22: it returns real data for
+   target users.
 2. **Social history starts at the first sync.** Deploy the sync as early as possible so the video
    has weeks of real data.
 3. **Google Play reviews older than a week are not in the API.** Same mitigation, plus CSV backfill.
