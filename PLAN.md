@@ -410,7 +410,7 @@ Status on 2026-11-22 (merged to `main` and deployed):
   back), encrypted rotating tokens, `needs_reauth` when TikTok rejects the refresh token, and a
   connector that saves posts and daily snapshots on every sync and derives daily views.
 - The app page lists its posts with lifetime totals.
-- Steps 5 and 6 (branch `phase-2-post-markers`, not merged): a posts lane above the funnel rows
+- Steps 5 and 6 (merged and deployed 2026-11-22): a posts lane above the funnel rows
   with one marker per posting day, sized by views. Selecting one shades its day and the two
   after in every row and shows the post with its download lift: downloads over those three
   days against the week before's daily pace (`list_posts` returns it as `downloadLift`, with
