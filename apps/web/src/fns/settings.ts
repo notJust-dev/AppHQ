@@ -26,7 +26,7 @@ export const getSyncStatusFn = createServerFn({ method: 'GET' })
 
 export const connectRevenueCatFn = createServerFn({ method: 'POST' })
   .middleware([requireSession])
-  .validator(z.object({ apiKey: z.string().trim().min(8).max(500) }))
+  .validator(z.object({ apiKey: z.string().trim().min(8).max(500), appId: z.string().min(1).max(64).optional() }))
   .handler(async ({ data }) => {
     try {
       const { projects } = await api().apps.connectRevenueCat.mutate(data)

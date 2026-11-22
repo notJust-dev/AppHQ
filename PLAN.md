@@ -235,7 +235,8 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - Charts stored: `revenue` → `revenue`, `mrr` → `mrr`, `actives` → `active_subs`, `trials` →
   `active_trials`, `trials_new` → `trials`, `customers_new` → `new_customers`. Six requests per
   app per sync.
-- Auth: a v2 secret key per project, pasted on the Accounts page and stored encrypted in `connections`.
+- Auth: a v2 secret key per project, pasted in the app's Settings (the key belongs to one
+  project, so it is connected from the app it feeds) and stored encrypted in `connections`.
   It needs `charts_metrics:charts:read`, plus `project_configuration:projects:read` and
   `project_configuration:apps:read` to read the project's iOS bundle id and Android package,
   which tie it to its app.
@@ -546,6 +547,10 @@ Status on 2026-11-22 (merged to `main` and deployed):
 - App settings (2026-11-22): each app has Overview and Settings tabs (`/apps/<id>` and
   `/apps/<id>/settings`); Settings holds the name (renamable, the id stays), the sources and Stop
   tracking. Adding an app by name moved to `/apps/new`; the id `new` is reserved.
+- RevenueCat per app (2026-11-22): a RevenueCat key belongs to one project, so it is pasted in
+  the app's Settings and links that project to that app, whatever its bundle id says (a key that
+  sees several projects is refused there). The Accounts page's RevenueCat entry only lists each
+  app's project and state.
 
 ### Phase 3 — Reviews inbox
 

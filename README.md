@@ -59,10 +59,11 @@ numbers and posts, and Settings, with its name, what feeds it, and a button to s
 To add an app by name (one only on Android, say), use Add app on the Apps page. Linking
 something fetches its history.
 
-For revenue, paste a RevenueCat v2 secret key from each project. The key needs read access to
-charts and metrics, and to project configuration. The project joins the app with the same bundle
-id or package; otherwise it waits on the Apps page. About a year of history is fetched once it
-belongs to an app, and later syncs re-read the last seven days.
+For revenue, open an app's Settings and paste a RevenueCat v2 secret key from that app's project
+(a RevenueCat key belongs to one project, so it is connected per app, not on the Accounts page).
+The key needs read access to charts and metrics, and to project configuration. About a year of
+history is fetched, and later syncs re-read the last seven days. The Accounts page lists every
+app's project and its state.
 
 For downloads, connect App Store Connect with a team API key (the `.p8` file, whose name gives
 the Key ID, and the Issuer ID) and your vendor number. The Sales and Reports role is enough. The account's

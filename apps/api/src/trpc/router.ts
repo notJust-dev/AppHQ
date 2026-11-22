@@ -189,11 +189,14 @@ export const appRouter = t.router({
         }),
       })),
 
-    /** Registers the app behind a RevenueCat secret key and starts fetching its history. */
+    /**
+     * Connects the project behind a RevenueCat secret key, to `appId` when it is added from an
+     * app's settings, and starts fetching its history once it belongs to an app.
+     */
     connectRevenueCat: t.procedure
-      .input(z.object({ apiKey: z.string().trim().min(8).max(500) }))
+      .input(z.object({ apiKey: z.string().trim().min(8).max(500), appId: z.string().min(1).max(64).optional() }))
       .mutation(async ({ ctx, input }) => {
-        const connected = await connectRevenueCat(ctx, input.apiKey).catch((err: unknown) => {
+        const connected = await connectRevenueCat(ctx, input.apiKey, { appId: input.appId }).catch((err: unknown) => {
           ctx.log.error(`connect RevenueCat failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })

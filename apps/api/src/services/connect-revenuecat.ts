@@ -1,16 +1,22 @@
-import { eq } from 'drizzle-orm'
-import { autoLink, upsertAssets } from '../assets/store.js'
+import { and, eq, ne } from 'drizzle-orm'
+import { PORTFOLIO_APP_ID } from '../assets/kinds.js'
+import { assignAsset, autoLink, upsertAssets } from '../assets/store.js'
 import { RevenueCatError, createRevenueCatClient } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
 import type { Db } from '../db/client.js'
 import { apps, assets, connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import { ConnectInputError } from './errors.js'
 
 export interface ConnectedProject {
   name: string
   /** The app the project belongs to, or null while it waits on the Apps page. */
   appId: string | null
   appName: string | null
+  /** The app the project fed before, when connecting it to a chosen app moved it. */
+  movedFrom: string | null
+  /** The project the chosen app had before, which now waits on the Apps page. */
+  replaced: string | null
 }
 
 /**
@@ -18,16 +24,32 @@ export interface ConnectedProject {
  * project as an asset, and links it to the app exact evidence points at (an iOS app or Android
  * package the project names). No app is created: a project without one waits on the Apps page.
  * Connecting the same project again replaces its key.
+ *
+ * With `appId`, the key is being added from that app's settings: its project goes to that app,
+ * whatever its bundle id says, and the key must belong to exactly one project.
  */
 export async function connectRevenueCat(
   deps: { db: Db; secrets: Secrets; fetch?: typeof fetch },
   apiKey: string,
+  options: { appId?: string } = {},
 ): Promise<ConnectedProject[]> {
+  if (options.appId !== undefined) {
+    const [target] = await deps.db.select({ id: apps.id }).from(apps).where(eq(apps.id, options.appId)).limit(1)
+    if (!target || options.appId === PORTFOLIO_APP_ID) {
+      throw new ConnectInputError('That app no longer exists. Reload the page.')
+    }
+  }
+
   // Encrypt first: if the key cannot be stored, fail before sending it anywhere.
   const encryptedKey = deps.secrets.encrypt(apiKey)
   const client = createRevenueCatClient({ apiKey, fetch: deps.fetch })
 
   const projects = await client.listProjects()
+  if (options.appId !== undefined && projects.length > 1) {
+    throw new ConnectInputError(
+      `This key can see ${projects.length} projects. Use a secret key from the one project that belongs to this app.`,
+    )
+  }
   const connected: ConnectedProject[] = []
 
   for (const project of projects) {
@@ -58,15 +80,40 @@ export async function connectRevenueCat(
       },
     ])
     if (!asset) throw new Error('could not save the RevenueCat project')
-    await autoLink(deps.db)
+
+    let movedFrom: string | null = null
+    let replaced: string | null = null
+    if (options.appId !== undefined) {
+      const [before] = await deps.db.select({ appId: assets.appId }).from(assets).where(eq(assets.id, asset.id)).limit(1)
+      if (before?.appId && before.appId !== options.appId) movedFrom = await appName(deps.db, before.appId)
+      const [previous] = await deps.db
+        .select({ name: assets.name })
+        .from(assets)
+        .where(
+          and(eq(assets.kind, 'revenuecat_project'), eq(assets.appId, options.appId), ne(assets.id, asset.id)),
+        )
+        .limit(1)
+      replaced = previous?.name ?? null
+      await assignAsset(deps.db, { assetId: asset.id, appId: options.appId })
+    } else {
+      await autoLink(deps.db)
+    }
 
     const [current] = await deps.db.select().from(assets).where(eq(assets.id, asset.id)).limit(1)
     const appId = current?.appId ?? null
-    const [app] = appId
-      ? await deps.db.select({ name: apps.name }).from(apps).where(eq(apps.id, appId)).limit(1)
-      : []
-    connected.push({ name: project.name, appId, appName: app?.name ?? null })
+    connected.push({
+      name: project.name,
+      appId,
+      appName: appId ? await appName(deps.db, appId) : null,
+      movedFrom,
+      replaced,
+    })
   }
 
   return connected
+}
+
+async function appName(db: Db, appId: string): Promise<string | null> {
+  const [app] = await db.select({ name: apps.name }).from(apps).where(eq(apps.id, appId)).limit(1)
+  return app?.name ?? null
 }

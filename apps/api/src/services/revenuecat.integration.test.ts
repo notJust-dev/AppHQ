@@ -9,7 +9,8 @@ import { assetOf, connectionOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { connectRevenueCat } from './connect-revenuecat.js'
-import { assignAsset } from '../assets/store.js'
+import { assignAsset, createApp } from '../assets/store.js'
+import { ConnectInputError } from './errors.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
 const url = testDatabaseUrl()
@@ -74,7 +75,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     const [connected] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_live_key')
 
     // Nothing in the dashboard names this bundle id, so the project waits on the Apps page.
-    expect(connected).toEqual({ name: 'Integration Test App', appId: null, appName: null })
+    expect(connected).toEqual({ name: 'Integration Test App', appId: null, appName: null, movedFrom: null, replaced: null })
     const project = await assetOf(db, 'revenuecat_project', projectId)
     expect(project).toMatchObject({
       appId: null,
@@ -93,10 +94,46 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
 
     const [again] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key')
 
-    expect(again).toEqual({ name: 'Integration Test App', appId, appName: 'Integration Test App' })
+    expect(again).toEqual({ name: 'Integration Test App', appId, appName: 'Integration Test App', movedFrom: null, replaced: null })
     const rows = await db.select().from(connections).where(eq(connections.externalAccountId, projectId))
     expect(rows).toHaveLength(1)
     expect(secrets.decrypt(rows[0]?.accessTokenEnc ?? '')).toBe('sk_new_key')
+  })
+
+  it("goes to the app it is added from, whatever its bundle id says, and moves back", async () => {
+    const otherId = await createApp(db, `Other ${projectId}`)
+    try {
+      const [moved] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key', { appId: otherId })
+      expect(moved).toEqual({
+        name: 'Integration Test App',
+        appId: otherId,
+        appName: `Other ${projectId}`,
+        movedFrom: 'Integration Test App',
+        replaced: null,
+      })
+      expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(otherId)
+
+      const [back] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key', { appId })
+      expect(back).toMatchObject({ appId, movedFrom: `Other ${projectId}` })
+    } finally {
+      await db.delete(apps).where(eq(apps.id, otherId))
+    }
+  })
+
+  it('refuses a key from several projects, or an app that is gone, when added from an app', async () => {
+    const several = (async (input: Parameters<typeof fetch>[0]) => {
+      const { pathname } = new URL(String(input))
+      const items = pathname === '/v2/projects' ? [{ id: 'p1', name: 'One' }, { id: 'p2', name: 'Two' }] : []
+      return new Response(JSON.stringify({ items }))
+    }) as typeof fetch
+
+    await expect(connectRevenueCat({ db, secrets, fetch: several }, 'sk_other', { appId })).rejects.toThrow(
+      /can see 2 projects/,
+    )
+    await expect(
+      connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_other', { appId: `gone-${projectId}` }),
+    ).rejects.toBeInstanceOf(ConnectInputError)
+    expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(appId)
   })
 
   it('syncs the charts into metric_daily, reading revenue by name', async () => {

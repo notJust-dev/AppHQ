@@ -1,130 +1,94 @@
-import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
-import { useState } from 'react'
-import { Button } from '../../components/Button'
-import {
-  AccountList,
-  Found,
-  Section,
-  SourcePage,
-  Steps,
-  emptyFamily,
-  useWatch,
-} from '../../components/accounts/shared'
-import { connectRevenueCatFn } from '../../fns/settings'
-import { accountsQuery } from '../../lib/queries'
+import { Section, SourcePage } from '../../components/accounts/shared'
+import { ATTENTION } from '../../lib/assets'
+import { formatMoment } from '../../lib/format'
+import { appsQuery, assetsQuery } from '../../lib/queries'
 
 export const Route = createFileRoute('/_app/accounts/revenuecat')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(appsQuery()),
+      context.queryClient.ensureQueryData(assetsQuery()),
+    ]),
   component: RevenueCatPage,
 })
 
+/**
+ * A RevenueCat key belongs to one project, which belongs to one app, so keys are connected from
+ * each app's Settings. This page only shows where every app stands.
+ */
 function RevenueCatPage() {
-  const watch = useWatch()
-  const { data: families } = useSuspenseQuery({ ...accountsQuery(), refetchInterval: watch.refetchInterval })
-  const family = families.find((entry) => entry.family === 'revenuecat') ?? emptyFamily('revenuecat')
-  const connected = family.accounts.length > 0
+  const { data: apps } = useSuspenseQuery(appsQuery())
+  const { data: assets } = useSuspenseQuery(assetsQuery())
+  const ownApps = apps.filter((app) => app.kind !== 'portfolio')
+  const waiting = assets.filter((asset) => asset.kind === 'revenuecat_project' && asset.appId === null && !asset.ignored)
 
   return (
     <SourcePage
       title="RevenueCat"
-      intro="Revenue, MRR, trials and subscribers, one RevenueCat project at a time. A project joins the app with the same bundle id or package; otherwise you add it on the Apps page. About a year of history is fetched once it belongs to an app."
+      intro="Revenue, MRR, trials and subscribers. A RevenueCat key belongs to one project, and a project to one app, so each app connects its own key in its Settings. About a year of history is fetched when it does."
     >
-      <Section title={connected ? 'Projects' : 'Project'}>
-        <AccountList accounts={family.accounts} />
-        <Found family={family} />
+      <Section title="Projects by app">
+        {ownApps.length === 0 ? (
+          <p className="rounded-lg border border-line bg-surface px-6 py-4 text-sm text-ink-soft">
+            No apps yet.{' '}
+            <Link to="/apps/new" className="font-medium text-ink underline underline-offset-4">
+              Add an app
+            </Link>
+            , then connect its RevenueCat project in its Settings.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line rounded-lg border border-line bg-surface text-sm">
+            {ownApps.map((app) => {
+              const project = app.assets.find((asset) => asset.kind === 'revenuecat_project')
+              const attention = project ? ATTENTION[project.status] : undefined
+              return (
+                <li key={app.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
+                  <span className="min-w-0 break-words">
+                    <span className="font-medium">{app.name}</span>
+                    <span className={`block text-xs ${attention ? 'font-medium' : 'text-ink-soft'}`}>
+                      {project
+                        ? [
+                            project.name,
+                            attention ? `key ${attention}` : 'connected',
+                            project.lastSyncedAt ? `synced ${formatMoment(project.lastSyncedAt)}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : 'No project connected'}
+                    </span>
+                  </span>
+                  <Link
+                    to="/apps/$appId/settings"
+                    params={{ appId: app.id }}
+                    search={{ range: '28d' }}
+                    aria-label={`${project ? 'Settings' : 'Connect a project'} for ${app.name}`}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                      project ? 'border border-line bg-surface' : 'bg-ink text-surface'
+                    }`}
+                  >
+                    {project ? 'Settings' : 'Connect'}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </Section>
 
-      <Section title={connected ? 'Add another project' : 'Connect'}>
-        <Steps>
-          <li>In RevenueCat, open the project, then Project settings, API keys.</li>
-          <li>
-            Create a new secret API key, version 2, with read access to Charts &amp; metrics and to
-            Project configuration.
-          </li>
-          <li>Paste it below. Repeat for each project.</li>
-        </Steps>
-        <ConnectForm onConnected={watch.dataChanged} />
-      </Section>
-    </SourcePage>
-  )
-}
-
-function ConnectForm({ onConnected }: { onConnected: () => void }) {
-  const connect = useServerFn(connectRevenueCatFn)
-  const [apiKey, setApiKey] = useState('')
-  const mutation = useMutation({
-    mutationFn: (key: string) => connect({ data: { apiKey: key } }),
-    onSuccess: (result) => {
-      if (!result.ok) return
-      setApiKey('')
-      onConnected()
-    },
-  })
-  const result = mutation.data
-
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        mutation.mutate(apiKey)
-      }}
-    >
-      <label htmlFor="revenuecat-key" className="text-sm font-medium">
-        Secret API key
-      </label>
-      <div className="mt-2 flex flex-wrap gap-3">
-        <input
-          id="revenuecat-key"
-          name="revenuecat-key"
-          type="password"
-          autoComplete="off"
-          required
-          minLength={8}
-          placeholder="sk_…"
-          value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
-          aria-describedby="revenuecat-key-note"
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
-        />
-        <Button type="submit" variant="primary" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Connecting…' : 'Connect project'}
-        </Button>
-      </div>
-      <p id="revenuecat-key-note" className="mt-2 text-xs text-ink-soft">
-        Stored encrypted on the API. It is not shown again and never reaches the browser after this.
-      </p>
-      <div role="status" className="mt-3 text-sm">
-        {mutation.isError && 'Could not reach the dashboard server. Try again.'}
-        {result && !result.ok && result.message}
-        {result?.ok && <Connected projects={result.projects} />}
-      </div>
-    </form>
-  )
-}
-
-function Connected(props: { projects: { name: string; appId: string | null; appName: string | null }[] }) {
-  const linked = props.projects.filter((project) => project.appName !== null)
-  const waiting = props.projects.filter((project) => project.appName === null)
-  return (
-    <>
-      {linked.map((project) => (
-        <p key={project.name}>
-          Connected {project.name} to {project.appName}. Its history is being fetched; the numbers
-          appear within a minute.
-        </p>
-      ))}
       {waiting.length > 0 && (
-        <p>
-          Connected {waiting.map((project) => project.name).join(', ')}. No app has the same bundle
-          id or package yet: add it as an app, or link it to one, on the{' '}
-          <Link to="/apps" className="font-medium underline underline-offset-4">
-            Apps page
-          </Link>
-          .
-        </p>
+        <Section title="Not in an app">
+          <p className="text-sm">
+            {waiting.map((asset) => asset.name).join(', ')} {waiting.length === 1 ? 'is' : 'are'} connected
+            but not part of an app.{' '}
+            <Link to="/apps" className="font-medium underline underline-offset-4">
+              Link {waiting.length === 1 ? 'it' : 'them'} on the Apps page
+            </Link>
+            .
+          </p>
+        </Section>
       )}
-    </>
+    </SourcePage>
   )
 }

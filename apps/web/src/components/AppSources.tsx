@@ -1,9 +1,11 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
 import { useId, useState } from 'react'
+import { connectRevenueCatFn } from '../fns/settings'
 import {
   ATTENTION,
   KIND_LABEL,
-  ONE_SLOT_KINDS,
   PLATFORM_OF_KIND,
   SOURCE_OF_KIND,
   assetDetail,
@@ -41,7 +43,7 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
       )}
       <ul className="mt-4 max-w-3xl divide-y divide-line rounded-lg border border-line bg-surface text-sm">
         {!portfolio &&
-          ONE_SLOT_KINDS.map((kind) => (
+          STORE_KINDS.map((kind) => (
             <SlotRow
               key={kind}
               kind={kind}
@@ -52,6 +54,17 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
               actions={actions}
             />
           ))}
+        {!portfolio && (
+          <RevenueCatRow
+            app={app}
+            current={mine.find((asset) => asset.kind === 'revenuecat_project')}
+            others={assets.filter(
+              (asset) => asset.kind === 'revenuecat_project' && !asset.ignored && asset.appId !== app.id,
+            )}
+            appName={appName}
+            actions={actions}
+          />
+        )}
         <SocialRow
           appId={app.id}
           linked={mine.filter((asset) => asset.social)}
@@ -64,11 +77,13 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
   )
 }
 
-/** The page where the account behind each kind is set up. */
+/** Store apps come from an account connected once, on the Accounts page. */
+const STORE_KINDS = ['ios_app', 'android_app'] as const
+
+/** The page where the account behind each store kind is set up. */
 const SETUP_PAGE = {
   ios_app: '/accounts/app-store',
   android_app: '/accounts/google-play',
-  revenuecat_project: '/accounts/revenuecat',
 } as const
 
 /** Where an asset belongs now, said next to it in a list of choices. */
@@ -78,7 +93,7 @@ function whereNow(asset: Asset, appName: (appId: string) => string) {
 }
 
 function SlotRow(props: {
-  kind: (typeof ONE_SLOT_KINDS)[number]
+  kind: (typeof STORE_KINDS)[number]
   appId: string
   current: Asset | undefined
   candidates: Asset[]
@@ -227,5 +242,179 @@ function SocialRow(props: {
         )}
       </div>
     </li>
+  )
+}
+
+/**
+ * A RevenueCat key belongs to one project, so it is connected here, from the app it feeds,
+ * rather than on the Accounts page.
+ */
+function RevenueCatRow(props: {
+  app: AppSummary
+  current: Asset | undefined
+  others: Asset[]
+  appName: (appId: string) => string
+  actions: AssetActions
+}) {
+  const { app, current, others, appName, actions } = props
+  const [replacing, setReplacing] = useState(false)
+  const [choice, setChoice] = useState('')
+  // Said after a key connects, outside the form, which closes once the project shows here.
+  const [connected, setConnected] = useState<string | null>(null)
+  const selectId = useId()
+
+  return (
+    <li className="flex flex-wrap gap-x-6 gap-y-3 px-6 py-4">
+      <span className="w-full font-medium sm:w-40 sm:shrink-0">RevenueCat project</span>
+      <div className="w-full min-w-0 space-y-3 sm:w-auto sm:flex-1">
+        {current && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <span className="min-w-0 break-words">
+              {current.name}
+              <span className="block text-xs text-ink-soft">
+                {current.bundleId ?? current.externalId}
+                {ATTENTION[current.status] && (
+                  <span className="font-medium text-ink"> · The key {ATTENTION[current.status]}; replace it.</span>
+                )}
+              </span>
+            </span>
+            {!replacing && (
+              <span className="flex gap-2">
+                <Button className="px-3 py-1" onClick={() => setReplacing(true)}>
+                  Replace key
+                </Button>
+                <Button
+                  className="px-3 py-1"
+                  disabled={actions.pending}
+                  onClick={() => actions.assign(current.id, null)}
+                  aria-label={`Unlink ${current.name}`}
+                >
+                  Unlink
+                </Button>
+              </span>
+            )}
+          </div>
+        )}
+        {(!current || replacing) && (
+          <RevenueCatKeyForm
+            app={app}
+            replacing={current !== undefined}
+            onCancel={() => setReplacing(false)}
+            onConnected={(message) => {
+              setConnected(message)
+              setReplacing(false)
+            }}
+          />
+        )}
+        {connected && (
+          <p role="status" className="text-sm text-ink-soft">
+            {connected}
+          </p>
+        )}
+        {!current && others.length > 0 && (
+          <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+            <label htmlFor={selectId} className="w-full text-xs text-ink-soft">
+              Or use a project that is already connected
+            </label>
+            <select
+              id={selectId}
+              value={choice}
+              onChange={(event) => setChoice(event.target.value)}
+              className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+            >
+              <option value="" disabled>
+                Choose a project
+              </option>
+              {others.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.name}
+                  {whereNow(asset, appName)}
+                </option>
+              ))}
+            </select>
+            <Button disabled={!choice || actions.pending} onClick={() => actions.assign(choice, app.id)}>
+              Link
+            </Button>
+          </div>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function RevenueCatKeyForm(props: {
+  app: AppSummary
+  replacing: boolean
+  onCancel: () => void
+  onConnected: (message: string) => void
+}) {
+  const connect = useServerFn(connectRevenueCatFn)
+  const queryClient = useQueryClient()
+  const inputId = useId()
+  const [apiKey, setApiKey] = useState('')
+  const mutation = useMutation({
+    mutationFn: () => connect({ data: { apiKey, appId: props.app.id } }),
+    onSuccess: async (result) => {
+      if (!result.ok) return
+      setApiKey('')
+      const project = result.projects[0]
+      props.onConnected(
+        project
+          ? [
+              `Connected ${project.name}.`,
+              project.movedFrom ? `It fed ${project.movedFrom} until now.` : '',
+              project.replaced ? `${project.replaced} now waits on the Apps page.` : '',
+              'Its history is being fetched; the numbers appear within a minute.',
+            ]
+              .filter(Boolean)
+              .join(' ')
+          : 'Connected.',
+      )
+      await queryClient.invalidateQueries()
+    },
+  })
+  const result = mutation.data
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        mutation.mutate()
+      }}
+    >
+      <p className="text-xs text-ink-soft">
+        In RevenueCat, open the project for {props.app.name}, then Project settings, API keys.
+        Create a secret API key, version 2, with read access to Charts &amp; metrics and to Project
+        configuration, and paste it here. It is stored encrypted and never shown again.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <label htmlFor={inputId} className="sr-only">
+          RevenueCat secret key for {props.app.name}
+        </label>
+        <input
+          id={inputId}
+          type="password"
+          autoComplete="off"
+          required
+          minLength={8}
+          placeholder="sk_…"
+          value={apiKey}
+          onChange={(event) => setApiKey(event.target.value)}
+          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2"
+        />
+        <Button type="submit" variant="primary" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Connecting…' : props.replacing ? 'Replace key' : 'Connect'}
+        </Button>
+        {props.replacing && (
+          <Button disabled={mutation.isPending} onClick={props.onCancel}>
+            Cancel
+          </Button>
+        )}
+      </div>
+      <div role="status" className="mt-2 text-sm">
+        {mutation.isError && 'Could not reach the dashboard server. Try again.'}
+        {result && !result.ok && result.message}
+      </div>
+    </form>
   )
 }

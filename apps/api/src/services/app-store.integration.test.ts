@@ -214,7 +214,13 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     const [connected] = await connectRevenueCat({ db, secrets, fetch: revenueCat }, 'sk_live_key')
 
     const [one] = await ourApps()
-    expect(connected).toEqual({ name: 'A Different Name In RevenueCat', appId: one?.id, appName: one?.name })
+    expect(connected).toEqual({
+      name: 'A Different Name In RevenueCat',
+      appId: one?.id,
+      appName: one?.name,
+      movedFrom: null,
+      replaced: null,
+    })
     expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(one?.id)
     expect(await ourApps()).toHaveLength(2)
   })

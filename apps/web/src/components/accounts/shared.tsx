@@ -42,7 +42,7 @@ export const SOURCES: {
     family: 'revenuecat',
     title: 'RevenueCat',
     to: '/accounts/revenuecat',
-    brings: 'Revenue, MRR, trials and subscribers.',
+    brings: "Revenue, MRR, trials and subscribers. Each app connects its own project, in the app's Settings.",
     noun: ['project', 'projects'],
   },
   {
