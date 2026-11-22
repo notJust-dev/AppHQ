@@ -21,7 +21,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
         const attempt = await finishOAuth('tiktok', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
           await attempt.report(ok, message)
-          return redirectTo('/accounts?connected=tiktok')
+          return redirectTo('/accounts/tiktok?connected=tiktok')
         }
 
         const error = params.get('error')

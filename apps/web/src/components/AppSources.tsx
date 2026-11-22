@@ -64,6 +64,13 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
   )
 }
 
+/** The page where the account behind each kind is set up. */
+const SETUP_PAGE = {
+  ios_app: '/accounts/app-store',
+  android_app: '/accounts/google-play',
+  revenuecat_project: '/accounts/revenuecat',
+} as const
+
 /** Where an asset belongs now, said next to it in a list of choices. */
 function whereNow(asset: Asset, appName: (appId: string) => string) {
   if (asset.appId === null) return ''
@@ -71,7 +78,7 @@ function whereNow(asset: Asset, appName: (appId: string) => string) {
 }
 
 function SlotRow(props: {
-  kind: string
+  kind: (typeof ONE_SLOT_KINDS)[number]
   appId: string
   current: Asset | undefined
   candidates: Asset[]
@@ -90,7 +97,7 @@ function SlotRow(props: {
       {candidates.length === 0 ? (
         <span className="w-full min-w-0 text-ink-soft sm:w-auto sm:flex-1">
           None found.{' '}
-          <Link to="/accounts" className="font-medium text-ink underline underline-offset-4">
+          <Link to={SETUP_PAGE[kind]} className="font-medium text-ink underline underline-offset-4">
             Connect {SOURCE_OF_KIND[kind]}
           </Link>{' '}
           to find one.
@@ -126,8 +133,8 @@ function SlotRow(props: {
           {current && ATTENTION[current.status] && (
             <span className="mt-1 block text-xs font-medium">
               The account behind it {ATTENTION[current.status]}.{' '}
-              <Link to="/accounts" className="underline underline-offset-4">
-                Accounts
+              <Link to={SETUP_PAGE[kind]} className="underline underline-offset-4">
+                Connect it again
               </Link>
             </span>
           )}

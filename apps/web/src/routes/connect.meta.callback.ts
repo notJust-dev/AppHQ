@@ -19,7 +19,7 @@ export const Route = createFileRoute('/connect/meta/callback')({
         const attempt = await finishOAuth('meta', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
           await attempt.report(ok, message)
-          return redirectTo('/accounts?connected=meta')
+          return redirectTo('/accounts/meta?connected=meta')
         }
 
         const error = params.get('error')
@@ -42,8 +42,8 @@ export const Route = createFileRoute('/connect/meta/callback')({
               : ''
           return finish(
             true,
-            `Found ${found}. Choose the app each one promotes below; its history is fetched as ` +
-              `soon as it has one.${missing}`,
+            `Found ${found}. Link each one to the app it promotes on the Apps page; its ` +
+              `history is fetched as soon as it has one.${missing}`,
           )
         } catch (err) {
           return finish(false, callbackError(err))

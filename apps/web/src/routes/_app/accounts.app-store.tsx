@@ -1,0 +1,218 @@
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
+import { useState } from 'react'
+import { Button } from '../../components/Button'
+import { KeyFileField, checkP8, keyIdFromFileName } from '../../components/accounts/KeyFileField'
+import {
+  AccountList,
+  Found,
+  Section,
+  SourcePage,
+  Steps,
+  emptyFamily,
+  inputClass,
+  useWatch,
+} from '../../components/accounts/shared'
+import { connectAppStoreFn } from '../../fns/settings'
+import { accountsQuery } from '../../lib/queries'
+
+export const Route = createFileRoute('/_app/accounts/app-store')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
+  component: AppStorePage,
+})
+
+function AppStorePage() {
+  const watch = useWatch()
+  const { data: families } = useSuspenseQuery({ ...accountsQuery(), refetchInterval: watch.refetchInterval })
+  const family = families.find((entry) => entry.family === 'app_store') ?? emptyFamily('app_store')
+  const account = family.accounts[0]
+  const [replacing, setReplacing] = useState(false)
+  const [outcome, setOutcome] = useState<ConnectOutcome | null>(null)
+
+  return (
+    <SourcePage
+      title="App Store Connect"
+      intro="Daily downloads for every iOS app in your account, from Apple's daily sales report. A year of history is fetched when you connect."
+    >
+      <Section title="Account">
+        <AccountList accounts={family.accounts} />
+        <Found family={family} />
+        {outcome && (
+          <div role="status" className="mt-4 rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+            <Connected result={outcome} />
+          </div>
+        )}
+      </Section>
+
+      {account && !replacing ? (
+        <div className="mt-6">
+          <Button onClick={() => setReplacing(true)}>Use a different key</Button>
+        </div>
+      ) : (
+        <Section title={account ? 'Use a different key' : 'Connect'}>
+          <Steps>
+            <li>
+              In App Store Connect, open Users and Access, then Integrations, then App Store Connect
+              API, and the Team Keys tab.
+            </li>
+            <li>
+              Generate a key with the Sales and Reports role. With an Admin key the dashboard also
+              asks Apple to start analytics reports, which bring impressions and page views later.
+            </li>
+            <li>Download the key file. Apple offers the download only once, so keep it safe.</li>
+            <li>Copy the Issuer ID shown above the list of keys.</li>
+            <li>Your vendor number is in Payments and Financial Reports, next to your name.</li>
+          </Steps>
+          <ConnectForm
+            onConnected={(result) => {
+              setOutcome(result)
+              setReplacing(false)
+              watch.dataChanged()
+            }}
+          />
+          {account && (
+            <div className="mt-4">
+              <Button onClick={() => setReplacing(false)}>Keep the current key</Button>
+            </div>
+          )}
+        </Section>
+      )}
+    </SourcePage>
+  )
+}
+
+type ConnectOutcome = {
+  apps: number
+  created: number
+  analytics: { requested: number; existing: number; problem: string | null }
+}
+
+function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) => void }) {
+  const connect = useServerFn(connectAppStoreFn)
+  const empty = { issuerId: '', keyId: '', vendorNumber: '', privateKey: '' }
+  const [fields, setFields] = useState(empty)
+  const set = (name: keyof typeof empty) => (event: { target: { value: string } }) =>
+    setFields((current) => ({ ...current, [name]: event.target.value }))
+
+  const mutation = useMutation({
+    mutationFn: () => connect({ data: fields }),
+    onSuccess: (result) => {
+      if (!result.ok) return
+      setFields(empty)
+      onConnected(result)
+    },
+  })
+  const result = mutation.data
+  const keyReady = fields.privateKey !== '' && checkP8(fields.privateKey) === null
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (keyReady) mutation.mutate()
+      }}
+    >
+      <KeyFileField
+        label="Key file"
+        accept=".p8"
+        fileHint="AuthKey_….p8"
+        pastePlaceholder="Paste the contents of the .p8 file, including the BEGIN and END lines"
+        value={fields.privateKey}
+        check={checkP8}
+        onChange={(text, fileName) =>
+          setFields((current) => ({
+            ...current,
+            privateKey: text,
+            // Apple names the file after the key, so the Key ID comes with it.
+            keyId: keyIdFromFileName(fileName) ?? current.keyId,
+          }))
+        }
+      />
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div>
+          <label htmlFor="app-store-keyId" className="text-sm font-medium">
+            Key ID
+          </label>
+          <input
+            id="app-store-keyId"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            required
+            minLength={4}
+            value={fields.keyId}
+            onChange={set('keyId')}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="app-store-issuerId" className="text-sm font-medium">
+            Issuer ID
+          </label>
+          <input
+            id="app-store-issuerId"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            required
+            minLength={8}
+            value={fields.issuerId}
+            onChange={set('issuerId')}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="app-store-vendorNumber" className="text-sm font-medium">
+            Vendor number
+          </label>
+          <input
+            id="app-store-vendorNumber"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            required
+            pattern="[0-9]{4,15}"
+            title="Digits only. It is shown in Payments and Financial Reports."
+            value={fields.vendorNumber}
+            onChange={set('vendorNumber')}
+            className={inputClass}
+          />
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-ink-soft">
+        Stored encrypted on the API. The key is not shown again and never reaches the browser after
+        this.
+      </p>
+      <div className="mt-4">
+        <Button type="submit" variant="primary" disabled={mutation.isPending || !keyReady}>
+          {mutation.isPending ? 'Connecting…' : 'Connect App Store Connect'}
+        </Button>
+      </div>
+      <div role="status" className="mt-3 text-sm">
+        {mutation.isError && 'Could not reach the dashboard server. Try again.'}
+        {result && !result.ok && result.message}
+      </div>
+    </form>
+  )
+}
+
+function Connected(props: { result: ConnectOutcome }) {
+  const { apps, created, analytics } = props.result
+  return (
+    <>
+      <p>
+        Connected. {apps} {apps === 1 ? 'app' : 'apps'} found
+        {created > 0 && `, ${created} new to the dashboard`}. A year of downloads is being fetched;
+        the numbers appear within a few minutes.
+      </p>
+      <p className="mt-2">
+        {analytics.problem
+          ? `Analytics reports were not requested. ${analytics.problem} Downloads are not affected.`
+          : analytics.requested > 0
+            ? `Analytics reports were requested for ${analytics.requested} ${analytics.requested === 1 ? 'app' : 'apps'}. Apple starts delivering them in one to two days.`
+            : 'Analytics reports were already requested for every app.'}
+      </p>
+    </>
+  )
+}

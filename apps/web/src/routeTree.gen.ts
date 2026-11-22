@@ -15,6 +15,12 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts.index'
+import { Route as AppAccountsAppStoreRouteImport } from './routes/_app/accounts.app-store'
+import { Route as AppAccountsGooglePlayRouteImport } from './routes/_app/accounts.google-play'
+import { Route as AppAccountsMetaRouteImport } from './routes/_app/accounts.meta'
+import { Route as AppAccountsRevenuecatRouteImport } from './routes/_app/accounts.revenuecat'
+import { Route as AppAccountsTiktokRouteImport } from './routes/_app/accounts.tiktok'
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
 import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
 import { Route as ConnectMetaCallbackRouteImport } from './routes/connect.meta.callback'
@@ -49,6 +55,36 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
+const AppAccountsAppStoreRoute = AppAccountsAppStoreRouteImport.update({
+  id: '/app-store',
+  path: '/app-store',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
+const AppAccountsGooglePlayRoute = AppAccountsGooglePlayRouteImport.update({
+  id: '/google-play',
+  path: '/google-play',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
+const AppAccountsMetaRoute = AppAccountsMetaRouteImport.update({
+  id: '/meta',
+  path: '/meta',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
+const AppAccountsRevenuecatRoute = AppAccountsRevenuecatRouteImport.update({
+  id: '/revenuecat',
+  path: '/revenuecat',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
+const AppAccountsTiktokRoute = AppAccountsTiktokRouteImport.update({
+  id: '/tiktok',
+  path: '/tiktok',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
 const AppAppsIndexRoute = AppAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
@@ -74,22 +110,33 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
-  '/accounts': typeof AppAccountsRoute
+  '/accounts': typeof AppAccountsRouteWithChildren
   '/settings': typeof AppSettingsRoute
+  '/accounts/app-store': typeof AppAccountsAppStoreRoute
+  '/accounts/google-play': typeof AppAccountsGooglePlayRoute
+  '/accounts/meta': typeof AppAccountsMetaRoute
+  '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
+  '/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/apps/$appId': typeof AppAppsAppIdRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
+  '/accounts/': typeof AppAccountsIndexRoute
   '/apps/': typeof AppAppsIndexRoute
 }
 export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
-  '/accounts': typeof AppAccountsRoute
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
+  '/accounts/app-store': typeof AppAccountsAppStoreRoute
+  '/accounts/google-play': typeof AppAccountsGooglePlayRoute
+  '/accounts/meta': typeof AppAccountsMetaRoute
+  '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
+  '/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/apps/$appId': typeof AppAppsAppIdRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
+  '/accounts': typeof AppAccountsIndexRoute
   '/apps': typeof AppAppsIndexRoute
 }
 export interface FileRoutesById {
@@ -97,12 +144,18 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
-  '/_app/accounts': typeof AppAccountsRoute
+  '/_app/accounts': typeof AppAccountsRouteWithChildren
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/accounts/app-store': typeof AppAccountsAppStoreRoute
+  '/_app/accounts/google-play': typeof AppAccountsGooglePlayRoute
+  '/_app/accounts/meta': typeof AppAccountsMetaRoute
+  '/_app/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
+  '/_app/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/_app/apps/$appId': typeof AppAppsAppIdRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
+  '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/apps/': typeof AppAppsIndexRoute
 }
 export interface FileRouteTypes {
@@ -113,20 +166,31 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/settings'
+    | '/accounts/app-store'
+    | '/accounts/google-play'
+    | '/accounts/meta'
+    | '/accounts/revenuecat'
+    | '/accounts/tiktok'
     | '/apps/$appId'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
+    | '/accounts/'
     | '/apps/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/health'
     | '/login'
-    | '/accounts'
     | '/settings'
     | '/'
+    | '/accounts/app-store'
+    | '/accounts/google-play'
+    | '/accounts/meta'
+    | '/accounts/revenuecat'
+    | '/accounts/tiktok'
     | '/apps/$appId'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
+    | '/accounts'
     | '/apps'
   id:
     | '__root__'
@@ -136,9 +200,15 @@ export interface FileRouteTypes {
     | '/_app/accounts'
     | '/_app/settings'
     | '/_app/'
+    | '/_app/accounts/app-store'
+    | '/_app/accounts/google-play'
+    | '/_app/accounts/meta'
+    | '/_app/accounts/revenuecat'
+    | '/_app/accounts/tiktok'
     | '/_app/apps/$appId'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
+    | '/_app/accounts/'
     | '/_app/apps/'
   fileRoutesById: FileRoutesById
 }
@@ -194,6 +264,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/accounts/': {
+      id: '/_app/accounts/'
+      path: '/'
+      fullPath: '/accounts/'
+      preLoaderRoute: typeof AppAccountsIndexRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
+    '/_app/accounts/app-store': {
+      id: '/_app/accounts/app-store'
+      path: '/app-store'
+      fullPath: '/accounts/app-store'
+      preLoaderRoute: typeof AppAccountsAppStoreRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
+    '/_app/accounts/google-play': {
+      id: '/_app/accounts/google-play'
+      path: '/google-play'
+      fullPath: '/accounts/google-play'
+      preLoaderRoute: typeof AppAccountsGooglePlayRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
+    '/_app/accounts/meta': {
+      id: '/_app/accounts/meta'
+      path: '/meta'
+      fullPath: '/accounts/meta'
+      preLoaderRoute: typeof AppAccountsMetaRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
+    '/_app/accounts/revenuecat': {
+      id: '/_app/accounts/revenuecat'
+      path: '/revenuecat'
+      fullPath: '/accounts/revenuecat'
+      preLoaderRoute: typeof AppAccountsRevenuecatRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
+    '/_app/accounts/tiktok': {
+      id: '/_app/accounts/tiktok'
+      path: '/tiktok'
+      fullPath: '/accounts/tiktok'
+      preLoaderRoute: typeof AppAccountsTiktokRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
     '/_app/apps/': {
       id: '/_app/apps/'
       path: '/apps'
@@ -225,8 +337,30 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppAccountsRouteChildren {
+  AppAccountsAppStoreRoute: typeof AppAccountsAppStoreRoute
+  AppAccountsGooglePlayRoute: typeof AppAccountsGooglePlayRoute
+  AppAccountsMetaRoute: typeof AppAccountsMetaRoute
+  AppAccountsRevenuecatRoute: typeof AppAccountsRevenuecatRoute
+  AppAccountsTiktokRoute: typeof AppAccountsTiktokRoute
+  AppAccountsIndexRoute: typeof AppAccountsIndexRoute
+}
+
+const AppAccountsRouteChildren: AppAccountsRouteChildren = {
+  AppAccountsAppStoreRoute: AppAccountsAppStoreRoute,
+  AppAccountsGooglePlayRoute: AppAccountsGooglePlayRoute,
+  AppAccountsMetaRoute: AppAccountsMetaRoute,
+  AppAccountsRevenuecatRoute: AppAccountsRevenuecatRoute,
+  AppAccountsTiktokRoute: AppAccountsTiktokRoute,
+  AppAccountsIndexRoute: AppAccountsIndexRoute,
+}
+
+const AppAccountsRouteWithChildren = AppAccountsRoute._addFileChildren(
+  AppAccountsRouteChildren,
+)
+
 interface AppRouteChildren {
-  AppAccountsRoute: typeof AppAccountsRoute
+  AppAccountsRoute: typeof AppAccountsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAppsAppIdRoute: typeof AppAppsAppIdRoute
@@ -234,7 +368,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppAccountsRoute: AppAccountsRoute,
+  AppAccountsRoute: AppAccountsRouteWithChildren,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
   AppAppsAppIdRoute: AppAppsAppIdRoute,

@@ -530,7 +530,14 @@ Status on 2026-11-22 (merged to `main` and deployed):
   the "Needs a decision" list (link, new app, Shared accounts, ignore) and the ignored assets.
   Each app's page has a Sources panel to change any of them. `/settings` redirects to
   `/accounts`. Migrations 0004 to 0006 move the existing links into `assets` (checked on a copy
-  shaped like production), drop the old link columns and add `decided`.
+  shaped like production), drop the old link columns and add `decided`. Deployed 2026-11-22: the
+  first API build failed on a file the deploy kept after the repository deleted it, so the API
+  now compiles from its entry points; every production link was checked against a snapshot.
+- Accounts split into pages (2026-11-22): `/accounts` lists each source with its state, what it
+  found and what needs attention; Connect or Configure opens `/accounts/app-store`,
+  `/google-play`, `/revenuecat`, `/meta` or `/tiktok`, each with numbered steps and its form.
+  The `.p8` and the Google service account JSON can be dropped or chosen as files (read in the
+  browser; the `.p8` name fills in the Key ID). Sign-ins come back to their source's page.
 
 ### Phase 3 — Reviews inbox
 
