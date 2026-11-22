@@ -132,6 +132,8 @@ Still to verify:
 Env variables set: `INTERNAL_API_TOKEN` on both apps, `ENCRYPTION_KEY` on `api`, and
 `SESSION_SECRET` and `DASHBOARD_PASSWORD` on `web`, as private random values; `API_URL` on `web`. The dashboard
 password is also recorded locally in the git-ignored `apps/web/.env.velocity`.
+`TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` (the sandbox's pair) are private variables on
+`api` since 2026-11-22, copied from the git-ignored `apps/api/.env.velocity`.
 
 Both apps answer `GET /health`. The dashboard's reports `configured` (all its variables are
 valid) and `api` (it can reach the API), so a deployment can be checked without signing in.
@@ -400,7 +402,7 @@ Status on 2026-11-20 (merged to `main` and deployed):
 Done when: you open an app, see a views spike next to the downloads line, click it, and get the
 post and its download lift.
 
-Status on 2026-11-22 (branch `phase-2-tiktok`, not merged):
+Status on 2026-11-22 (merged to `main` and deployed):
 
 - Steps 1 and 2 for TikTok: "Connect TikTok" in Settings (pick the app, sign in on TikTok, come
   back), encrypted rotating tokens, `needs_reauth` when TikTok rejects the refresh token, and a
@@ -410,8 +412,9 @@ Status on 2026-11-22 (branch `phase-2-tiktok`, not merged):
   missing permission, connect, revoked account, reconnect. Not yet run against TikTok itself.
 - Snapshots happen on every sync, so the 6-hour sync cron covers step 4; no separate
   `snapshot` command is needed.
-- Before the first real connection: the sandbox's client key and secret on the `api` app, and
-  the redirect URI registered in the sandbox.
+- The sandbox's client key and secret are on the `api` app. Still to do before the first real
+  connection: register the redirect URI that Settings shows, and add the four scopes and the
+  target users in the sandbox.
 
 ### Phase 3 — Reviews inbox
 
