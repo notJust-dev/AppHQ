@@ -1,4 +1,11 @@
-@import 'tailwindcss';
+/*
+ * Class names are read from src/ only. Left to itself, Tailwind scans the whole app folder and
+ * skips build output by its .gitignore, which only counts inside a git checkout. Velocity builds
+ * without one, so the server build also read the client build's fresh .output, made a larger
+ * stylesheet under another name, and linked a file that does not exist: every page drew
+ * unstyled until the scripts loaded, and privacy mode's blur with it.
+ */
+@import 'tailwindcss' source('.');
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/ibm-plex-sans';
