@@ -6,6 +6,8 @@
     "outDir": "dist",
     "sourceMap": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  // Compile what the entry points import, not every file under src: Velocity's deploy keeps
+  // files that were deleted from the repository, and a stale one must not fail the build.
+  "files": ["src/server.ts", "src/cli.ts"],
+  "include": []
 }
