@@ -573,6 +573,14 @@ Status on 2026-11-22 (merged to `main` and deployed):
   themes follow the system unless picked in the sidebar; the funnel colours have dark variants
   checked for colour-vision deficiency against the dark panels. One family, IBM Plex Sans, with
   Plex Mono for identifiers; colour stays reserved for the funnel stages and for problems.
+- TanStack Charts trial (2026-11-22): `@tanstack/charts` 1.5.0, pinned, draws a "Downloads by
+  store" stacked bar on each app's Overview from the timeline data already loaded (no API change).
+  It server-renders its SVG, takes its colours and tooltip from `--ts-chart-*` variables mapped to
+  the tokens (so it follows both themes without rebuilding), groups the tooltip by day, and is
+  keyboard-navigable. The two store greens are checked against each other in each theme. It
+  adds about 42 kB gzipped to the app Overview's chunk only. The hand-built Timeline stays: its
+  shared cursor across rows, post markers and completeness cut-off are specific to this product.
+  New charts start with the library.
 
 ### Phase 3 — Reviews inbox
 

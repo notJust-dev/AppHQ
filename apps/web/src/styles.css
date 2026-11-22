@@ -30,6 +30,10 @@
   --color-downloads: #1baf7a;
   --color-revenue: #eb6834;
 
+  /* Downloads split by store: two greens of the downloads stage, checked against each other. */
+  --color-store-ios: #1baf7a;
+  --color-store-android: #0d7a54;
+
   --color-warn: #8a5300;
   --color-warn-soft: #fdf3e1;
   --color-danger: #b42318;
@@ -50,6 +54,8 @@
     --color-views: #3d8ef0;
     --color-downloads: #1a9f72;
     --color-revenue: #e06a37;
+    --color-store-ios: #20ad7c;
+    --color-store-android: #0c7a55;
     --color-warn: #f0b453;
     --color-warn-soft: #2e2413;
     --color-danger: #f28b82;
@@ -71,6 +77,8 @@
     --color-views: #3d8ef0;
     --color-downloads: #1a9f72;
     --color-revenue: #e06a37;
+    --color-store-ios: #20ad7c;
+    --color-store-android: #0c7a55;
     --color-warn: #f0b453;
     --color-warn-soft: #2e2413;
     --color-danger: #f28b82;
@@ -147,4 +155,30 @@
   &:disabled {
     opacity: 0.6;
   }
+}
+
+/*
+ * TanStack Charts inherit the page: text and grid lines follow currentColor, the palette and the
+ * tooltip follow --ts-chart-* variables. Mapping them to the tokens makes every chart follow the
+ * themes without rebuilding it.
+ */
+.ts-chart-host {
+  color: var(--color-ink-soft);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  --ts-chart-1: var(--color-views);
+  --ts-chart-2: var(--color-downloads);
+  --ts-chart-3: var(--color-revenue);
+  --ts-chart-tooltip-background: var(--color-surface);
+  --ts-chart-tooltip-color: var(--color-ink);
+  --ts-chart-tooltip-border: 1px solid var(--color-line-strong);
+  --ts-chart-tooltip-border-radius: 0.5rem;
+  --ts-chart-tooltip-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  --ts-chart-tooltip-font: 12px/1.45 var(--font-sans);
+}
+
+/* Downloads by store: the two store greens, in stack order. */
+.store-chart {
+  --ts-chart-1: var(--color-store-ios);
+  --ts-chart-2: var(--color-store-android);
 }

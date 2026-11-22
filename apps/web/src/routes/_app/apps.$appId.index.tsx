@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, notFound } from '@tanstack/react-router'
+import { DownloadsByStore } from '../../components/DownloadsByStore'
 import { PostsTable } from '../../components/PostsTable'
 import { RangeSwitch } from '../../components/RangeSwitch'
 import { Timeline } from '../../components/Timeline'
@@ -48,6 +49,7 @@ function AppOverview() {
         <RangeSwitch current={range} />
       </div>
       <Timeline days={data.days} series={data.series} posts={posts} connected={connected} />
+      <DownloadsByStore timeline={data} />
       <Panel
         title="Posts"
         description="Published in this range, newest first. Totals are lifetime numbers from the last sync. Download lift compares downloads on the post's day and the two after with the week before's pace; posts close together share those days."
