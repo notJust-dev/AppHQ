@@ -1,5 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
-import { getAppTimelineFn, getOverviewFn, listPostsFn } from '@/fns/portfolio'
+import { getAppFlowFn, getAppTimelineFn, getOverviewFn, listPostsFn } from '@/fns/portfolio'
 import { getSyncStatusFn, listAccountsFn, listAppsFn } from '@/fns/settings'
 import { listAssetsFn } from '@/fns/assets'
 import { metaSetupFn } from '@/fns/meta'
@@ -19,6 +19,12 @@ export const timelineQuery = (appId: string, dates: { from: string; to: string }
   queryOptions({
     queryKey: ['timeline', appId, dates.from, dates.to],
     queryFn: () => getAppTimelineFn({ data: { appId, ...dates } }),
+  })
+
+export const flowQuery = (appId: string, dates: { from: string; to: string }) =>
+  queryOptions({
+    queryKey: ['flow', appId, dates.from, dates.to],
+    queryFn: () => getAppFlowFn({ data: { appId, ...dates } }),
   })
 
 export const postsQuery = (appId: string, dates: { from: string; to: string }) =>
@@ -131,6 +137,7 @@ export type Overview = Awaited<ReturnType<typeof getOverviewFn>>
 export const reportingOf = (value: Overview['reporting'] | undefined): Overview['reporting'] =>
   value ?? { downloads: true, revenue: true, socialViews: true }
 export type Timeline = NonNullable<Awaited<ReturnType<typeof getAppTimelineFn>>>
+export type AppFlow = NonNullable<Awaited<ReturnType<typeof getAppFlowFn>>>
 export type AppSummary = Awaited<ReturnType<typeof listAppsFn>>[number]
 export type SyncRun = Awaited<ReturnType<typeof getSyncStatusFn>>[number]
 export type AccountFamily = Awaited<ReturnType<typeof listAccountsFn>>[number]

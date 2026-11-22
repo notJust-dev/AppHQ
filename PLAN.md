@@ -233,8 +233,11 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   `measure` indexes `measures`. A chart can carry several measures (revenue has Revenue and
   Transactions), so the connector picks one by name and falls back to the first.
 - Charts stored: `revenue` → `revenue`, `mrr` → `mrr`, `actives` → `active_subs`, `trials` →
-  `active_trials`, `trials_new` → `trials`, `customers_new` → `new_customers`. Six requests per
-  app per sync.
+  `active_trials`, `trials_new` → `trials`, `customers_new` → `new_customers`,
+  `trial_conversion_rate` → `trial_conversions`, `trial_expirations`, `trials_pending` (by the
+  day each trial started; read back 45 days each sync), and `actives_new` → `direct_subs`
+  (Direct Subscriptions). Eight requests per app per sync. The measure names were confirmed
+  with a real key on 2026-11-22; the two newer charts store a measure only on an exact name.
 - Auth: a v2 secret key per project, pasted in the app's Settings (the key belongs to one
   project, so it is connected from the app it feeds) and stored encrypted in `connections`.
   It needs `charts_metrics:charts:read`, plus `project_configuration:projects:read` and

@@ -229,7 +229,18 @@ export function generateDemoData(options: DemoOptions): {
       push('search_console', 'search_clicks', Math.round(searchImpressions * (0.025 + searchRand() * 0.02)))
       push('search_console', 'search_position_sum', Math.round(searchPosition * searchImpressions))
 
-      push('revenuecat', 'trials', Math.round(downloads * 0.11 * noise(0.15)))
+      const trials = Math.round(downloads * 0.11 * noise(0.15))
+      push('revenuecat', 'trials', trials)
+      // What became of each day's trials, counted on the day they started: a week-long trial
+      // is still running for the last week's starts. Worked out without the random sequence, so
+      // every number above stays as it was.
+      const running = Math.min(1, Math.max(0, (i - (options.days - 8)) / 7))
+      const pending = Math.round(trials * running)
+      const converted = Math.round((trials - pending) * (0.32 + ((i * 7919) % 13) / 100))
+      push('revenuecat', 'trial_conversions', converted)
+      push('revenuecat', 'trials_pending', pending)
+      push('revenuecat', 'trial_expirations', trials - pending - converted)
+      push('revenuecat', 'direct_subs', Math.round(downloads * (0.004 + ((i * 104729) % 7) / 1000)))
       push('revenuecat', 'revenue', Math.round(revenue * 100) / 100)
       push('revenuecat', 'mrr', Math.round(mrr * 100) / 100)
       push('revenuecat', 'active_subs', Math.round(mrr / monthlyPrice))

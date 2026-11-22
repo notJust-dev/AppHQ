@@ -15,6 +15,19 @@ export const listPostsFn = createServerFn({ method: 'GET' })
   .validator(z.object({ appId: z.string().min(1).max(64), from: z.iso.date(), to: z.iso.date() }))
   .handler(({ data }) => api().apps.posts.query({ ...data, limit: 100 }))
 
+/** One app's totals for the funnel and flow charts, or null when there is no such app. */
+export const getAppFlowFn = createServerFn({ method: 'GET' })
+  .middleware([requireSession])
+  .validator(z.object({ appId: z.string().min(1).max(64), from: z.iso.date(), to: z.iso.date() }))
+  .handler(async ({ data }) => {
+    try {
+      return await api().apps.flow.query(data)
+    } catch (err) {
+      if (err instanceof TRPCClientError && err.data?.code === 'NOT_FOUND') return null
+      throw err
+    }
+  })
+
 /** One app's daily funnel, or null when there is no such app. */
 export const getAppTimelineFn = createServerFn({ method: 'GET' })
   .middleware([requireSession])

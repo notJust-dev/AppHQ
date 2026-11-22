@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createRevenueCatConnector } from '../connectors/revenuecat/connector.js'
 import { createDb } from '../db/client.js'
@@ -21,6 +21,8 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
   const projectId = `proj_${randomUUID().slice(0, 8)}`
   const log = { info() {}, warn() {}, error() {} }
   const day = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 1000
+  /** The first day each chart was asked for, by chart name. */
+  const startDates: Record<string, string> = {}
 
   /** Stands in for RevenueCat. `reject` makes every chart request fail like a revoked key. */
   const revenueCat = (options: { reject?: boolean } = {}) =>
@@ -41,6 +43,23 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
       }
       if (pathname.includes('/charts/')) {
         if (options.reject) return json({ type: 'authentication_error', message: 'revoked' }, 401)
+        const chart = pathname.split('/').at(-1) ?? ''
+        startDates[chart] = new URL(String(input)).searchParams.get('start_date') ?? ''
+        if (chart === 'trial_conversion_rate') {
+          // Counted by the day the trials started: 10 started, of which 4 converted so far.
+          const measures = ['Trial Starts', 'Conversions', 'Expirations', 'Pending', 'Completed Trials', 'Conversion Rate']
+          return json({
+            measures: measures.map((display_name) => ({ display_name })),
+            values: [10, 4, 5, 1, 9, 44.4].map((value, measure) => ({ cohort: day('2026-11-12'), measure, value })),
+          })
+        }
+        if (chart === 'actives_new') {
+          const measures = ['Trial Conversions', 'Intro Offers', 'Direct Subscriptions', 'Total Paid Subscriptions']
+          return json({
+            measures: measures.map((display_name) => ({ display_name })),
+            values: [3, 0, 2, 5].map((value, measure) => ({ cohort: day('2026-11-19'), measure, value })),
+          })
+        }
         const isRevenue = pathname.endsWith('/charts/revenue')
         return json({
           measures: isRevenue
@@ -156,8 +175,30 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
       { date: '2026-11-18', value: 20.5 },
       { date: '2026-11-19', value: 30 },
     ])
-    // Two revenue days, plus one point for each of the other five charts.
-    expect(first.rowsWritten).toBe(7)
+    // Two revenue days, one point for each of the other five one-measure charts, three trial
+    // outcomes, and the subscriptions bought without a trial.
+    expect(first.rowsWritten).toBe(11)
+
+    const stored = await db
+      .select({ metric: metricDaily.metric, date: metricDaily.date, value: metricDaily.value })
+      .from(metricDaily)
+      .where(
+        and(
+          eq(metricDaily.appId, appId),
+          inArray(metricDaily.metric, ['trial_conversions', 'trial_expirations', 'trials_pending', 'direct_subs']),
+        ),
+      )
+      .orderBy(metricDaily.metric)
+    // Picked by name, never the chart's first measure (trial starts).
+    expect(stored).toEqual([
+      { metric: 'direct_subs', date: '2026-11-19', value: 2 },
+      { metric: 'trial_conversions', date: '2026-11-12', value: 4 },
+      { metric: 'trial_expirations', date: '2026-11-12', value: 5 },
+      { metric: 'trials_pending', date: '2026-11-12', value: 1 },
+    ])
+    // Trials keep converting after they start, so their weeks are read again.
+    expect(startDates.trial_conversion_rate).toBe('2026-10-05')
+    expect(startDates.revenue).toBe('2026-11-01')
 
     const connection = await connectionOf(db, 'revenuecat_project', projectId)
     expect(connection?.status).toBe('ok')
@@ -171,7 +212,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
 
     await expect(
       connector.sync({ db, app, range: { from: '2026-11-01', to: '2026-11-19' }, log, secrets }),
-    ).rejects.toThrow(/6 of 6 charts failed/)
+    ).rejects.toThrow(/8 of 8 charts failed/)
 
     const connection = await connectionOf(db, 'revenuecat_project', projectId)
     expect(connection?.status).toBe('needs_reauth')

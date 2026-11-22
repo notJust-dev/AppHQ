@@ -65,6 +65,14 @@ numbers and posts, and Settings, with its name, what feeds it, and a button to s
 To add an app by name (one only on Android, say), use Add app on the Apps page. Linking
 something fetches its history.
 
+An app's Overview also has a funnel (social views, downloads, trials started, trials converted,
+with the rate between each step; widths on a log scale, since the stages span orders of
+magnitude) and, as an experiment, a Sankey of where its downloads went: by store, into a trial,
+straight to a paid subscription, or neither, and what became of the trials. The trial outcomes
+come from RevenueCat's trial conversion chart, counted by the day each trial started, and are
+read back 45 days on every sync, since a trial can still convert after it starts. Social views
+stay out of the Sankey: nothing ties a view to a download, and a flow would pretend it does.
+
 The Performance pages look at one part of the funnel across all apps, or one app picked at the
 top: Social (posts, views by platform, followers, top posts with the download lift after each,
 and posts, views and downloads on one day axis), Store (impressions, page views and downloads

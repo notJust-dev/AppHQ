@@ -14,6 +14,7 @@ import { MissingEncryptionKeyError, type Secrets } from '../lib/crypto.js'
 import { trailingRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
 import type { QueryContext } from '../queries/define.js'
+import { getAppFlow } from '../queries/get-app-flow.js'
 import { getAppTimeline } from '../queries/get-app-timeline.js'
 import { getOverview } from '../queries/get-overview.js'
 import { getSyncStatus } from '../queries/get-sync-status.js'
@@ -191,6 +192,13 @@ export const appRouter = t.router({
       const timeline = await getAppTimeline.handler(ctx, input)
       if (!timeline) throw new TRPCError({ code: 'NOT_FOUND', message: 'There is no such app.' })
       return timeline
+    }),
+
+    /** Totals for the funnel and flow charts: views, downloads, trials and what became of them. */
+    flow: t.procedure.input(getAppFlow.input).query(async ({ ctx, input }) => {
+      const flow = await getAppFlow.handler(ctx, input)
+      if (!flow) throw new TRPCError({ code: 'NOT_FOUND', message: 'There is no such app.' })
+      return flow
     }),
 
     posts: t.procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
