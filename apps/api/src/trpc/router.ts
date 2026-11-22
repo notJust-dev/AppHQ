@@ -31,7 +31,7 @@ import {
 import { connectGooglePlay } from '../services/connect-google-play.js'
 import { connectMeta } from '../services/connect-meta.js'
 import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
-import { assignAsset, createApp, setIgnored } from '../assets/store.js'
+import { assignAsset, createApp, removeApp, setIgnored } from '../assets/store.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 
@@ -161,6 +161,16 @@ export const appRouter = t.router({
 
     posts: t.procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
 
+    /**
+     * Stops tracking an app: deletes it with its numbers and posts. What fed it stays, without an
+     * app, on the Apps page.
+     */
+    remove: t.procedure.input(z.object({ appId: z.string().min(1).max(64) })).mutation(async ({ ctx, input }) => ({
+      name: await removeApp(ctx.db, input.appId).catch((err: unknown) => {
+        throw connectError(err)
+      }),
+    })),
+
     /** Makes an app by name, to link assets to; returns its id. */
     create: t.procedure
       .input(z.object({ name: z.string().trim().min(1).max(80) }))
@@ -184,13 +194,12 @@ export const appRouter = t.router({
             message: 'This key cannot see any RevenueCat project.',
           })
         }
-        startSync(ctx, {
-          connectors,
-          sources: [REVENUECAT],
-          appIds: connected.map((app) => app.appId),
-          range: trailingRange(BACKFILL_DAYS),
-        })
-        return { apps: connected }
+        // A project waiting for an app is fetched once it is linked.
+        const appIds = connected.flatMap((project) => (project.appId ? [project.appId] : []))
+        if (appIds.length > 0) {
+          startSync(ctx, { connectors, sources: [REVENUECAT], appIds, range: trailingRange(BACKFILL_DAYS) })
+        }
+        return { projects: connected }
       }),
   }),
   accounts: t.router({
@@ -333,14 +342,14 @@ export const appRouter = t.router({
         return { appId }
       }),
 
-    /** Stops an asset asking for a decision (and unlinks it), or brings it back. */
+    /** Stops assets asking for a decision (and unlinks them), or brings them back. */
     ignore: t.procedure
-      .input(z.object({ assetId: z.uuid(), ignored: z.boolean() }))
+      .input(z.object({ assetIds: z.array(z.uuid()).min(1).max(500), ignored: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        await setIgnored(ctx.db, input.assetId, input.ignored).catch((err: unknown) => {
+        const count = await setIgnored(ctx.db, input.assetIds, input.ignored).catch((err: unknown) => {
           throw connectError(err)
         })
-        return { ok: true }
+        return { count }
       }),
   }),
   overview: t.router({

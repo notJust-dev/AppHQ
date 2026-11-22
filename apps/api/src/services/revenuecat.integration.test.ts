@@ -9,6 +9,7 @@ import { assetOf, connectionOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { connectRevenueCat } from './connect-revenuecat.js'
+import { assignAsset } from '../assets/store.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
 const url = testDatabaseUrl()
@@ -69,14 +70,14 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     await sql.end({ timeout: 5 })
   })
 
-  it('creates the app and stores the key encrypted', async () => {
+  it('finds the project without adding an app, and stores the key encrypted', async () => {
     const [connected] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_live_key')
-    appId = connected?.appId ?? ''
 
-    expect(connected).toMatchObject({ name: 'Integration Test App', created: true })
+    // Nothing in the dashboard names this bundle id, so the project waits on the Apps page.
+    expect(connected).toEqual({ name: 'Integration Test App', appId: null, appName: null })
     const project = await assetOf(db, 'revenuecat_project', projectId)
     expect(project).toMatchObject({
-      appId,
+      appId: null,
       details: { bundleId: 'dev.example.app', androidPackage: 'dev.example.app' },
     })
 
@@ -85,10 +86,14 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     expect(secrets.decrypt(connection?.accessTokenEnc ?? '')).toBe('sk_live_key')
   })
 
-  it('replaces the key when the same project is connected again', async () => {
+  it('adds the app when the person picks it, and keeps it when the key is replaced', async () => {
+    const project = await assetOf(db, 'revenuecat_project', projectId)
+    appId = (await assignAsset(db, { assetId: project.id, appId: 'new' })).appId ?? ''
+    expect(appId).not.toBe('')
+
     const [again] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key')
 
-    expect(again).toMatchObject({ appId, created: false })
+    expect(again).toEqual({ name: 'Integration Test App', appId, appName: 'Integration Test App' })
     const rows = await db.select().from(connections).where(eq(connections.externalAccountId, projectId))
     expect(rows).toHaveLength(1)
     expect(secrets.decrypt(rows[0]?.accessTokenEnc ?? '')).toBe('sk_new_key')

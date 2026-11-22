@@ -11,6 +11,7 @@ import { salesReport } from '../connectors/app-store/fixtures.js'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
 import { apps, assets, connections, metricDaily } from '../db/schema.js'
+import { assignAsset } from '../assets/store.js'
 import { assetOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
@@ -109,15 +110,17 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     ).rejects.toBeInstanceOf(ConnectInputError)
   })
 
-  it("adds the account's apps and stores the key encrypted", async () => {
+  it("finds the account's apps without adding any, and stores the key encrypted", async () => {
     const result = await connectAppStore({ db, secrets, fetch: appStore() }, input)
 
     expect(result).toEqual({
       apps: 2,
-      created: 2,
+      linked: 0,
       analytics: { requested: 2, existing: 0, problem: null },
     })
-    expect((await ourApps()).map((app) => app.bundleId)).toEqual([first.bundleId, second.bundleId])
+    // They wait on the Apps page until the person adds the ones to track.
+    expect(await ourApps()).toEqual([])
+    expect(await assetOf(db, 'ios_app', first.id)).toMatchObject({ appId: null, details: { bundleId: first.bundleId } })
 
     const connection = await findAppStoreConnection(db)
     expect(connection?.displayName).toBe('Vendor 85999001')
@@ -128,10 +131,17 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     })
   })
 
+  it('adds the apps the person picks', async () => {
+    for (const app of [first, second]) {
+      await assignAsset(db, { assetId: (await assetOf(db, 'ios_app', app.id)).id, appId: 'new' })
+    }
+    expect((await ourApps()).map((app) => app.bundleId)).toEqual([first.bundleId, second.bundleId])
+  })
+
   it('still connects with a key that may not request analytics reports', async () => {
     const result = await connectAppStore({ db, secrets, fetch: appStore({ admin: false }) }, input)
 
-    expect(result.created).toBe(0)
+    expect(result.linked).toBe(2)
     expect(result.analytics.requested).toBe(0)
     expect(result.analytics.problem).toMatch(/Admin key/)
   })
@@ -204,7 +214,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     const [connected] = await connectRevenueCat({ db, secrets, fetch: revenueCat }, 'sk_live_key')
 
     const [one] = await ourApps()
-    expect(connected).toMatchObject({ appId: one?.id, created: false })
+    expect(connected).toEqual({ name: 'A Different Name In RevenueCat', appId: one?.id, appName: one?.name })
     expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(one?.id)
     expect(await ourApps()).toHaveLength(2)
   })

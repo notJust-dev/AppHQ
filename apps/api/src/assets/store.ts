@@ -114,14 +114,26 @@ export async function assignAsset(
   return { asset, appId }
 }
 
-/** Marks an asset as not needing a decision, or brings it back. Ignoring also unlinks it. */
-export async function setIgnored(db: Db, assetId: string, ignored: boolean) {
+/** Marks assets as not needing a decision, or brings them back. Ignoring also unlinks them. */
+export async function setIgnored(db: Db, assetIds: string[], ignored: boolean) {
   const updated = await db
     .update(assets)
     .set({ ignored, decided: true, ...(ignored ? { appId: null } : {}), updatedAt: new Date() })
-    .where(eq(assets.id, assetId))
+    .where(inArray(assets.id, assetIds))
     .returning({ id: assets.id })
   if (updated.length === 0) throw new ConnectInputError('That asset is no longer there. Reload the page.')
+  return updated.length
+}
+
+/**
+ * Removes an app the person no longer wants to track. Its numbers and posts go with it; what fed
+ * it (store apps, projects, social accounts) stays, without an app, on the Apps page.
+ */
+export async function removeApp(db: Db, appId: string) {
+  if (appId === PORTFOLIO_APP_ID) throw new ConnectInputError('Shared accounts cannot be removed.')
+  const removed = await db.delete(apps).where(eq(apps.id, appId)).returning({ name: apps.name })
+  if (removed.length === 0) throw new ConnectInputError('That app no longer exists. Reload the page.')
+  return removed[0]!.name
 }
 
 /**

@@ -26,15 +26,27 @@ export const assignAssetFn = createServerFn({ method: 'POST' })
     }
   })
 
-export const ignoreAssetFn = createServerFn({ method: 'POST' })
+/** Stops assets asking for a decision, or brings them back. */
+export const ignoreAssetsFn = createServerFn({ method: 'POST' })
   .middleware([requireSession])
-  .validator(z.object({ assetId: z.uuid(), ignored: z.boolean() }))
+  .validator(z.object({ assetIds: z.array(z.uuid()).min(1).max(500), ignored: z.boolean() }))
   .handler(async ({ data }) => {
     try {
-      await api().assets.ignore.mutate(data)
-      return { ok: true as const }
+      return { ok: true as const, ...(await api().assets.ignore.mutate(data)) }
     } catch (err) {
       return { ok: false as const, message: messageFrom(err, 'Could not save that. Try again.') }
+    }
+  })
+
+/** Stops tracking an app: removes it with its numbers; what fed it waits on the Apps page. */
+export const removeAppFn = createServerFn({ method: 'POST' })
+  .middleware([requireSession])
+  .validator(z.object({ appId: z.string().min(1).max(64) }))
+  .handler(async ({ data }) => {
+    try {
+      return { ok: true as const, ...(await api().apps.remove.mutate(data)) }
+    } catch (err) {
+      return { ok: false as const, message: messageFrom(err, 'Could not remove the app. Try again.') }
     }
   })
 

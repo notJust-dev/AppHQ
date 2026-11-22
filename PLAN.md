@@ -208,9 +208,11 @@ Three layers, so one sign-in can serve several apps and one app can gather sever
 
 Linking happens by itself only on exact evidence, and only into a free slot: an Android package
 equal to an app's iOS bundle id, a RevenueCat project naming a store app's bundle id or package
-(and the other way round), an Instagram account linked to a Page that has its app. A new iOS app
-gets an app of its own. Everything else waits on the Apps page under "Needs a decision", with a
-suggestion when the name matches an app; a person links, ignores, or makes a new app. Once a
+(and the other way round), an Instagram account linked to a Page that has its app. No source
+creates apps: an account may hold dozens of apps when only a few are worth tracking. Everything
+else waits on the Apps page under "Needs a decision", with a suggestion when the name matches an
+app; a person adds it as a new app, links it, or ignores it (also all at once). Removing an app
+deletes its numbers and posts and puts what fed it back under "Needs a decision". Once a
 person has placed an asset, or taken it off an app, `decided` keeps automatic linking away from
 it. Linking an asset fetches its history.
 
@@ -235,8 +237,8 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   app per sync.
 - Auth: a v2 secret key per project, pasted on the Accounts page and stored encrypted in `connections`.
   It needs `charts_metrics:charts:read`, plus `project_configuration:projects:read` and
-  `project_configuration:apps:read` so the app can be created from the project (name, iOS bundle
-  id, Android package).
+  `project_configuration:apps:read` to read the project's iOS bundle id and Android package,
+  which tie it to its app.
 - Rate limit: 25 requests per minute for Charts & Metrics; a 429 is retried after the wait
   RevenueCat asks for.
 - Daily buckets are UTC. Recent periods can be flagged incomplete; they are stored and corrected
@@ -301,7 +303,7 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
 - App titles from the Reporting API's `apps:search` when that API is enabled in the service
   account's project; otherwise packages show by name.
 - Each package found is an `android_app` asset. It links by itself when it equals an app's iOS
-  bundle id; otherwise it waits on the Apps page, where "A new app named …" covers Android-only
+  bundle id; otherwise it waits on the Apps page, where "Add as a new app" covers Android-only
   apps.
 - Reviews (Phase 3): the Android Publisher reviews endpoint only returns the last week, so
   syncing must start early; older reviews come from the bucket's review CSVs.
@@ -538,6 +540,9 @@ Status on 2026-11-22 (merged to `main` and deployed):
   `/google-play`, `/revenuecat`, `/meta` or `/tiktok`, each with numbered steps and its form.
   The `.p8` and the Google service account JSON can be dropped or chosen as files (read in the
   browser; the `.p8` name fills in the Key ID). Sign-ins come back to their source's page.
+- No automatic apps (2026-11-22): connecting App Store Connect or RevenueCat used to create an app
+  for every iOS app or unmatched project. Now everything found waits on the Apps page, where a
+  store app is one click to add, the rest can be ignored at once, and an app's page can remove it.
 
 ### Phase 3 — Reviews inbox
 

@@ -1,5 +1,5 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 import { Button } from '../../components/Button'
@@ -63,6 +63,10 @@ function AppStorePage() {
             <li>Download the key file. Apple offers the download only once, so keep it safe.</li>
             <li>Copy the Issuer ID shown above the list of keys.</li>
             <li>Your vendor number is in Payments and Financial Reports, next to your name.</li>
+            <li>
+              Connect below, then add the apps you want to track on the Apps page. Nothing is added
+              on its own.
+            </li>
           </Steps>
           <ConnectForm
             onConnected={(result) => {
@@ -84,7 +88,7 @@ function AppStorePage() {
 
 type ConnectOutcome = {
   apps: number
-  created: number
+  linked: number
   analytics: { requested: number; existing: number; problem: string | null }
 }
 
@@ -198,13 +202,22 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
 }
 
 function Connected(props: { result: ConnectOutcome }) {
-  const { apps, created, analytics } = props.result
+  const { apps, linked, analytics } = props.result
+  const waiting = apps - linked
   return (
     <>
       <p>
         Connected. {apps} {apps === 1 ? 'app' : 'apps'} found
-        {created > 0 && `, ${created} new to the dashboard`}. A year of downloads is being fetched;
-        the numbers appear within a few minutes.
+        {linked > 0 && `, ${linked} already part of an app`}.{' '}
+        {waiting > 0 && (
+          <>
+            Add the ones you want to track on the{' '}
+            <Link to="/apps" className="font-medium underline underline-offset-4">
+              Apps page
+            </Link>
+            ; a year of downloads is fetched for each one you add.
+          </>
+        )}
       </p>
       <p className="mt-2">
         {analytics.problem

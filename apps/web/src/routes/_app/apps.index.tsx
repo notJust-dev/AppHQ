@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useId, useState, type ReactNode } from 'react'
 import { Button } from '../../components/Button'
@@ -31,6 +31,8 @@ function AppsPage() {
   const { data: apps } = useSuspenseQuery(appsQuery())
   const { data: assets } = useSuspenseQuery(assetsQuery())
   const actions = useAssetActions()
+  // Set by the app page after removing an app; history state, so a link cannot set it.
+  const removedApp = useRouterState({ select: (state) => state.location.state.removedApp })
 
   const waiting = assets.filter((asset) => asset.appId === null && !asset.ignored)
   const ignored = assets.filter((asset) => asset.ignored)
@@ -45,9 +47,15 @@ function AppsPage() {
         <Link to="/accounts" className="font-medium text-ink underline underline-offset-4">
           Accounts page
         </Link>{' '}
-        find these. They are linked by themselves only when the evidence is exact, like an Android
-        package equal to an iOS bundle id; the rest waits for you here.
+        find these, and nothing becomes an app until you add it. Once an app is here, what clearly
+        belongs to it joins by itself, like an Android package equal to its iOS bundle id.
       </p>
+
+      {removedApp && !actions.notice && (
+        <p role="status" className="mt-6 max-w-3xl rounded-lg border border-line bg-surface px-6 py-4 text-sm">
+          Removed {removedApp}. What fed it waits below, to add again or ignore.
+        </p>
+      )}
 
       {actions.notice && (
         <p
@@ -63,7 +71,17 @@ function AppsPage() {
       {waiting.length > 0 && (
         <Section
           title="Needs a decision"
-          intro="Found by an account, but not part of any app yet. A suggestion comes from a matching name; check it before linking."
+          intro="Found by your accounts, not tracked yet. Add the ones you want as apps, link them to an app, or ignore them. A suggestion comes from a matching name; check it before linking."
+          action={
+            waiting.length > 1 && (
+              <Button
+                disabled={actions.pending}
+                onClick={() => actions.ignore(waiting.map((asset) => asset.id), true)}
+              >
+                Ignore all {waiting.length}
+              </Button>
+            )
+          }
         >
           <ul className="max-w-3xl divide-y divide-line rounded-lg border border-line bg-surface text-sm">
             {waiting.map((asset) => (
@@ -90,7 +108,7 @@ function AppsPage() {
             {ignored.map((asset) => (
               <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
                 <AssetName asset={asset} />
-                <Button disabled={actions.pending} onClick={() => actions.ignore(asset.id, false)}>
+                <Button disabled={actions.pending} onClick={() => actions.ignore([asset.id], false)}>
                   Restore
                 </Button>
               </li>
@@ -102,10 +120,13 @@ function AppsPage() {
   )
 }
 
-function Section(props: { title: string; intro?: string; children: ReactNode }) {
+function Section(props: { title: string; intro?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-12">
-      <h2 className="font-display text-xl font-semibold tracking-tight">{props.title}</h2>
+      <div className="flex max-w-3xl flex-wrap items-end justify-between gap-3">
+        <h2 className="font-display text-xl font-semibold tracking-tight">{props.title}</h2>
+        {props.action}
+      </div>
       {props.intro && <p className="mt-2 max-w-prose text-sm text-ink-soft">{props.intro}</p>}
       <div className="mt-4">{props.children}</div>
     </section>
@@ -127,10 +148,11 @@ function AssetName({ asset }: { asset: Asset }) {
   )
 }
 
-/** One asset without an app: link it to one, to a new one, to Shared accounts, or ignore it. */
+/** One asset without an app: add it as an app, link it to one or to Shared accounts, or ignore it. */
 function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActions }) {
   const { asset, apps, actions } = props
-  const [choice, setChoice] = useState(asset.suggestedAppId ?? '')
+  // A store app or project with no likely app is most often one to add.
+  const [choice, setChoice] = useState(asset.suggestedAppId ?? (asset.social ? '' : 'new'))
   const selectId = useId()
   const suggested = apps.find((app) => app.id === asset.suggestedAppId)
   const label = KIND_LABEL[asset.kind] ?? asset.label
@@ -156,6 +178,7 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
         <option value="" disabled>
           Choose an app
         </option>
+        {!asset.social && <option value="new">Add as a new app</option>}
         {apps.map((app) => {
           const current = holder(app)
           return (
@@ -165,11 +188,7 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
             </option>
           )
         })}
-        {asset.social ? (
-          <option value={PORTFOLIO_APP_ID}>Shared accounts (promotes several apps)</option>
-        ) : (
-          <option value="new">A new app named {asset.name}</option>
-        )}
+        {asset.social && <option value={PORTFOLIO_APP_ID}>Shared accounts (promotes several apps)</option>}
       </select>
       <div className="flex gap-2">
         <Button
@@ -177,9 +196,9 @@ function Decision(props: { asset: Asset; apps: AppSummary[]; actions: AssetActio
           disabled={!choice || actions.pending}
           onClick={() => actions.assign(asset.id, choice)}
         >
-          Link
+          {choice === 'new' ? 'Add app' : 'Link'}
         </Button>
-        <Button disabled={actions.pending} onClick={() => actions.ignore(asset.id, true)}>
+        <Button disabled={actions.pending} onClick={() => actions.ignore([asset.id], true)}>
           Ignore
         </Button>
       </div>
@@ -196,8 +215,8 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-line bg-surface px-6 py-5 text-sm text-ink-soft">
-        No apps yet. Connect App Store Connect, Google Play or RevenueCat on the Accounts page and
-        their apps appear here.
+        No apps yet. Connect a source on the Accounts page, then add the apps you want to track
+        from what it finds, or add one by name below.
       </p>
     )
   }

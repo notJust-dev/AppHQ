@@ -1,5 +1,5 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 import { Button } from '../../components/Button'
@@ -29,7 +29,7 @@ function RevenueCatPage() {
   return (
     <SourcePage
       title="RevenueCat"
-      intro="Revenue, MRR, trials and subscribers, one RevenueCat project at a time. Each project is matched to its app by bundle id or package, or becomes a new app, and about a year of history is fetched."
+      intro="Revenue, MRR, trials and subscribers, one RevenueCat project at a time. A project joins the app with the same bundle id or package; otherwise you add it on the Apps page. About a year of history is fetched once it belongs to an app."
     >
       <Section title={connected ? 'Projects' : 'Project'}>
         <AccountList accounts={family.accounts} />
@@ -98,9 +98,33 @@ function ConnectForm({ onConnected }: { onConnected: () => void }) {
       <div role="status" className="mt-3 text-sm">
         {mutation.isError && 'Could not reach the dashboard server. Try again.'}
         {result && !result.ok && result.message}
-        {result?.ok &&
-          `Connected ${result.apps.map((app) => app.name).join(', ')}. Its history is being fetched; the numbers appear within a minute.`}
+        {result?.ok && <Connected projects={result.projects} />}
       </div>
     </form>
+  )
+}
+
+function Connected(props: { projects: { name: string; appId: string | null; appName: string | null }[] }) {
+  const linked = props.projects.filter((project) => project.appName !== null)
+  const waiting = props.projects.filter((project) => project.appName === null)
+  return (
+    <>
+      {linked.map((project) => (
+        <p key={project.name}>
+          Connected {project.name} to {project.appName}. Its history is being fetched; the numbers
+          appear within a minute.
+        </p>
+      ))}
+      {waiting.length > 0 && (
+        <p>
+          Connected {waiting.map((project) => project.name).join(', ')}. No app has the same bundle
+          id or package yet: add it as an app, or link it to one, on the{' '}
+          <Link to="/apps" className="font-medium underline underline-offset-4">
+            Apps page
+          </Link>
+          .
+        </p>
+      )}
+    </>
   )
 }

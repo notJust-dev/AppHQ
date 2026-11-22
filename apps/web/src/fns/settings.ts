@@ -29,8 +29,8 @@ export const connectRevenueCatFn = createServerFn({ method: 'POST' })
   .validator(z.object({ apiKey: z.string().trim().min(8).max(500) }))
   .handler(async ({ data }) => {
     try {
-      const { apps } = await api().apps.connectRevenueCat.mutate(data)
-      return { ok: true as const, apps }
+      const { projects } = await api().apps.connectRevenueCat.mutate(data)
+      return { ok: true as const, projects }
     } catch (err) {
       return { ok: false as const, message: messageFrom(err, 'Could not reach the API.') }
     }

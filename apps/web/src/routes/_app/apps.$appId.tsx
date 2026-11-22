@@ -2,6 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, notFound } from '@tanstack/react-router'
 import { AppSources } from '../../components/AppSources'
 import { PostsTable } from '../../components/PostsTable'
+import { RemoveApp } from '../../components/RemoveApp'
 import { RangeSwitch } from '../../components/RangeSwitch'
 import { Timeline } from '../../components/Timeline'
 import { formatDay } from '../../lib/format'
@@ -73,6 +74,7 @@ function AppPage() {
         </div>
       </section>
       {app && <AppSources app={app} apps={apps} assets={assets} />}
+      {app && app.kind !== 'portfolio' && <RemoveApp appId={app.id} name={app.name} />}
     </>
   )
 }

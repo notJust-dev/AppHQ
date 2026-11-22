@@ -16,7 +16,8 @@ export interface AppStoreConnectResult {
   /** Apps in the App Store account. */
   apps: number
   /** Of those, how many were new to the dashboard. */
-  created: number
+  /** How many of the account's apps already belong to an app; the rest wait on the Apps page. */
+  linked: number
   analytics: {
     /** Report requests created now. */
     requested: number
@@ -80,7 +81,7 @@ export async function connectAppStore(
   })
   if (!saved) throw new Error('could not save the App Store connection')
 
-  const { created } = await saveAppStoreApps(deps.db, saved.id, storeApps)
+  const { linked } = await saveAppStoreApps(deps.db, saved.id, storeApps)
 
   const analytics: AppStoreConnectResult['analytics'] = { requested: 0, existing: 0, problem: null }
   for (const app of storeApps) {
@@ -103,5 +104,5 @@ export async function connectAppStore(
     }
   }
 
-  return { apps: storeApps.length, created, analytics }
+  return { apps: storeApps.length, linked, analytics }
 }

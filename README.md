@@ -50,20 +50,21 @@ Sign in and open Accounts. It lists every source with its state; Connect or Conf
 source's page, with the steps to get a key and the form. Keys you download (App Store Connect's
 `.p8`, Google Play's JSON) can be dropped or chosen as files; they are read in the browser and sent
 like a pasted key. What a source finds (iOS and Android apps, RevenueCat projects, Pages,
-Instagram and TikTok accounts) lands on the Apps page. Links
-that exact evidence settles, like an Android package equal to an iOS bundle id, are made for you;
-the rest waits under "Needs a decision", where you link each one to an app, to a new app, to
-Shared accounts (for a social account that promotes several apps), or ignore it. Each app's page
-has a Sources panel to change what feeds it. Linking something fetches its history.
+Instagram and TikTok accounts) lands on the Apps page under "Needs a decision". Nothing becomes an
+app on its own: add the ones you want to track (one click for a store app), link the others to an
+app or to Shared accounts (for a social account that promotes several apps), and ignore the rest,
+one by one or all at once. Once an app exists, what exact evidence ties to it joins by itself,
+like an Android package equal to its iOS bundle id. Each app's page has a Sources panel to change
+what feeds it, and a button to stop tracking it. Linking something fetches its history.
 
-To add an app from RevenueCat, paste a v2 secret key from its project. The key needs read access
-to charts and metrics, and to project configuration. The project is matched to a store app by
-bundle id or package, or becomes a new app; about a year of history is fetched in the background,
-and later syncs re-read the last seven days.
+For revenue, paste a RevenueCat v2 secret key from each project. The key needs read access to
+charts and metrics, and to project configuration. The project joins the app with the same bundle
+id or package; otherwise it waits on the Apps page. About a year of history is fetched once it
+belongs to an app, and later syncs re-read the last seven days.
 
 For downloads, connect App Store Connect with a team API key (the `.p8` file, whose name gives
 the Key ID, and the Issuer ID) and your vendor number. The Sales and Reports role is enough. The account's
-apps are added, matched to existing ones by bundle id, and a year of daily downloads is fetched.
+apps wait on the Apps page; a year of daily downloads is fetched for each one you add.
 With an Admin key the dashboard also asks Apple to start analytics reports for each app.
 
 For Google Play, create a service account in Google Cloud with a JSON key, and invite its email
