@@ -19,6 +19,15 @@ export const META_PERMISSIONS = [
   'business_management',
 ] as const
 
+/** Without these the connectors cannot read anything: Pages, Page insights, Instagram. */
+export const ESSENTIAL_PERMISSIONS = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'read_insights',
+  'instagram_basic',
+  'instagram_manage_insights',
+] as const
+
 export interface MetaConfig {
   appId: string
   appSecret: string

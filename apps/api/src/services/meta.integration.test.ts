@@ -55,6 +55,14 @@ function fakeMeta(suffix: string) {
       if (q.get('code') === 'unified-code') return json({ access_token: 'suat-1', token_type: 'bearer' })
       return json({ error: { message: 'Invalid verification code format.', code: 100 } }, 400)
     }
+    if (path === '/debug_token') {
+      // The Unified login token here was granted Instagram only, as a short configuration would.
+      const scopes =
+        q.get('input_token') === 'suat-1'
+          ? ['instagram_basic', 'instagram_manage_insights']
+          : ['pages_show_list', 'pages_read_engagement', 'read_insights', 'instagram_basic', 'instagram_manage_insights']
+      return json({ data: { type: 'USER', is_valid: true, scopes } })
+    }
     if (token === 'suat-1') {
       if (path === '/me/accounts') return json({ error: { message: 'Missing permission', code: 200 } }, 403)
       if (path === '/me/assigned_instagram_accounts') {
@@ -172,7 +180,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   it('saves every Page and linked Instagram account, unassigned, with tokens encrypted', async () => {
     const result = await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })
-    expect(result).toMatchObject({ pages: 2, instagram: 1 })
+    expect(result).toMatchObject({ pages: 2, instagram: 1, missing: [] })
 
     const page = await row(meta.ids.pageA)
     const ig = await row(meta.ids.ig)
@@ -190,10 +198,21 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   it('connects with Unified login: a lasting token and an Instagram account without a Page', async () => {
     const result = await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'unified-code', redirectUri })
-    expect(result).toEqual({ pages: 0, instagram: 1, expiresAt: null })
+    // The sign-in works, and says which Page permissions it was not given.
+    expect(result).toEqual({
+      pages: 0,
+      instagram: 1,
+      expiresAt: null,
+      missing: ['pages_show_list', 'pages_read_engagement', 'read_insights'],
+    })
 
     const ig = await row(meta.ids.igOnly)
-    expect(ig).toMatchObject({ provider: 'instagram', displayName: '@quillnote.app', expiresAt: null })
+    expect(ig).toMatchObject({
+      provider: 'instagram',
+      displayName: '@quillnote.app',
+      expiresAt: null,
+      scopes: 'instagram_basic,instagram_manage_insights',
+    })
     expect(secrets.decrypt(ig.accessTokenEnc ?? '')).toBe('suat-1')
     expect(secrets.decrypt(ig.refreshTokenEnc ?? '')).toBe('suat-1')
   })

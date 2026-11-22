@@ -1,6 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { MetaError, createMetaClient, type MetaPage } from '../connectors/meta/client.js'
-import { FACEBOOK, INSTAGRAM, META_PROVIDERS, requireMetaConfig } from '../connectors/meta/config.js'
+import {
+  ESSENTIAL_PERMISSIONS,
+  FACEBOOK,
+  INSTAGRAM,
+  META_PROVIDERS,
+  requireMetaConfig,
+} from '../connectors/meta/config.js'
 import type { Db } from '../db/client.js'
 import { apps, connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
@@ -11,6 +17,11 @@ export interface MetaConnectResult {
   instagram: number
   /** When the sign-in, and with it Instagram, has to be renewed. */
   expiresAt: string | null
+  /**
+   * Essential permissions the sign-in did not get, usually because the login configuration in
+   * the Meta app lacks them. Empty when all are there, or when Meta would not say.
+   */
+  missing: string[]
 }
 
 /** A token that lasts less than this is a short-lived user token, worth swapping. */
@@ -61,6 +72,13 @@ export async function connectMeta(
   }
   const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null
 
+  // Which permissions the sign-in really got. Not knowing is not a reason to fail the connection.
+  const granted = await client
+    .debugToken(signInToken)
+    .then((info) => info.scopes ?? null)
+    .catch(() => null)
+  const missing = granted ? ESSENTIAL_PERMISSIONS.filter((scope) => !granted.includes(scope)) : []
+
   const pages = (await client.pages(signInToken).catch(unlessRefused<MetaPage>)).filter(
     (page) => page.access_token,
   )
@@ -79,8 +97,11 @@ export async function connectMeta(
 
   if (pages.length === 0 && instagramAccounts.size === 0) {
     throw new ConnectInputError(
-      'Facebook returned no Pages or Instagram accounts. Sign in again and select them when ' +
-        'Facebook asks which ones to share.',
+      missing.length > 0
+        ? `Facebook returned no Pages or Instagram accounts, and the sign-in lacks ${missing.join(', ')}. ` +
+            'Add them to the login configuration in the Meta app, then connect again.'
+        : 'Facebook returned no Pages or Instagram accounts. Sign in again and select them when ' +
+            'Facebook asks which ones to share.',
     )
   }
 
@@ -95,7 +116,7 @@ export async function connectMeta(
       expiresAt: Date | null
     }) => {
       // `appId` is left out of the update, so reconnecting keeps each account's app.
-      const values = { ...row, status: 'ok', updatedAt: new Date() }
+      const values = { ...row, scopes: granted?.join(',') ?? null, status: 'ok', updatedAt: new Date() }
       return tx
         .insert(connections)
         .values(values)
@@ -131,6 +152,7 @@ export async function connectMeta(
     pages: pages.length,
     instagram: instagramAccounts.size,
     expiresAt: expiresAt?.toISOString() ?? null,
+    missing,
   }
 }
 

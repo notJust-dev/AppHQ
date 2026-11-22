@@ -218,6 +218,25 @@ export function createMetaClient(options: MetaClientOptions) {
     longLived: (shortToken: string) =>
       token({ grant_type: 'fb_exchange_token', fb_exchange_token: shortToken }),
 
+    /**
+     * What a token is and which permissions it actually carries, asked with the app's own token.
+     * The sign-in can grant fewer permissions than the configuration lists.
+     */
+    async debugToken(token: string) {
+      const appToken = `${config.appId}|${config.appSecret}`
+      const parsed = z
+        .object({
+          data: z.object({
+            type: z.string().optional(),
+            is_valid: z.boolean().optional(),
+            expires_at: z.number().optional(),
+            scopes: z.array(z.string()).optional(),
+          }),
+        })
+        .parse(await graph('/debug_token', appToken, { input_token: token }))
+      return parsed.data
+    },
+
     async me(userToken: string) {
       return z.object({ id: z.string(), name: z.string().optional() }).parse(
         await graph('/me', userToken, { fields: 'id,name' }),

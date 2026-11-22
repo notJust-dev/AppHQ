@@ -196,6 +196,14 @@ function ConnectResult({ onConnected }: { onConnected: () => void }) {
 }
 
 const META_PLATFORM = { facebook: 'Facebook Page', instagram: 'Instagram' } as const
+/** Without these the Meta connectors cannot read Pages, Page insights or Instagram. */
+const META_ESSENTIAL = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'read_insights',
+  'instagram_basic',
+  'instagram_manage_insights',
+]
 /** Warn this long before the Facebook sign-in, and with it Instagram, stops working. */
 const RENEW_WARNING_MS = 10 * 86_400_000
 
@@ -226,6 +234,9 @@ function ConnectMeta(props: {
     .map((account) => account.expiresAt ?? '')
     .sort()[0]
   const renewSoon = renewBy !== undefined && Date.parse(renewBy) - Date.now() < RENEW_WARNING_MS
+  // What the latest sign-in was granted, as Meta reported it; unknown for older connections.
+  const granted = props.accounts.find((account) => account.scopes !== null)?.scopes ?? null
+  const missing = granted ? META_ESSENTIAL.filter((scope) => !granted.includes(scope)) : []
 
   return (
     <>
@@ -298,6 +309,15 @@ function ConnectMeta(props: {
       {choose.data && !choose.data.ok && (
         <p role="status" className="mb-4 text-sm">
           {choose.data.message}
+        </p>
+      )}
+
+      {missing.length > 0 && (
+        <p className="mb-4 rounded-lg border border-ink bg-surface px-6 py-4 text-sm">
+          <span className="font-medium">Missing permissions. </span>
+          The sign-in was not granted {missing.map((scope) => <code key={scope}>{scope} </code>)}
+          so some numbers cannot be read. Add them to the login configuration in the Meta app
+          (Facebook Login for Business, Configurations), then press Connect again.
         </p>
       )}
 

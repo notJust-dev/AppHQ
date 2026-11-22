@@ -8,8 +8,9 @@ export const listMetaAccounts = defineQuery({
   name: 'list_meta_accounts',
   description:
     'The Facebook Pages and Instagram accounts found by the Facebook sign-in, each with the app ' +
-    'it promotes (null when it is not tracked), its state, when it last synced, and when the ' +
-    'sign-in behind it has to be renewed.',
+    'it promotes (null when it is not tracked), its state, when it last synced, when the ' +
+    'sign-in behind it has to be renewed, and the permissions that sign-in was granted (null ' +
+    'when unknown).',
   input: z.void(),
   async handler({ db }) {
     const rows = await db
@@ -21,6 +22,7 @@ export const listMetaAccounts = defineQuery({
         status: connections.status,
         expiresAt: connections.expiresAt,
         lastSyncedAt: connections.lastSyncedAt,
+        scopes: connections.scopes,
       })
       .from(connections)
       .where(inArray(connections.provider, [...META_PROVIDERS]))
@@ -28,6 +30,7 @@ export const listMetaAccounts = defineQuery({
 
     return rows.map((row) => ({
       ...row,
+      scopes: row.scopes ? row.scopes.split(',') : null,
       expiresAt: row.expiresAt?.toISOString() ?? null,
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
     }))

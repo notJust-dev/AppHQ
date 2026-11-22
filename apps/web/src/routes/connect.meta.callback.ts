@@ -35,10 +35,15 @@ export const Route = createFileRoute('/connect/meta/callback')({
           const found =
             `${result.pages} ${result.pages === 1 ? 'Page' : 'Pages'} and ${result.instagram} ` +
             `Instagram ${result.instagram === 1 ? 'account' : 'accounts'}`
+          const missing =
+            result.missing.length > 0
+              ? ` Meta did not grant ${result.missing.join(', ')}, so some numbers will not come ` +
+                'through: add them to the login configuration in the Meta app, then connect again.'
+              : ''
           return finish(
             true,
             `Found ${found}. Choose the app each one promotes below; its history is fetched as ` +
-              'soon as it has one.',
+              `soon as it has one.${missing}`,
           )
         } catch (err) {
           return finish(false, callbackError(err))
