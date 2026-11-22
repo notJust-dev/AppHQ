@@ -1,5 +1,5 @@
 import { and, eq, ne } from 'drizzle-orm'
-import { AppStoreError, createAppStoreClient } from '../connectors/app-store/client.js'
+import { createAppStoreClient } from '../connectors/app-store/client.js'
 import { APP_STORE } from '../connectors/app-store/connector.js'
 import { saveAppStoreApps } from '../connectors/app-store/link-apps.js'
 import { isPrivateKey, type AppStoreCredentials } from '../connectors/app-store/token.js'
@@ -7,7 +7,6 @@ import type { Db } from '../db/client.js'
 import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import { addDays, todayUtc } from '../lib/dates.js'
-
 import { ConnectInputError } from './errors.js'
 
 export { ConnectInputError }
@@ -15,23 +14,14 @@ export { ConnectInputError }
 export interface AppStoreConnectResult {
   /** Apps in the App Store account. */
   apps: number
-  /** Of those, how many were new to the dashboard. */
   /** How many of the account's apps already belong to an app; the rest wait on the Apps page. */
   linked: number
-  analytics: {
-    /** Report requests created now. */
-    requested: number
-    /** Apps that already had one. */
-    existing: number
-    /** Set when requests could not be created, most often because the key is not Admin. */
-    problem: string | null
-  }
 }
 
 /**
  * Connects the App Store Connect account: checks the key and the vendor number against Apple,
- * stores the key encrypted, adds the account's apps, and asks Apple to start generating
- * analytics reports for them (which needs an Admin key and is skipped without one).
+ * stores the key encrypted, and saves the account's apps for the person to pick from. Analytics
+ * reports are asked for later, by the sync, for the apps that are tracked.
  */
 export async function connectAppStore(
   deps: { db: Db; secrets: Secrets; fetch?: typeof fetch },
@@ -62,6 +52,8 @@ export async function connectAppStore(
     displayName: `Vendor ${credentials.vendorNumber}`,
     accessTokenEnc: encrypted,
     status: 'ok',
+    // A new key starts over: whether it may ask for analytics reports is found out again.
+    details: null,
     updatedAt: new Date(),
   }
   const saved = await deps.db.transaction(async (tx) => {
@@ -83,26 +75,5 @@ export async function connectAppStore(
 
   const { linked } = await saveAppStoreApps(deps.db, saved.id, storeApps)
 
-  const analytics: AppStoreConnectResult['analytics'] = { requested: 0, existing: 0, problem: null }
-  for (const app of storeApps) {
-    try {
-      if (await client.hasOngoingReportRequest(app.appleId)) {
-        analytics.existing++
-      } else {
-        await client.createOngoingReportRequest(app.appleId)
-        analytics.requested++
-      }
-    } catch (err) {
-      analytics.problem =
-        err instanceof AppStoreError && err.isAuthProblem
-          ? 'The key is not allowed to request analytics reports. That needs an Admin key.'
-          : err instanceof Error
-            ? err.message
-            : String(err)
-      // A role problem is the same for every app, so stop at the first one.
-      break
-    }
-  }
-
-  return { apps: storeApps.length, linked, analytics }
+  return { apps: storeApps.length, linked }
 }

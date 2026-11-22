@@ -74,6 +74,11 @@ function emptyReason(
   // `from` can be missing for a moment during a deploy, when the dashboard is newer than the API.
   const from = series.from ?? []
   const reported = from.filter((source) => reporting.has(source))
+  // The App Store sends downloads from one report and page views from another, which Apple
+  // only makes once asked; its downloads say nothing about whether page views have started.
+  if (series.key === 'pageViews' && reported.length === 1 && reported[0] === 'app_store') {
+    return "App Store page views come from Apple's analytics reports, which start a day or two after an app is added and need an Admin key once. See App Store Connect on the Accounts page."
+  }
   if (reported.length > 0) return `${reported.map(sourceLabel).join(' and ')} reported none in this range.`
   const linked = from.filter((source) => connected.has(source))
   if (linked.includes('tiktok')) {

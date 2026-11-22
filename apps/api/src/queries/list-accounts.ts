@@ -1,5 +1,6 @@
 import { asc } from 'drizzle-orm'
 import { z } from 'zod'
+import { readAnalyticsState } from '../connectors/app-store/analytics.js'
 import { assets, connections } from '../db/schema.js'
 import { defineQuery } from './define.js'
 
@@ -19,7 +20,8 @@ export const listAccounts = defineQuery({
   description:
     'The connected accounts, grouped by source (App Store Connect, Google Play, RevenueCat, ' +
     'Meta for Facebook and Instagram, TikTok): each sign-in or key with its state, when it last ' +
-    'synced and when it expires, and how many assets the source found, how many belong to an ' +
+    'synced and when it expires, a note when it needs the person (an App Store key that may not ' +
+    'start analytics reports, say), and how many assets the source found, how many belong to an ' +
     'app, and how many wait for a decision.',
   input: z.void(),
   async handler({ db }) {
@@ -35,6 +37,7 @@ export const listAccounts = defineQuery({
           lastSyncedAt: connections.lastSyncedAt,
           expiresAt: connections.expiresAt,
           scopes: connections.scopes,
+          details: connections.details,
         })
         .from(connections)
         .orderBy(asc(connections.provider), asc(connections.displayName)),
@@ -47,8 +50,10 @@ export const listAccounts = defineQuery({
       const found = assetRows.filter((asset) => asset.connectionId !== null && ids.has(asset.connectionId))
       return {
         family,
-        accounts: accounts.map((account) => ({
+        accounts: accounts.map(({ details, ...account }) => ({
           ...account,
+          /** Something about the account the person should act on, in their words. */
+          note: noteFor(account.provider, details),
           scopes: account.scopes ? account.scopes.split(',') : null,
           lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null,
           expiresAt: account.expiresAt?.toISOString() ?? null,
@@ -63,3 +68,13 @@ export const listAccounts = defineQuery({
     })
   },
 })
+
+function noteFor(provider: string, details: unknown): string | null {
+  if (provider === 'app_store' && readAnalyticsState(details).needsAdmin) {
+    return (
+      'This key may not ask Apple for analytics reports, so store page views and impressions ' +
+      'cannot start. Connect once with an Admin key; a Sales and Reports key can read them after that.'
+    )
+  }
+  return null
+}

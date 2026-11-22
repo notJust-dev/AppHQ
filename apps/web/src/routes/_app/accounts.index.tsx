@@ -165,6 +165,8 @@ function attentionOf(family: AccountFamily): string | null {
     const who = broken.displayName ?? sourceLabel(broken.provider)
     return `${who}: ${(CONNECTION_STATUS[broken.status] ?? broken.status).toLowerCase()}.`
   }
+  const noted = family.accounts.find((account) => account.note)
+  if (noted?.note) return noted.note
   if (family.family === 'meta' && family.accounts.length > 0) {
     const { missing, renewBy, renewSoon } = metaHealth(family.accounts)
     if (missing.length > 0) return 'Missing permissions, so some numbers cannot be read.'

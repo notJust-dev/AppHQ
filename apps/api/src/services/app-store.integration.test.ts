@@ -113,11 +113,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
   it("finds the account's apps without adding any, and stores the key encrypted", async () => {
     const result = await connectAppStore({ db, secrets, fetch: appStore() }, input)
 
-    expect(result).toEqual({
-      apps: 2,
-      linked: 0,
-      analytics: { requested: 2, existing: 0, problem: null },
-    })
+    expect(result).toEqual({ apps: 2, linked: 0 })
     // They wait on the Apps page until the person adds the ones to track.
     expect(await ourApps()).toEqual([])
     expect(await assetOf(db, 'ios_app', first.id)).toMatchObject({ appId: null, details: { bundleId: first.bundleId } })
@@ -138,12 +134,15 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     expect((await ourApps()).map((app) => app.bundleId)).toEqual([first.bundleId, second.bundleId])
   })
 
-  it('still connects with a key that may not request analytics reports', async () => {
-    const result = await connectAppStore({ db, secrets, fetch: appStore({ admin: false }) }, input)
+  it('still syncs with a key that may not ask for analytics reports, and notes it', async () => {
+    expect((await connectAppStore({ db, secrets, fetch: appStore({ admin: false }) }, input)).linked).toBe(2)
 
-    expect(result.linked).toBe(2)
-    expect(result.analytics.requested).toBe(0)
-    expect(result.analytics.problem).toMatch(/Admin key/)
+    const connector = createAppStoreConnector({ fetch: appStore({ admin: false }) })
+    await connector.sync({ db, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
+
+    const connection = await findAppStoreConnection(db)
+    expect(connection?.status).toBe('ok')
+    expect(connection?.details).toMatchObject({ analytics: { needsAdmin: true } })
   })
 
   it('writes downloads per app and day, with zero for an app missing from a report', async () => {

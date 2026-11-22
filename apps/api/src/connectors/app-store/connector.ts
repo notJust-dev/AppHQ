@@ -4,10 +4,11 @@ import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
 import { apps, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
-import { eachDay } from '../../lib/dates.js'
+import { eachDay, todayUtc } from '../../lib/dates.js'
 import { mapLimit } from '../../lib/pool.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
 import type { AccountConnector } from '../types.js'
+import { readAnalyticsState, syncStoreAnalytics, type AnalyticsState } from './analytics.js'
 import { AppStoreError, createAppStoreClient } from './client.js'
 import { saveAppStoreApps } from './link-apps.js'
 import { summarizeSalesReport } from './sales-report.js'
@@ -38,8 +39,9 @@ export const readAppStoreCredentials = (secrets: Secrets, encrypted: string): Ap
   credentialsSchema.parse(JSON.parse(secrets.decrypt(encrypted)))
 
 /**
- * Downloads, re-downloads and updates per app and day, from Apple's daily Summary Sales Report.
- * One request per day covers every app in the account.
+ * Downloads, re-downloads and updates per app and day, from Apple's daily Summary Sales Report
+ * (one request per day covers every app in the account), then store page views and impressions
+ * from each tracked app's analytics reports.
  */
 export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}): AccountConnector {
   return {
@@ -61,6 +63,7 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
       const rows: NewMetric[] = []
       const failures: string[] = []
       let keyRejected = false
+      let analyticsState: AnalyticsState | undefined
 
       try {
         // Picks up apps published since the last run.
@@ -83,7 +86,7 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
               asset.appId !== null &&
               active.has(asset.appId),
           )
-          .map((asset) => ({ id: asset.appId ?? '', iosAppId: asset.externalId }))
+          .map((asset) => ({ id: asset.appId ?? '', iosAppId: asset.externalId, name: asset.name }))
 
         await mapLimit(eachDay(range), 4, async (date) => {
           if (keyRejected) return
@@ -106,6 +109,19 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
             failures.push(`${date}: ${err instanceof Error ? err.message : String(err)}`)
           }
         })
+
+        if (!keyRejected) {
+          const analytics = await syncStoreAnalytics({
+            client,
+            tracked,
+            range,
+            state: readAnalyticsState(connection.details),
+            today: todayUtc(),
+          })
+          rows.push(...analytics.rows)
+          failures.push(...analytics.failures)
+          analyticsState = analytics.state
+        }
       } catch (err) {
         if (err instanceof AppStoreError && err.isAuthProblem) keyRejected = true
         failures.push(err instanceof Error ? err.message : String(err))
@@ -117,6 +133,9 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
         .set({
           status: keyRejected ? 'needs_reauth' : failures.length > 0 ? 'error' : 'ok',
           lastSyncedAt: new Date(),
+          ...(analyticsState
+            ? { details: { ...((connection.details as Record<string, unknown> | null) ?? {}), analytics: analyticsState } }
+            : {}),
           updatedAt: new Date(),
         })
         .where(eq(connections.id, connection.id))

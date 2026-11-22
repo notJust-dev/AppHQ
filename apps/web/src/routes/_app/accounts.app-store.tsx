@@ -33,7 +33,7 @@ function AppStorePage() {
   return (
     <SourcePage
       title="App Store Connect"
-      intro="Daily downloads for every iOS app in your account, from Apple's daily sales report. A year of history is fetched when you connect."
+      intro="Daily downloads from Apple's sales reports, and store page views and impressions from its analytics reports, for the iOS apps you track. Downloads go back a year, page views to January 2024."
     >
       <Section title="Account">
         <AccountList accounts={family.accounts} />
@@ -57,8 +57,9 @@ function AppStorePage() {
               API, and the Team Keys tab.
             </li>
             <li>
-              Generate a key with the Sales and Reports role. With an Admin key the dashboard also
-              asks Apple to start analytics reports, which bring impressions and page views later.
+              Generate a key with the Admin role. Downloads only need Sales and Reports, but store
+              page views and impressions come from analytics reports, and only an Admin key may ask
+              Apple to start them. After that, a Sales and Reports key can read them.
             </li>
             <li>Download the key file. Apple offers the download only once, so keep it safe.</li>
             <li>Copy the Issuer ID shown above the list of keys.</li>
@@ -89,7 +90,6 @@ function AppStorePage() {
 type ConnectOutcome = {
   apps: number
   linked: number
-  analytics: { requested: number; existing: number; problem: string | null }
 }
 
 function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) => void }) {
@@ -202,7 +202,7 @@ function ConnectForm({ onConnected }: { onConnected: (result: ConnectOutcome) =>
 }
 
 function Connected(props: { result: ConnectOutcome }) {
-  const { apps, linked, analytics } = props.result
+  const { apps, linked } = props.result
   const waiting = apps - linked
   return (
     <>
@@ -215,16 +215,10 @@ function Connected(props: { result: ConnectOutcome }) {
             <Link to="/apps" className="font-medium underline underline-offset-4">
               Apps page
             </Link>
-            ; a year of downloads is fetched for each one you add.
+            ; a year of downloads is fetched for each one you add. Store page views follow a day
+            or two later, once Apple has made the analytics reports, back to January 2024.
           </>
         )}
-      </p>
-      <p className="mt-2">
-        {analytics.problem
-          ? `Analytics reports were not requested. ${analytics.problem} Downloads are not affected.`
-          : analytics.requested > 0
-            ? `Analytics reports were requested for ${analytics.requested} ${analytics.requested === 1 ? 'app' : 'apps'}. Apple starts delivering them in one to two days.`
-            : 'Analytics reports were already requested for every app.'}
       </p>
     </>
   )

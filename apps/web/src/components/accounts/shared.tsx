@@ -28,7 +28,7 @@ export const SOURCES: {
     family: 'app_store',
     title: 'App Store Connect',
     to: '/accounts/app-store',
-    brings: 'Daily downloads for your iOS apps.',
+    brings: 'Downloads and store page views for your iOS apps.',
     noun: ['iOS app', 'iOS apps'],
   },
   {
@@ -179,6 +179,7 @@ export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (acc
                 <span className="text-ink-soft"> · {sourceLabel(account.provider)}</span>
               )}
               {detail && <span className="block text-xs text-ink-soft">{detail}</span>}
+              {account.note && <span className="mt-1 block text-xs font-medium">{account.note}</span>}
             </span>
             <span className={`text-xs ${account.status === 'ok' ? 'text-ink-soft' : 'font-medium'}`}>
               {CONNECTION_STATUS[account.status] ?? account.status}

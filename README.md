@@ -65,10 +65,14 @@ The key needs read access to charts and metrics, and to project configuration. A
 history is fetched, and later syncs re-read the last seven days. The Accounts page lists every
 app's project and its state.
 
-For downloads, connect App Store Connect with a team API key (the `.p8` file, whose name gives
-the Key ID, and the Issuer ID) and your vendor number. The Sales and Reports role is enough. The account's
-apps wait on the Apps page; a year of daily downloads is fetched for each one you add.
-With an Admin key the dashboard also asks Apple to start analytics reports for each app.
+For downloads and store page views, connect App Store Connect with a team API key (the `.p8`
+file, whose name gives the Key ID, and the Issuer ID) and your vendor number. The account's apps
+wait on the Apps page; a year of daily downloads is fetched for each one you add. Store page
+views and impressions come from Apple's analytics reports, which Apple makes only once asked,
+per app: the sync asks for each app you track (an ongoing report, and a one-time snapshot of the
+history back to January 2024) and reads them a day or two later. Only an Admin key may ask, so
+use one at least the first time; a Sales and Reports key is enough for downloads and for reading
+reports already asked for. Without one, the App Store Connect page says so.
 
 For Google Play, create a service account in Google Cloud with a JSON key, and invite its email
 in Play Console (Users and permissions) with "View app information and download bulk reports"

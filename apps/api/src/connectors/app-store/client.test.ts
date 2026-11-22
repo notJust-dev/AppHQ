@@ -126,32 +126,79 @@ describe('App Store Connect client', () => {
     expect(calls[1]?.url.searchParams.get('cursor')).toBe('abc')
   })
 
-  it('creates an ongoing analytics report request for an app', async () => {
-    const { impl, calls } = fakeFetch([{ status: 201, body: '{}' }])
+  it('asks for ongoing or history analytics reports for an app', async () => {
+    const { impl, calls } = fakeFetch([{ status: 201, body: '{}' }, { status: 409, body: '{}' }])
     const client = createAppStoreClient({ credentials, fetch: impl })
 
-    await client.createOngoingReportRequest('111')
+    await client.createReportRequest('111', 'ONE_TIME_SNAPSHOT')
+    // A request that already exists is fine.
+    await client.createReportRequest('111', 'ONGOING')
 
     expect(calls[0]).toMatchObject({
       method: 'POST',
       body: {
         data: {
           type: 'analyticsReportRequests',
-          attributes: { accessType: 'ONGOING' },
+          attributes: { accessType: 'ONE_TIME_SNAPSHOT' },
           relationships: { app: { data: { type: 'apps', id: '111' } } },
         },
       },
     })
   })
 
-  it('counts a stopped report request as absent', async () => {
+  it('lists report requests, marking ones Apple stopped', async () => {
     const { impl } = fakeFetch([
-      { body: JSON.stringify({ data: [{ id: 'r1', attributes: { stoppedDueToInactivity: true } }] }) },
-      { body: JSON.stringify({ data: [{ id: 'r2', attributes: { stoppedDueToInactivity: false } }] }) },
+      {
+        body: JSON.stringify({
+          data: [
+            { id: 'r1', attributes: { accessType: 'ONGOING', stoppedDueToInactivity: true } },
+            { id: 'r2', attributes: { accessType: 'ONE_TIME_SNAPSHOT', stoppedDueToInactivity: false } },
+          ],
+        }),
+      },
     ])
     const client = createAppStoreClient({ credentials, fetch: impl })
 
-    expect(await client.hasOngoingReportRequest('111')).toBe(false)
-    expect(await client.hasOngoingReportRequest('111')).toBe(true)
+    expect(await client.listReportRequests('111')).toEqual([
+      { id: 'r1', accessType: 'ONGOING', stopped: true },
+      { id: 'r2', accessType: 'ONE_TIME_SNAPSHOT', stopped: false },
+    ])
+  })
+
+  it('finds the Standard engagement report, not its Detailed twin', async () => {
+    const report = (id: string, name: string) => ({ id, attributes: { name, category: 'APP_STORE_ENGAGEMENT' } })
+    const { impl, calls } = fakeFetch([
+      {
+        body: JSON.stringify({
+          data: [
+            report('r15', 'App Store Discovery and Engagement Detailed'),
+            report('r14', 'App Store Discovery and Engagement Standard'),
+          ],
+        }),
+      },
+    ])
+    const client = createAppStoreClient({ credentials, fetch: impl })
+
+    expect(await client.findEngagementReport('req-1')).toBe('r14')
+    expect(calls[0]?.url.searchParams.get('filter[category]')).toBe('APP_STORE_ENGAGEMENT')
+  })
+
+  it("downloads an instance's files from their signed links, unzipped", async () => {
+    const file = 'Date\tCounts\n2026-11-20\t3\n'
+    const { impl, calls } = fakeFetch([
+      {
+        body: JSON.stringify({
+          data: [{ attributes: { url: 'https://storage.example/one.gz' } }, { attributes: { url: 'https://storage.example/two' } }],
+        }),
+      },
+      { body: gzipSync(file) },
+      { body: file },
+    ])
+    const client = createAppStoreClient({ credentials, fetch: impl })
+
+    expect(await client.downloadInstance('inst-1')).toEqual([file, file])
+    expect(calls[0]?.url.pathname).toBe('/v1/analyticsReportInstances/inst-1/segments')
+    // The signed link carries its own authorization; the API token is not sent to storage.
+    expect(calls[1]?.authorization).toBeNull()
   })
 })

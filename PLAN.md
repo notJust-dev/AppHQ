@@ -262,11 +262,22 @@ Every connector implements `sync(app, range)`, is idempotent (upserts), and re-f
   report exists, an app of the account that is missing from it gets zero for that day.
 - Reports arrive the next day by about 8 a.m. Pacific and are kept for a year, so the backfill
   is 364 days, four requests at a time.
-- Apps: `GET /v1/apps` runs on connect and on every sync. Apps are matched by Apple ID or bundle
-  id and created when new, so connecting RevenueCat and App Store in either order gives one app.
-- Analytics (impressions, page views): on connect, an ONGOING analytics report request is
-  created per app when the key allows it. Apple delivers the first reports in one to two days.
-  Reading and parsing those reports is not built yet.
+- Apps: `GET /v1/apps` runs on connect and on every sync. Each is saved as an `ios_app` asset;
+  none becomes an app until the person adds it (see Accounts, assets and apps).
+- Analytics (built 2026-11-22, checked against a real account): store page views and impressions
+  come from the "App Store Discovery and Engagement Standard" report (category
+  `APP_STORE_ENGAGEMENT`). Apple makes it only after an `analyticsReportRequests` POST per app:
+  ONGOING for every day from then on, ONE_TIME_SNAPSHOT for the history from 2024-01-01. Only an
+  Admin key may ask (a 403 otherwise, which the connection notes in `details.analytics` and the
+  Accounts page shows); Sales and Reports may read. The sync asks for each tracked app that lacks
+  a request, then reads `instances?filter[granularity]=DAILY` → `segments` → a signed `url` to a
+  gzipped, tab-separated file with a header row (Date, App Apple Identifier, Event, Page Type,
+  …, Counts, Unique Counts). Page views are Counts of `Page view` rows on `Product page` or
+  `Store sheet`; impressions are Counts of `Impression` rows; Unique Counts are not additive and
+  are not used. A daily instance holds the three days before its processing date, and a newer
+  instance restates older days, so each day is taken from its newest instance (ongoing before
+  snapshot), and only days whose every instance was read are written. The snapshot is read once
+  per app. Apple leaves out rows for fewer than five people, so small days run low.
 - Confirmed with a real key on 2026-11-20: `version=1_0` is accepted, and days before the
   account's first sale answer 404 and are stored as gaps. First sync: 10 apps, 7,020 rows, daily
   reports from 2026-03-31 to the day before, no missing days in between. Not yet seen: a 404 for
@@ -450,7 +461,7 @@ Differences from the list above:
 2. RevenueCat connector and backfill.
 3. App Store Connect sales connector and backfill; create the Analytics report requests.
 4. Google Play installs and store performance connector.
-5. App Store Connect analytics connector (impressions, page views) once instances exist.
+5. App Store Connect analytics connector (impressions, page views) once instances exist. Done 2026-11-22.
 6. Portfolio overview page; per-app page with downloads and revenue charts.
 7. Settings page: connections, sync status, "Sync now".
 8. Velocity cron: `sync` every 6 hours.
@@ -480,8 +491,9 @@ Status on 2026-11-20 (merged to `main` and deployed):
   Settings (service account key and Cloud Storage URI), package-to-app matching, and daily new
   users and store listing visitors from the monthly report files. Tested with unit tests,
   database tests and a browser run against a stand-in Google; not yet run against Play.
-- Not started: step 5 (reading the analytics reports) and step 8 (cron, which needs a Velocity
-  console entry: `node dist/cli.js sync` every six hours).
+- Step 5 (reading the analytics reports) is built, on 2026-11-22; see the App Store section.
+- Not started: step 8 (cron, which needs a Velocity console entry: `node dist/cli.js sync` every
+  six hours).
 
 ### Phase 2 — Social and the funnel chart
 
@@ -551,6 +563,10 @@ Status on 2026-11-22 (merged to `main` and deployed):
   the app's Settings and links that project to that app, whatever its bundle id says (a key that
   sees several projects is refused there). The Accounts page's RevenueCat entry only lists each
   app's project and state.
+- App Store page views (2026-11-22): the analytics import above. Connecting no longer asks Apple
+  for reports for every app in the account; the sync asks for the tracked ones. Checked read-only
+  against the real account: of ten apps only ZenFit had a report request, and its last days came
+  out at 1 to 4 product page views and 50 to 211 impressions a day.
 
 ### Phase 3 — Reviews inbox
 
