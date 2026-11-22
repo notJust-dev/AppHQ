@@ -439,7 +439,7 @@ Status on 2026-11-20 (merged to `main` and deployed):
   shared date axis, each on its own scale, with one crosshair that reads a day across every
   row. Days no source reported are gaps, not zeros. It covers Phase 2 step 5's timeline too; the
   post markers come with the social connectors. Query: `get_app_timeline`.
-- Step 4 (Google Play) is built on branch `phase-1-google-play`: "Connect Google Play" in
+- Step 4 (Google Play) is merged and deployed (2026-11-22): "Connect Google Play" in
   Settings (service account key and Cloud Storage URI), package-to-app matching, and daily new
   users and store listing visitors from the monthly report files. Tested with unit tests,
   database tests and a browser run against a stand-in Google; not yet run against Play.
