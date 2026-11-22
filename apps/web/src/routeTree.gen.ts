@@ -14,7 +14,10 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
+import { Route as AppMonetisationRouteImport } from './routes/_app/monetisation'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSocialRouteImport } from './routes/_app/social'
+import { Route as AppStoreRouteImport } from './routes/_app/store'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts.index'
 import { Route as AppAccountsAppStoreRouteImport } from './routes/_app/accounts.app-store'
 import { Route as AppAccountsGooglePlayRouteImport } from './routes/_app/accounts.google-play'
@@ -53,9 +56,24 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMonetisationRoute = AppMonetisationRouteImport.update({
+  id: '/monetisation',
+  path: '/monetisation',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSocialRoute = AppSocialRouteImport.update({
+  id: '/social',
+  path: '/social',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStoreRoute = AppStoreRouteImport.update({
+  id: '/store',
+  path: '/store',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
@@ -129,7 +147,10 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRouteWithChildren
+  '/monetisation': typeof AppMonetisationRoute
   '/settings': typeof AppSettingsRoute
+  '/social': typeof AppSocialRoute
+  '/store': typeof AppStoreRoute
   '/accounts/app-store': typeof AppAccountsAppStoreRoute
   '/accounts/google-play': typeof AppAccountsGooglePlayRoute
   '/accounts/meta': typeof AppAccountsMetaRoute
@@ -147,7 +168,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/monetisation': typeof AppMonetisationRoute
   '/settings': typeof AppSettingsRoute
+  '/social': typeof AppSocialRoute
+  '/store': typeof AppStoreRoute
   '/': typeof AppIndexRoute
   '/accounts/app-store': typeof AppAccountsAppStoreRoute
   '/accounts/google-play': typeof AppAccountsGooglePlayRoute
@@ -168,7 +192,10 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/_app/accounts': typeof AppAccountsRouteWithChildren
+  '/_app/monetisation': typeof AppMonetisationRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/social': typeof AppSocialRoute
+  '/_app/store': typeof AppStoreRoute
   '/_app/': typeof AppIndexRoute
   '/_app/accounts/app-store': typeof AppAccountsAppStoreRoute
   '/_app/accounts/google-play': typeof AppAccountsGooglePlayRoute
@@ -191,7 +218,10 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/accounts'
+    | '/monetisation'
     | '/settings'
+    | '/social'
+    | '/store'
     | '/accounts/app-store'
     | '/accounts/google-play'
     | '/accounts/meta'
@@ -209,7 +239,10 @@ export interface FileRouteTypes {
   to:
     | '/health'
     | '/login'
+    | '/monetisation'
     | '/settings'
+    | '/social'
+    | '/store'
     | '/'
     | '/accounts/app-store'
     | '/accounts/google-play'
@@ -229,7 +262,10 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/_app/accounts'
+    | '/_app/monetisation'
     | '/_app/settings'
+    | '/_app/social'
+    | '/_app/store'
     | '/_app/'
     | '/_app/accounts/app-store'
     | '/_app/accounts/google-play'
@@ -291,11 +327,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/monetisation': {
+      id: '/_app/monetisation'
+      path: '/monetisation'
+      fullPath: '/monetisation'
+      preLoaderRoute: typeof AppMonetisationRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/social': {
+      id: '/_app/social'
+      path: '/social'
+      fullPath: '/social'
+      preLoaderRoute: typeof AppSocialRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/store': {
+      id: '/_app/store'
+      path: '/store'
+      fullPath: '/store'
+      preLoaderRoute: typeof AppStoreRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/accounts/': {
@@ -430,7 +487,10 @@ const AppAppsAppIdRouteWithChildren = AppAppsAppIdRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRouteWithChildren
+  AppMonetisationRoute: typeof AppMonetisationRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppSocialRoute: typeof AppSocialRoute
+  AppStoreRoute: typeof AppStoreRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAppsAppIdRoute: typeof AppAppsAppIdRouteWithChildren
   AppAppsNewRoute: typeof AppAppsNewRoute
@@ -439,7 +499,10 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRouteWithChildren,
+  AppMonetisationRoute: AppMonetisationRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppSocialRoute: AppSocialRoute,
+  AppStoreRoute: AppStoreRoute,
   AppIndexRoute: AppIndexRoute,
   AppAppsAppIdRoute: AppAppsAppIdRouteWithChildren,
   AppAppsNewRoute: AppAppsNewRoute,

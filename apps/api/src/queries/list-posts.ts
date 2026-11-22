@@ -4,7 +4,8 @@ import { metricDaily, posts } from '../db/schema.js'
 import { addDays, toIsoDate, type IsoDate } from '../lib/dates.js'
 import { HEADLINE } from '../metrics/catalog.js'
 import { lastCompleteDay } from '../metrics/complete.js'
-import { BASELINE_DAYS, LIFT_DAYS, downloadLift } from '../metrics/post-lift.js'
+import { BASELINE_DAYS, LIFT_DAYS, downloadLift, type DownloadLift } from '../metrics/post-lift.js'
+import type { Db } from '../db/client.js'
 import { defineQuery } from './define.js'
 import { checkRange, rangeFields } from './range.js'
 
@@ -54,44 +55,57 @@ export const listPosts = defineQuery({
       .limit(input.limit)
     if (rows.length === 0) return []
 
-    const downloadFilter = and(
-      eq(metricDaily.appId, input.appId),
-      eq(metricDaily.metric, DOWNLOADS.metric),
-      eq(metricDaily.dimension, ''),
-      inArray(metricDaily.source, [...DOWNLOADS.sources]),
-    )
-    const [downloadRows, latestBySource] = await Promise.all([
-      db
-        .select({ date: metricDaily.date, value: metricDaily.value })
-        .from(metricDaily)
-        .where(
-          and(
-            downloadFilter,
-            gte(metricDaily.date, addDays(input.from, -BASELINE_DAYS)),
-            lte(metricDaily.date, addDays(input.to, LIFT_DAYS - 1)),
-          ),
-        ),
-      db
-        .select({ source: metricDaily.source, day: max(metricDaily.date) })
-        .from(metricDaily)
-        .where(downloadFilter)
-        .groupBy(metricDaily.source),
-    ])
-
-    // Summed over the stores, like the downloads row of the timeline, and only up to the last
-    // day every store still reporting has reached: Google Play posts days after the App Store.
-    const byDay = new Map<IsoDate, number>()
-    for (const { date, value } of downloadRows) byDay.set(date, (byDay.get(date) ?? 0) + value)
-    const lastDays = new Map(
-      latestBySource.flatMap(({ source, day }) => (day ? [[source, day] as const] : [])),
-    )
-    const lastReportedDay = lastCompleteDay(lastDays).through
+    const liftOf = await downloadLifts(db, input.appId, input)
 
     return rows.map((row) => ({
       ...row,
       publishedAt: row.publishedAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      downloadLift: downloadLift(byDay, toIsoDate(row.publishedAt), lastReportedDay),
+      downloadLift: liftOf(row.publishedAt),
     }))
   },
 })
+
+/**
+ * How an app's downloads moved after each of its posts in a range: reads the downloads the
+ * lift needs once, then answers per post. Downloads are summed over the stores, like the
+ * downloads row of the timeline, and only up to the last day every store still reporting has
+ * reached: Google Play posts days after the App Store.
+ */
+export async function downloadLifts(
+  db: Db,
+  appId: string,
+  range: { from: IsoDate; to: IsoDate },
+): Promise<(publishedAt: Date) => DownloadLift> {
+  const downloadFilter = and(
+    eq(metricDaily.appId, appId),
+    eq(metricDaily.metric, DOWNLOADS.metric),
+    eq(metricDaily.dimension, ''),
+    inArray(metricDaily.source, [...DOWNLOADS.sources]),
+  )
+  const [downloadRows, latestBySource] = await Promise.all([
+    db
+      .select({ date: metricDaily.date, value: metricDaily.value })
+      .from(metricDaily)
+      .where(
+        and(
+          downloadFilter,
+          gte(metricDaily.date, addDays(range.from, -BASELINE_DAYS)),
+          lte(metricDaily.date, addDays(range.to, LIFT_DAYS - 1)),
+        ),
+      ),
+    db
+      .select({ source: metricDaily.source, day: max(metricDaily.date) })
+      .from(metricDaily)
+      .where(downloadFilter)
+      .groupBy(metricDaily.source),
+  ])
+
+  const byDay = new Map<IsoDate, number>()
+  for (const { date, value } of downloadRows) byDay.set(date, (byDay.get(date) ?? 0) + value)
+  const lastDays = new Map(
+    latestBySource.flatMap(({ source, day }) => (day ? [[source, day] as const] : [])),
+  )
+  const lastReportedDay = lastCompleteDay(lastDays).through
+  return (publishedAt) => downloadLift(byDay, toIsoDate(publishedAt), lastReportedDay)
+}

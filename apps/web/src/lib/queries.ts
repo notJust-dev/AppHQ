@@ -4,6 +4,7 @@ import { getSyncStatusFn, listAccountsFn, listAppsFn } from '@/fns/settings'
 import { listAssetsFn } from '@/fns/assets'
 import { metaSetupFn } from '@/fns/meta'
 import { tiktokSetupFn } from '@/fns/tiktok'
+import { getMonetisationPerformanceFn, getSocialPerformanceFn, getStorePerformanceFn } from '@/fns/performance'
 
 export const overviewQuery = (dates: { from: string; to: string }) =>
   queryOptions({
@@ -38,6 +39,36 @@ export const accountsQuery = () =>
 
 export const syncStatusQuery = () =>
   queryOptions({ queryKey: ['sync-status'], queryFn: () => getSyncStatusFn() })
+
+/** The dates of a performance page, and the app it is limited to, if any. */
+type PerformanceInput = { from: string; to: string; appId?: string }
+
+export const socialPerformanceQuery = (input: PerformanceInput) =>
+  queryOptions({
+    queryKey: ['performance', 'social', input.from, input.to, input.appId ?? 'all'],
+    queryFn: () => getSocialPerformanceFn({ data: input }),
+  })
+
+export const storePerformanceQuery = (input: PerformanceInput) =>
+  queryOptions({
+    queryKey: ['performance', 'store', input.from, input.to, input.appId ?? 'all'],
+    queryFn: () => getStorePerformanceFn({ data: input }),
+  })
+
+export const monetisationPerformanceQuery = (input: PerformanceInput) =>
+  queryOptions({
+    queryKey: ['performance', 'monetisation', input.from, input.to, input.appId ?? 'all'],
+    queryFn: () => getMonetisationPerformanceFn({ data: input }),
+  })
+
+export type SocialPerformance = Awaited<ReturnType<typeof getSocialPerformanceFn>>
+export type StorePerformance = Awaited<ReturnType<typeof getStorePerformanceFn>>
+export type MonetisationPerformance = Awaited<ReturnType<typeof getMonetisationPerformanceFn>>
+/** One series of a performance page, whichever page. */
+export type PerformanceSeries =
+  | SocialPerformance['series'][number]
+  | StorePerformance['series'][number]
+  | MonetisationPerformance['series'][number]
 
 export type Overview = Awaited<ReturnType<typeof getOverviewFn>>
 

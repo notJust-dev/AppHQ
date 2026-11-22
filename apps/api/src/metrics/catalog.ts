@@ -93,3 +93,45 @@ export const TIMELINE = [
   unit: 'count' | 'usd'
   aggregate: 'sum' | 'last'
 }[]
+
+export const SOCIAL_SOURCES = ['tiktok', 'instagram', 'facebook'] as const satisfies readonly Source[]
+export const STORE_SOURCES = ['app_store', 'google_play'] as const satisfies readonly Source[]
+
+/**
+ * The series behind each performance page. Like the timeline rows, each is one metric summed
+ * over the sources that report it; levels (followers, MRR, subscriptions) take the latest value
+ * over a range instead of a total.
+ */
+export const PERFORMANCE = {
+  social: [
+    { key: 'views', label: 'Social views', metric: 'views', sources: SOCIAL_SOURCES, unit: 'count', aggregate: 'sum' },
+    { key: 'followers', label: 'Followers', metric: 'followers', sources: SOCIAL_SOURCES, unit: 'count', aggregate: 'last' },
+    { key: 'downloads', label: 'Downloads', metric: 'downloads', sources: STORE_SOURCES, unit: 'count', aggregate: 'sum' },
+  ],
+  store: [
+    { key: 'impressions', label: 'Impressions', metric: 'impressions', sources: ['app_store'], unit: 'count', aggregate: 'sum' },
+    { key: 'pageViews', label: 'Store page views', metric: 'page_views', sources: STORE_SOURCES, unit: 'count', aggregate: 'sum' },
+    { key: 'downloads', label: 'Downloads', metric: 'downloads', sources: STORE_SOURCES, unit: 'count', aggregate: 'sum' },
+  ],
+  monetisation: [
+    { key: 'revenue', label: 'Revenue', metric: 'revenue', sources: ['revenuecat'], unit: 'usd', aggregate: 'sum' },
+    { key: 'mrr', label: 'MRR', metric: 'mrr', sources: ['revenuecat'], unit: 'usd', aggregate: 'last' },
+    { key: 'activeSubs', label: 'Active subscriptions', metric: 'active_subs', sources: ['revenuecat'], unit: 'count', aggregate: 'last' },
+    { key: 'activeTrials', label: 'Active trials', metric: 'active_trials', sources: ['revenuecat'], unit: 'count', aggregate: 'last' },
+    { key: 'trials', label: 'Trials started', metric: 'trials', sources: ['revenuecat'], unit: 'count', aggregate: 'sum' },
+    { key: 'newCustomers', label: 'New customers', metric: 'new_customers', sources: ['revenuecat'], unit: 'count', aggregate: 'sum' },
+    { key: 'downloads', label: 'Downloads', metric: 'downloads', sources: STORE_SOURCES, unit: 'count', aggregate: 'sum' },
+  ],
+} as const satisfies Record<
+  string,
+  readonly {
+    key: string
+    label: string
+    metric: string
+    sources: readonly Source[]
+    unit: 'count' | 'usd'
+    aggregate: 'sum' | 'last'
+  }[]
+>
+
+export type PerformanceSection = keyof typeof PERFORMANCE

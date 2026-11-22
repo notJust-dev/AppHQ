@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AppWindow, LayoutDashboard, LogOut, Monitor, Moon, Plug, Plus, Sun } from 'lucide-react'
+import { AppWindow, LayoutDashboard, LogOut, Megaphone, Monitor, Moon, Plug, Plus, Store, Sun, Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { BrandMark } from '@/components/Brand'
 import {
@@ -33,6 +33,13 @@ import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
 /** TanStack marks the link to the current page with aria-current; that is the active item. */
 const ACTIVE =
   'aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-medium aria-[current=page]:text-sidebar-accent-foreground'
+
+/** The pages that look at one part of the funnel across apps. */
+const PERFORMANCE = [
+  { to: '/social', label: 'Social', Icon: Megaphone },
+  { to: '/store', label: 'Store', Icon: Store },
+  { to: '/monetisation', label: 'Monetisation', Icon: Wallet },
+] as const
 
 /** How many apps the sidebar lists before pointing to the Apps page for the rest. */
 const APPS_SHOWN = 12
@@ -95,6 +102,25 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Performance</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu aria-label="Performance">
+              {PERFORMANCE.map(({ to, label, Icon }) => (
+                <SidebarMenuItem key={to}>
+                  <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
+                    {/* The page keeps the range and app it was last opened with in the address. */}
+                    <Link to={to} activeOptions={{ includeSearch: false }}>
+                      <Icon />
+                      <span>{label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

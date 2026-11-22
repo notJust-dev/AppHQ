@@ -11,6 +11,11 @@ export const rangeSearchSchema = z.object({
   range: z.enum(RANGE_KEYS).default('28d').catch('28d'),
 })
 
+/** A performance page's search params: the range, and the one app it is limited to, if any. */
+export const performanceSearchSchema = rangeSearchSchema.extend({
+  app: z.string().min(1).max(64).optional().catch(undefined),
+})
+
 export const RANGE_LABELS: Record<RangeKey, string> = {
   '7d': '7 days',
   '28d': '28 days',

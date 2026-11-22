@@ -7,8 +7,18 @@ import { lastCompleteDay } from '../metrics/complete.js'
 import { defineQuery } from './define.js'
 import { checkRange, rangeFields } from './range.js'
 
-type Definition = (typeof TIMELINE)[number]
 type Values = (number | null)[]
+
+/** A daily series: one metric summed over the sources that report it. */
+export interface SeriesDefinition {
+  key: string
+  label: string
+  metric: string
+  sources: readonly string[]
+  unit: 'count' | 'usd'
+  /** How a range is summed up: a total for flows, the latest value for levels such as MRR. */
+  aggregate: 'sum' | 'last'
+}
 
 export interface MetricRow {
   date: IsoDate
@@ -19,27 +29,35 @@ export interface MetricRow {
 
 const toCents = (amount: number) => Math.round(amount * 100) / 100
 
-function summarize(aggregate: Definition['aggregate'], values: Values): number | null {
+function summarize(aggregate: SeriesDefinition['aggregate'], values: Values): number | null {
   const present = values.filter((value): value is number => value !== null)
   if (present.length === 0) return null
   return aggregate === 'last' ? (present.at(-1) ?? null) : present.reduce((a, b) => a + b, 0)
 }
 
+/** The app timeline's rows, each with the funnel stage that colours it. */
+export function buildTimeline(rows: MetricRow[], days: IsoDate[]) {
+  return buildSeries(TIMELINE, rows, days).map((series, index) => ({
+    ...series,
+    stage: TIMELINE[index]!.stage,
+  }))
+}
+
 /**
- * Turns metric rows into one series per timeline row, with one value per day. A day no source
+ * Turns metric rows into one series per definition, with one value per day. A day no source
  * reported is null, not zero, so a source that has not caught up yet shows as a gap instead of
  * a collapse. Each series also carries its per-source parts.
  */
-export function buildTimeline(rows: MetricRow[], days: IsoDate[]) {
+export function buildSeries<D extends SeriesDefinition>(definitions: readonly D[], rows: MetricRow[], days: IsoDate[]) {
   const dayIndex = new Map(days.map((day, index) => [day, index]))
 
-  return TIMELINE.map((definition) => {
+  return definitions.map((definition) => {
     const round = (value: number) => (definition.unit === 'usd' ? toCents(value) : value)
     const bySource = new Map<string, Values>()
 
     for (const row of rows) {
       if (row.metric !== definition.metric) continue
-      if (!(definition.sources as readonly string[]).includes(row.source)) continue
+      if (!definition.sources.includes(row.source)) continue
       const index = dayIndex.get(row.date)
       if (index === undefined) continue
       const values = bySource.get(row.source) ?? days.map(() => null)
@@ -92,7 +110,6 @@ export function buildTimeline(rows: MetricRow[], days: IsoDate[]) {
     return {
       key: definition.key,
       label: definition.label,
-      stage: definition.stage,
       unit: definition.unit,
       aggregate: definition.aggregate,
       /** Every source that can report this row, whether or not it has. */

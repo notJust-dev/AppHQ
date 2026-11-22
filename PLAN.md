@@ -599,6 +599,16 @@ Status on 2026-11-22 (merged to `main` and deployed):
   theme instead of next-themes. The table lives in `table-primitives.tsx` behind `table.ts`,
   because Velocity keeps deleted files and an older `ui/table.ts` would otherwise win over a new
   `ui/table.tsx`.
+- Performance pages (2026-11-22): Social, Store and Monetisation, under Performance in the
+  sidebar, for all apps or one (`?app=`), over 7, 28 or 90 days. The API's
+  `get_social_performance`, `get_store_performance` and `get_monetisation_performance` share one
+  loader: the series in `PERFORMANCE` (catalog.ts) summed over the chosen apps with the period
+  before, and each app's summaries overall and by source, so rates pair only apps (and stores)
+  that report both numbers. Social adds the range's posts by platform and per day, and the top
+  posts with their download lift; Store adds a daily page-view-to-download rate paired the same
+  way. Charts are small multiples on one day axis (a fixed value-axis width lines them up), one
+  stage colour each: platforms and stores are named in tables, not told apart by colour, since
+  three blues that pass the colour-vision checks in the dark theme do not exist.
 
 ### Phase 3 — Reviews inbox
 

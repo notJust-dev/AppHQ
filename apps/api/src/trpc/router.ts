@@ -21,6 +21,7 @@ import { listAccounts } from '../queries/list-accounts.js'
 import { listApps } from '../queries/list-apps.js'
 import { listAssets } from '../queries/list-assets.js'
 import { listPosts } from '../queries/list-posts.js'
+import { getMonetisationPerformance, getSocialPerformance, getStorePerformance } from '../queries/performance.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
@@ -368,6 +369,18 @@ export const appRouter = t.router({
     get: t.procedure
       .input(getOverview.input)
       .query(({ ctx, input }) => getOverview.handler(ctx, input)),
+  }),
+  /** The Social, Store and Monetisation pages: one app or all of them, over a range. */
+  performance: t.router({
+    social: t.procedure
+      .input(getSocialPerformance.input)
+      .query(({ ctx, input }) => getSocialPerformance.handler(ctx, input)),
+    store: t.procedure
+      .input(getStorePerformance.input)
+      .query(({ ctx, input }) => getStorePerformance.handler(ctx, input)),
+    monetisation: t.procedure
+      .input(getMonetisationPerformance.input)
+      .query(({ ctx, input }) => getMonetisationPerformance.handler(ctx, input)),
   }),
   sync: t.router({
     status: t.procedure.query(({ ctx }) => getSyncStatus.handler(ctx)),

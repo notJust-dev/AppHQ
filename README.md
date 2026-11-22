@@ -65,6 +65,13 @@ numbers and posts, and Settings, with its name, what feeds it, and a button to s
 To add an app by name (one only on Android, say), use Add app on the Apps page. Linking
 something fetches its history.
 
+The Performance pages look at one part of the funnel across all apps, or one app picked at the
+top: Social (posts, views by platform, followers, top posts with the download lift after each,
+and posts, views and downloads on one day axis), Store (impressions, page views and downloads
+as a funnel per store, and the share of page views that end in a download) and Monetisation
+(revenue, MRR, subscriptions and trials). Each compares with the period before. A rate such as
+revenue per download only counts the apps, and stores, that report both of its numbers.
+
 For revenue, open an app's Settings and paste a RevenueCat v2 secret key from that app's project
 (a RevenueCat key belongs to one project, so it is connected per app, not on the Accounts page).
 The key needs read access to charts and metrics, and to project configuration. About a year of
