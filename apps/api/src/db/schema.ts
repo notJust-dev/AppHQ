@@ -157,3 +157,4 @@ export type NewMetric = typeof metricDaily.$inferInsert
 export type SyncRun = typeof syncRuns.$inferSelect
 export type Connection = typeof connections.$inferSelect
 export type Post = typeof posts.$inferSelect
+export type NewPost = typeof posts.$inferInsert

@@ -1,6 +1,6 @@
 import { like } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
-import { apps, type NewApp, type NewMetric } from '../db/schema.js'
+import { apps, posts, type NewApp, type NewMetric, type NewPost } from '../db/schema.js'
 import { addDays, parseIsoDate, todayUtc, type IsoDate } from '../lib/dates.js'
 import type { Source } from '../metrics/catalog.js'
 import { upsertMetrics } from '../metrics/upsert.js'
@@ -20,13 +20,67 @@ interface Profile {
   scale: number
   monthlyPrice: number
   androidShare: number
+  /** Made-up post captions, picked at random. */
+  captions: string[]
 }
 
 const PROFILES: Profile[] = [
-  { id: 'demo-habitloop', name: 'Habitloop', scale: 1, monthlyPrice: 6.99, androidShare: 0.35 },
-  { id: 'demo-trailmate', name: 'Trailmate', scale: 0.55, monthlyPrice: 9.99, androidShare: 0.45 },
-  { id: 'demo-dishcraft', name: 'Dishcraft', scale: 0.3, monthlyPrice: 4.99, androidShare: 0.3 },
-  { id: 'demo-quillnote', name: 'Quillnote', scale: 0.12, monthlyPrice: 7.99, androidShare: 0.2 },
+  {
+    id: 'demo-habitloop',
+    name: 'Habitloop',
+    scale: 1,
+    monthlyPrice: 6.99,
+    androidShare: 0.35,
+    captions: [
+      'Day 30 of tracking my habits, here is what changed',
+      'The two-minute rule fixed my mornings',
+      'My habit streaks after 90 days',
+      'Three habits that actually stuck this year',
+      'Why I stopped trying to change everything at once',
+    ],
+  },
+  {
+    id: 'demo-trailmate',
+    name: 'Trailmate',
+    scale: 0.55,
+    monthlyPrice: 9.99,
+    androidShare: 0.45,
+    captions: [
+      'Found this trail an hour from the city',
+      'Offline maps saved this hike',
+      'Sunrise hike, 6 km, worth every step',
+      'How I plan a weekend hike in five minutes',
+      'Five trails for your first autumn hike',
+    ],
+  },
+  {
+    id: 'demo-dishcraft',
+    name: 'Dishcraft',
+    scale: 0.3,
+    monthlyPrice: 4.99,
+    androidShare: 0.3,
+    captions: [
+      'A 15-minute dinner from whatever is in the fridge',
+      'Meal prep for the whole week in one go',
+      'This pasta has four ingredients',
+      'Turning last night’s leftovers into lunch',
+      'The only soup recipe you need this winter',
+    ],
+  },
+  {
+    id: 'demo-quillnote',
+    name: 'Quillnote',
+    scale: 0.12,
+    monthlyPrice: 7.99,
+    androidShare: 0.2,
+    captions: [
+      'My journaling setup for 2026',
+      'One page a day changed how I think',
+      'How I take notes from the books I read',
+      'Morning pages, week three',
+      'The note-taking mistake I made for years',
+    ],
+  },
 ]
 
 /** Small deterministic PRNG, so the same seed always produces the same dataset. */
@@ -54,15 +108,39 @@ export interface DemoOptions {
   endDate?: IsoDate
 }
 
-export function generateDemoData(options: DemoOptions): { apps: NewApp[]; metrics: NewMetric[] } {
+export function generateDemoData(options: DemoOptions): {
+  apps: NewApp[]
+  metrics: NewMetric[]
+  posts: NewPost[]
+} {
   const endDate = options.endDate ?? addDays(todayUtc(), -1)
   const startDate = addDays(endDate, -(options.days - 1))
   const metrics: NewMetric[] = []
+  const demoPosts: NewPost[] = []
 
   for (const profile of PROFILES) {
     const { id, scale, monthlyPrice, androidShare } = profile
     const rand = mulberry32(hash(id))
     const noise = (spread: number) => 1 + (rand() * 2 - 1) * spread
+    // Posts draw from their own sequence, so adding them left every metric exactly as it was.
+    const postRand = mulberry32(hash(`${id}:posts`))
+    const addPost = (platform: Source, index: number, date: IsoDate, views: number) => {
+      const hour = String(13 + Math.floor(postRand() * 8)).padStart(2, '0')
+      const minute = String(Math.floor(postRand() * 60)).padStart(2, '0')
+      const engagement = (rate: number) => Math.round(views * rate * (0.8 + postRand() * 0.4))
+      demoPosts.push({
+        platform,
+        externalId: `${id}-${platform}-${index}`,
+        appId: id,
+        caption: profile.captions[Math.floor(postRand() * profile.captions.length)] ?? null,
+        publishedAt: new Date(`${date}T${hour}:${minute}:00Z`),
+        durationSeconds: 8 + Math.floor(postRand() * 52),
+        views,
+        likes: engagement(0.075),
+        comments: engagement(0.004),
+        shares: engagement(0.008),
+      })
+    }
 
     let tiktokBoost = 0
     let instagramBoost = 0
@@ -80,11 +158,24 @@ export function generateDemoData(options: DemoOptions): { apps: NewApp[]; metric
       const weekday = parseIsoDate(date).getUTCDay()
       const weekend = weekday === 0 || weekday === 6 ? 1.15 : 1
 
-      // A post occasionally takes off, then fades over the following days.
+      // A post occasionally takes off, then fades over the following days. Over its life it
+      // collects about 1 / (1 - decay) times its first day's boost.
       tiktokBoost *= 0.42
-      if (rand() < 0.045) tiktokBoost += scale * (60_000 + rand() * 340_000)
+      if (rand() < 0.045) {
+        const boost = scale * (60_000 + rand() * 340_000)
+        tiktokBoost += boost
+        addPost('tiktok', i, date, Math.round(boost / 0.58 + scale * 3_000))
+      } else if (postRand() < 0.35) {
+        addPost('tiktok', i, date, Math.round(scale * (2_500 + postRand() * 9_000)))
+      }
       instagramBoost *= 0.5
-      if (rand() < 0.025) instagramBoost += scale * (15_000 + rand() * 90_000)
+      if (rand() < 0.025) {
+        const boost = scale * (15_000 + rand() * 90_000)
+        instagramBoost += boost
+        addPost('instagram', i, date, Math.round(boost / 0.5 + scale * 1_500))
+      } else if (postRand() < 0.15) {
+        addPost('instagram', i, date, Math.round(scale * (1_200 + postRand() * 4_000)))
+      }
 
       const tiktokViews = Math.round(scale * 9_000 * weekend * noise(0.35) + tiktokBoost)
       const instagramViews = Math.round(scale * 3_500 * weekend * noise(0.3) + instagramBoost)
@@ -143,6 +234,7 @@ export function generateDemoData(options: DemoOptions): { apps: NewApp[]; metric
       androidPackage: `demo.${id.replace('-', '.')}`,
     })),
     metrics,
+    posts: demoPosts,
   }
 }
 
@@ -155,14 +247,20 @@ export async function clearDemo(db: Db) {
   return { apps: removed.length }
 }
 
-/** Replaces the demo apps and their metrics. Real apps (ids without the prefix) are untouched. */
+/**
+ * Replaces the demo apps with their metrics and posts. Real apps (ids without the prefix) are
+ * untouched.
+ */
 export async function seedDemo(db: Db, options: DemoOptions) {
   const data = generateDemoData(options)
   await db.transaction(async (tx) => {
-    // Metrics go with the apps through ON DELETE CASCADE.
+    // Metrics and posts go with the apps through ON DELETE CASCADE.
     await tx.delete(apps).where(like(apps.id, `${DEMO_PREFIX}%`))
     await tx.insert(apps).values(data.apps)
     await upsertMetrics(tx as unknown as Db, data.metrics)
+    for (let i = 0; i < data.posts.length; i += 500) {
+      await tx.insert(posts).values(data.posts.slice(i, i + 500))
+    }
   })
-  return { apps: data.apps.length, metrics: data.metrics.length }
+  return { apps: data.apps.length, metrics: data.metrics.length, posts: data.posts.length }
 }

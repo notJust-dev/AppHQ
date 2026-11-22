@@ -20,6 +20,22 @@ describe('generateDemoData', () => {
     expect(metrics.every((m) => Number.isFinite(m.value) && m.value >= 0)).toBe(true)
   })
 
+  it('puts a viral TikTok post on the day TikTok views peaked', () => {
+    const { metrics, posts } = generateDemoData({ days: 120, endDate: '2026-11-19' })
+    const views = metrics.filter(
+      (m) => m.appId === 'demo-habitloop' && m.source === 'tiktok' && m.metric === 'views',
+    )
+    const peak = views.reduce((best, m) => (m.value > best.value ? m : best))
+    const tiktokPosts = posts.filter((p) => p.appId === 'demo-habitloop' && p.platform === 'tiktok')
+    const typical = [...tiktokPosts].map((p) => p.views ?? 0).sort((a, b) => a - b)[
+      Math.floor(tiktokPosts.length / 2)
+    ]
+    const onPeak = tiktokPosts.find((p) => p.publishedAt.toISOString().slice(0, 10) === peak.date)
+
+    expect(onPeak?.views).toBeGreaterThan(5 * (typical ?? 0))
+    expect(new Set(posts.map((p) => p.externalId)).size).toBe(posts.length)
+  })
+
   it('makes downloads follow social views', () => {
     const { metrics } = generateDemoData({ days: 120, endDate: '2026-11-19' })
     const series = (source: string, metric: string) =>

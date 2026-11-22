@@ -51,7 +51,7 @@ function AppPage() {
         <RangeSwitch current={range} />
       </div>
       <div className="mt-8">
-        <Timeline days={data.days} series={data.series} connected={connected} />
+        <Timeline days={data.days} series={data.series} posts={posts} connected={connected} />
       </div>
       <section className="mt-12" aria-labelledby="posts-heading">
         <h2 id="posts-heading" className="font-display text-xl font-semibold tracking-tight">
@@ -59,6 +59,8 @@ function AppPage() {
         </h2>
         <p className="mt-1 text-sm text-ink-soft">
           Published in this range, newest first. Totals are lifetime numbers from the last sync.
+          Download lift compares downloads on the post&apos;s day and the two after with the
+          week before&apos;s pace; posts close together share those days.
         </p>
         <div className="mt-4">
           <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} />

@@ -409,7 +409,14 @@ Status on 2026-11-22 (merged to `main` and deployed):
 - Steps 1 and 2 for TikTok: "Connect TikTok" in Settings (pick the app, sign in on TikTok, come
   back), encrypted rotating tokens, `needs_reauth` when TikTok rejects the refresh token, and a
   connector that saves posts and daily snapshots on every sync and derives daily views.
-- The app page lists its posts with lifetime totals. Step 5's post markers are not built yet.
+- The app page lists its posts with lifetime totals.
+- Steps 5 and 6 (branch `phase-2-post-markers`, not merged): a posts lane above the funnel rows
+  with one marker per posting day, sized by views. Selecting one shades its day and the two
+  after in every row and shows the post with its download lift: downloads over those three
+  days against the week before's daily pace (`list_posts` returns it as `downloadLift`, with
+  `too_recent`, `no_baseline` or `no_downloads` when it cannot be worked out). The posts table
+  has the same lift column. Markers on neighbouring days overlap, so the pointer picks the
+  nearest one. Demo data now includes posts on the TikTok and Instagram spike days.
 - Tested with unit tests, database tests and a browser run against a stand-in TikTok: cancel,
   missing permission, connect, revoked account, reconnect. Then against TikTok itself:
   @vadimnotjustdev connected to TinyKicks, 55 videos (2019 to 2026-09-25), real counts.

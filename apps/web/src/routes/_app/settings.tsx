@@ -108,7 +108,7 @@ function SettingsPage() {
 
       <Section
         title="Demo data"
-        intro="Four made-up apps with 200 days of numbers, for trying the dashboard or recording it without real figures on screen. Removing them leaves your own apps untouched."
+        intro="Four made-up apps with 200 days of numbers and posts, for trying the dashboard or recording it without real figures on screen. Removing them leaves your own apps untouched."
       >
         <DemoData onChanged={dataChanged} />
       </Section>

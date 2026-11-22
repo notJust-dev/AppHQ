@@ -1,11 +1,43 @@
-import { useState, type KeyboardEvent, type PointerEvent } from 'react'
-import { formatDay, formatTick, formatValue } from '../lib/format'
-import type { Timeline as TimelineData } from '../lib/queries'
+import { useState, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { formatCount, formatDay, formatTick, formatValue } from '../lib/format'
+import { liftSentence } from '../lib/lift'
+import type { Post, Timeline as TimelineData } from '../lib/queries'
 import { niceScale, tickIndexes } from '../lib/scale'
 import { sourceLabel } from '../lib/sources'
 
 type Series = TimelineData['series'][number]
 type Values = Series['values']
+
+/** The posts that went up on one day of the range. */
+interface PostDay {
+  index: number
+  day: string
+  posts: Post[]
+  views: number
+}
+
+/** The days a selected post's lift is measured over: its own day and the two after. */
+interface Band {
+  from: number
+  to: number
+}
+
+const LIFT_DAYS = 3
+
+function groupByDay(posts: Post[], days: string[]): PostDay[] {
+  const dayIndex = new Map(days.map((day, index) => [day, index]))
+  const groups = new Map<number, PostDay>()
+  for (const post of posts) {
+    const day = post.publishedAt.slice(0, 10)
+    const index = dayIndex.get(day)
+    if (index === undefined) continue
+    const group = groups.get(index) ?? { index, day, posts: [], views: 0 }
+    group.posts.push(post)
+    group.views += post.views
+    groups.set(index, group)
+  }
+  return [...groups.values()].sort((a, b) => a.index - b.index)
+}
 
 /**
  * One app's funnel, one row per step on a shared date axis. Each row has its own scale (the
@@ -64,17 +96,28 @@ const lastIndexOf = (values: Values) => values.findLastIndex((value) => value !=
 export function Timeline({
   days,
   series,
+  posts = [],
   connected = new Set(),
 }: {
   days: string[]
   series: Series[]
+  /** Posts published in the range, shown as markers above the rows. */
+  posts?: Post[]
   /** Providers with an account connected to this app, so an empty row can say why it is empty. */
   connected?: ReadonlySet<string>
 }) {
   const [active, setActive] = useState<number | null>(null)
   const [showTable, setShowTable] = useState(false)
+  // Kept as a day rather than an index, so a different range cannot point it at another day.
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const count = days.length
   const percent = (index: number) => (count <= 1 ? 50 : (index / (count - 1)) * 100)
+
+  const postDays = groupByDay(posts, days)
+  const selected = postDays.find((group) => group.day === selectedDay) ?? null
+  const band: Band | null = selected
+    ? { from: selected.index, to: Math.min(selected.index + LIFT_DAYS - 1, count - 1) }
+    : null
 
   const pointAt = (event: PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -125,12 +168,26 @@ export function Timeline({
         onPointerLeave={() => setActive(null)}
         className="overflow-hidden rounded-lg border border-line bg-surface outline-offset-4"
       >
+        {postDays.length > 0 && (
+          <PostsLane
+            groups={postDays}
+            total={posts.length}
+            active={active}
+            band={band}
+            selectedDay={selected?.day ?? null}
+            percent={percent}
+            onPoint={pointAt}
+            onFocusDay={setActive}
+            onSelect={(day) => setSelectedDay((current) => (current === day ? null : day))}
+          />
+        )}
         {series.map((entry) => (
           <Track
             key={entry.key}
             series={entry}
             days={days}
             active={active}
+            band={band}
             percent={percent}
             onPoint={pointAt}
             reporting={reporting}
@@ -144,10 +201,13 @@ export function Timeline({
         {readout}
       </div>
 
+      {selected && <PostDetail group={selected} onClose={() => setSelectedDay(null)} />}
+
       <figcaption className="mt-3 flex flex-wrap items-baseline justify-between gap-3 text-sm text-ink-soft">
         <span>
           Each row has its own scale. Point at a day, or focus the chart and use the arrow keys,
           to read that day across every row.
+          {postDays.length > 0 && ' Select a post to shade the three days its lift is measured over.'}
         </span>
         <button
           type="button"
@@ -164,10 +224,234 @@ export function Timeline({
   )
 }
 
+/**
+ * One marker per day with posts, sized by their views (by area, so a post with four times the
+ * views has a dot twice as wide). Hovering or focusing a marker shows its post; selecting it
+ * shades the days its download lift covers in every row.
+ *
+ * Dots on neighbouring days overlap, so the pointer picks the nearest marker rather than
+ * whichever was drawn last. The markers are still buttons, for the keyboard and screen readers.
+ */
+function PostsLane(props: {
+  groups: PostDay[]
+  total: number
+  active: number | null
+  band: Band | null
+  selectedDay: string | null
+  percent: (index: number) => number
+  onPoint: (event: PointerEvent<HTMLElement>) => void
+  onFocusDay: (index: number) => void
+  onSelect: (day: string) => void
+}) {
+  const { groups, percent } = props
+  const most = Math.max(1, ...groups.map((group) => group.views))
+  const diameter = (views: number) => 8 + 12 * Math.sqrt(views / most)
+  // The tooltip describes the marker nearest the pointer, or else the focused one. They are
+  // kept apart so moving the mouse never takes the tooltip away from keyboard focus.
+  const [hoverDay, setHoverDay] = useState<string | null>(null)
+  const [focusDay, setFocusDay] = useState<string | null>(null)
+  const tip = groups.find((group) => group.day === (hoverDay ?? focusDay)) ?? null
+
+  /** The marker nearest to `clientX`, when one is within reach of it. */
+  const nearest = (plot: HTMLElement, clientX: number): PostDay | null => {
+    const rect = plot.getBoundingClientRect()
+    const x = clientX - rect.left
+    let best: PostDay | null = null
+    let bestDistance = Number.POSITIVE_INFINITY
+    for (const group of groups) {
+      const distance = Math.abs((percent(group.index) / 100) * rect.width - x)
+      if (distance < bestDistance) {
+        best = group
+        bestDistance = distance
+      }
+    }
+    return best && bestDistance <= Math.max(12, diameter(best.views) / 2 + 6) ? best : null
+  }
+  const track = (event: PointerEvent<HTMLElement>) => {
+    props.onPoint(event)
+    setHoverDay(nearest(event.currentTarget, event.clientX)?.day ?? null)
+  }
+  const tipLeft = tip ? percent(tip.index) : 0
+  // Near the edges the tooltip hangs inwards, so it is never cut off.
+  const tipAlign = tipLeft < 20 ? '' : tipLeft > 80 ? '-translate-x-full' : '-translate-x-1/2'
+
+  return (
+    <div className="border-b border-line md:grid md:grid-cols-[13rem_1fr]">
+      <div className="px-6 pt-4 md:py-4">
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <span className="size-2.5 rounded-full bg-views" aria-hidden="true" />
+          Posts
+        </p>
+        <p className="mt-1 text-xs text-ink-soft">
+          {props.total} in this range. Dot size shows views.
+        </p>
+      </div>
+      <div
+        onPointerMove={track}
+        onPointerDown={track}
+        onPointerLeave={() => setHoverDay(null)}
+        onClick={(event) => {
+          const group = nearest(event.currentTarget, event.clientX)
+          if (group) props.onSelect(group.day)
+        }}
+        className={`relative mt-2 mb-3 h-12 touch-pan-y md:my-3 ${PLOT_INSET} ${tip ? 'cursor-pointer' : ''}`}
+      >
+        <BandShade band={props.band} percent={percent} />
+        {props.active !== null && (
+          <span
+            className="pointer-events-none absolute inset-y-0 w-px bg-ink/40"
+            style={{ left: `${percent(props.active)}%` }}
+            aria-hidden="true"
+          />
+        )}
+        {groups.map((group) => {
+          const size = diameter(group.views)
+          const left = percent(group.index)
+          const isSelected = group.day === props.selectedDay
+          const first = group.posts[0]
+          const label =
+            `${formatDay(group.day)}: ` +
+            (group.posts.length === 1
+              ? `${sourceLabel(first?.platform ?? '')} post, ${formatCount(group.views)} views`
+              : `${group.posts.length} posts, ${formatCount(group.views)} views`)
+
+          return (
+            <button
+              key={group.day}
+              type="button"
+              aria-label={label}
+              aria-pressed={isSelected}
+              aria-controls={isSelected ? 'post-detail' : undefined}
+              onClick={(event) => {
+                // Only the keyboard reaches here (the pointer goes to the lane); keep the lane
+                // from handling the same click again.
+                event.stopPropagation()
+                props.onSelect(group.day)
+              }}
+              onFocus={(event: FocusEvent<HTMLButtonElement>) => {
+                // The chart's own focus handler would move the crosshair to the last day.
+                event.stopPropagation()
+                props.onFocusDay(group.index)
+                setFocusDay(group.day)
+              }}
+              onBlur={() => setFocusDay(null)}
+              className="pointer-events-none absolute top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full outline-offset-2"
+              style={{ left: `${left}%`, width: Math.max(24, size + 8), height: Math.max(24, size + 8) }}
+            >
+              <span
+                className={`block rounded-full bg-views ring-2 transition-transform ${
+                  isSelected ? 'ring-ink' : 'ring-surface'
+                } ${tip?.day === group.day ? 'scale-110' : ''}`}
+                style={{ width: size, height: size }}
+                aria-hidden="true"
+              />
+            </button>
+          )
+        })}
+
+        {tip && (
+          <span
+            className={`pointer-events-none absolute top-full z-20 mt-1 w-60 rounded-md border border-line bg-surface px-3 py-2 text-xs shadow-sm ${tipAlign}`}
+            style={{ left: `${tipLeft}%` }}
+            aria-hidden="true"
+          >
+            <span className="figures block font-semibold text-ink">
+              {formatCount(tip.views)} views
+            </span>
+            <span className="block text-ink-soft">
+              {formatDay(tip.day)}
+              {tip.posts.length > 1
+                ? `, ${tip.posts.length} posts`
+                : `, ${sourceLabel(tip.posts[0]?.platform ?? '')}`}
+            </span>
+            {tip.posts[0]?.caption && (
+              <span className="mt-1 line-clamp-2 block text-ink">{tip.posts[0].caption}</span>
+            )}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The lift window, shaded behind a row's plot. */
+function BandShade({ band, percent }: { band: Band | null; percent: (index: number) => number }) {
+  if (!band) return null
+  const left = percent(band.from)
+  return (
+    <span
+      className="pointer-events-none absolute inset-y-0 border-l border-views bg-views/10"
+      style={{ left: `${left}%`, width: `max(2px, ${percent(band.to) - left}%)` }}
+      aria-hidden="true"
+    />
+  )
+}
+
+/** The selected day's posts, their totals, and the download lift around them. */
+function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void }) {
+  const lift = group.posts[0]?.downloadLift
+  return (
+    <section
+      id="post-detail"
+      aria-label={`Posts on ${formatDay(group.day)}`}
+      className="mt-4 rounded-lg border border-line bg-surface px-6 py-5"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-ink-soft">
+          Posted {formatDay(group.day)}
+          {group.posts.length > 1 && `, ${group.posts.length} posts`}
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="cursor-pointer text-sm font-medium text-ink underline underline-offset-4"
+        >
+          Close
+        </button>
+      </div>
+      <ul className="mt-2 space-y-3">
+        {group.posts.map((post) => (
+          <li key={post.id}>
+            <p className="font-medium">
+              {post.url ? (
+                <a
+                  href={post.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                >
+                  {post.caption || 'Untitled post'}
+                </a>
+              ) : (
+                post.caption || 'Untitled post'
+              )}
+            </p>
+            <p className="figures mt-1 text-sm text-ink-soft">
+              {sourceLabel(post.platform)} · {formatCount(post.views)} views ·{' '}
+              {formatCount(post.likes)} likes · {formatCount(post.comments)} comments ·{' '}
+              {formatCount(post.shares)} shares
+            </p>
+          </li>
+        ))}
+      </ul>
+      {lift && (
+        <p className="mt-4 border-t border-line pt-4 text-sm">
+          <span className="font-medium">Download lift. </span>
+          {liftSentence(lift, group.day)}{' '}
+          <span className="text-ink-soft">
+            Lift is measured against a baseline; it does not prove the post caused it.
+          </span>
+        </p>
+      )}
+    </section>
+  )
+}
+
 function Track(props: {
   series: Series
   days: string[]
   active: number | null
+  band: Band | null
   percent: (index: number) => number
   onPoint: (event: PointerEvent<HTMLElement>) => void
   /** Sources that reported anything for this app in the range. */
@@ -240,6 +524,7 @@ function Track(props: {
           onPointerDown={props.onPoint}
           className={`relative mt-5 mb-4 h-20 touch-pan-y md:mt-6 ${PLOT_INSET}`}
         >
+          <BandShade band={props.band} percent={percent} />
           <svg
             viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
             preserveAspectRatio="none"

@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { formatCount, formatDay } from '../lib/format'
+import { liftSentence, liftShort } from '../lib/lift'
 import type { Post } from '../lib/queries'
 import { sourceLabel } from '../lib/sources'
 
@@ -27,9 +28,9 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean }) 
 
   return (
     <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-      <table className="w-full min-w-[640px] border-collapse text-sm">
+      <table className="w-full min-w-[760px] border-collapse text-sm">
         <caption className="sr-only">
-          Posts published in this range, newest first, with lifetime totals
+          Posts published in this range, newest first, with lifetime totals and download lift
         </caption>
         <thead>
           <tr className="border-b border-line text-left text-ink-soft">
@@ -40,10 +41,13 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean }) 
               Post
             </th>
             {['Views', 'Likes', 'Comments', 'Shares'].map((label) => (
-              <th key={label} scope="col" className="px-4 py-3 text-right font-medium last:pr-6">
+              <th key={label} scope="col" className="px-4 py-3 text-right font-medium">
                 {label}
               </th>
             ))}
+            <th scope="col" className="px-6 py-3 text-right font-medium whitespace-nowrap">
+              Download lift
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -68,10 +72,18 @@ export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean }) 
                 )}
               </td>
               {[post.views, post.likes, post.comments, post.shares].map((value, index) => (
-                <td key={index} className="figures px-4 py-3 text-right last:pr-6">
+                <td key={index} className="figures px-4 py-3 text-right">
                   {formatCount(value)}
                 </td>
               ))}
+              <td
+                className={`figures px-6 py-3 text-right whitespace-nowrap ${
+                  post.downloadLift.status === 'ok' ? '' : 'text-ink-soft'
+                }`}
+                title={liftSentence(post.downloadLift, post.publishedAt.slice(0, 10))}
+              >
+                {liftShort(post.downloadLift)}
+              </td>
             </tr>
           ))}
         </tbody>
