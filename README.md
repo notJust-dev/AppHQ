@@ -135,6 +135,14 @@ Page insights, Instagram 90 days. Meta's sign-in lasts about 60 days and cannot 
 server, so sign in again before the date its page shows (Facebook Pages keep working without).
 `META_GRAPH_URL` and `META_DIALOG_URL` point the API at a stand-in.
 
+For YouTube, create an OAuth client of type Web application in Google Cloud, in a project with
+the YouTube Data API v3 and the YouTube Analytics API enabled; its consent screen needs the
+`youtube.readonly` and `yt-analytics.readonly` scopes (add yourself as a test user while it is in
+testing). Add the redirect URI the YouTube page shows, and set `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` on the API. Sign in once per channel (a brand account is a channel
+of its own), then link each to the app it promotes. YouTube views count toward social views;
+the sync reads daily views, likes, comments and shares, subscribers, and a year of videos.
+
 ## Commands
 
 | Where | Command | What it does |
@@ -160,7 +168,7 @@ Both apps deploy from this repository to the same server. Settings that work:
 | Build command | `npm run build` | `npm run build` |
 | Start command | `npm run start` | `npm run start` |
 | Database | Attach PostgreSQL here | None |
-| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD`, optional `PUBLIC_URL` |
+| Env variables | `INTERNAL_API_TOKEN`, `ENCRYPTION_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | `API_URL`, `INTERNAL_API_TOKEN`, `SESSION_SECRET`, `DASHBOARD_PASSWORD`, optional `PUBLIC_URL` |
 | Cron | `node dist/cli.js sync` | None |
 
 Things to know:

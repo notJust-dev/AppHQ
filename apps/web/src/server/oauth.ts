@@ -3,7 +3,7 @@ import { getCookie, getRequestUrl, setCookie } from '@tanstack/react-start/serve
 import { getIronSession } from 'iron-session'
 import { serverEnv } from './env'
 
-export type OAuthProvider = 'tiktok' | 'meta'
+export type OAuthProvider = 'tiktok' | 'meta' | 'youtube'
 
 interface OAuthData {
   /** Which sign-in this is, so one provider's callback cannot finish another's. */
@@ -56,6 +56,9 @@ export const tiktokRedirectUri = () => `${publicOrigin()}/connect/tiktok/callbac
 
 /** Must match a Valid OAuth Redirect URI of the Meta app's Facebook Login for Business. */
 export const metaRedirectUri = () => `${publicOrigin()}/connect/meta/callback`
+
+/** Must match an Authorized redirect URI of the Google OAuth client. */
+export const youtubeRedirectUri = () => `${publicOrigin()}/connect/youtube/callback`
 
 /** Remembers a sign-in that is about to leave for the provider. */
 export async function beginOAuth(provider: OAuthProvider, state: string, appId?: string) {

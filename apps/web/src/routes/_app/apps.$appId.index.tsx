@@ -9,7 +9,7 @@ import { formatDay } from '@/lib/format'
 import { appsQuery, postsQuery, timelineQuery } from '@/lib/queries'
 import { RANGE_DAYS, rangeToDates } from '@/lib/range'
 
-const SOCIAL = new Set(['tiktok', 'instagram', 'facebook'])
+const SOCIAL = new Set(['tiktok', 'instagram', 'facebook', 'youtube'])
 
 /** An app's numbers over the chosen range, and the posts published in it. */
 export const Route = createFileRoute('/_app/apps/$appId/')({

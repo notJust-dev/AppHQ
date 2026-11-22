@@ -5,6 +5,7 @@ import { createInstagramConnector } from './meta/instagram-connector.js'
 import { createRevenueCatConnector } from './revenuecat/connector.js'
 import { createSearchConsoleConnector } from './search-console/connector.js'
 import { createTikTokConnector } from './tiktok/connector.js'
+import { createYouTubeConnector } from './youtube/connector.js'
 import type { Connector } from './types.js'
 
 /** Connectors run by a sync, in order. */
@@ -16,4 +17,5 @@ export const connectors: Connector[] = [
   createFacebookConnector(),
   createInstagramConnector(),
   createSearchConsoleConnector(),
+  createYouTubeConnector(),
 ]

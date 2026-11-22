@@ -308,7 +308,7 @@ function NoSocial() {
         </EmptyMedia>
         <EmptyTitle>No social numbers in this range</EmptyTitle>
         <EmptyDescription>
-          Connect TikTok, Instagram or Facebook, then link each account to the app it promotes. Views and posts
+          Connect TikTok, Instagram, Facebook or YouTube, then link each account to the app it promotes. Views and posts
           appear here after the next sync.
         </EmptyDescription>
       </EmptyHeader>

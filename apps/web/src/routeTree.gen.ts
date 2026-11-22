@@ -27,11 +27,13 @@ import { Route as AppAccountsMetaRouteImport } from './routes/_app/accounts.meta
 import { Route as AppAccountsRevenuecatRouteImport } from './routes/_app/accounts.revenuecat'
 import { Route as AppAccountsSearchConsoleRouteImport } from './routes/_app/accounts.search-console'
 import { Route as AppAccountsTiktokRouteImport } from './routes/_app/accounts.tiktok'
+import { Route as AppAccountsYoutubeRouteImport } from './routes/_app/accounts.youtube'
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
 import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
 import { Route as AppAppsNewRouteImport } from './routes/_app/apps.new'
 import { Route as ConnectMetaCallbackRouteImport } from './routes/connect.meta.callback'
 import { Route as ConnectTiktokCallbackRouteImport } from './routes/connect.tiktok.callback'
+import { Route as ConnectYoutubeCallbackRouteImport } from './routes/connect.youtube.callback'
 import { Route as AppAppsAppIdIndexRouteImport } from './routes/_app/apps.$appId.index'
 import { Route as AppAppsAppIdSettingsRouteImport } from './routes/_app/apps.$appId.settings'
 
@@ -125,6 +127,11 @@ const AppAccountsTiktokRoute = AppAccountsTiktokRouteImport.update({
   path: '/tiktok',
   getParentRoute: () => AppAccountsRoute,
 } as any)
+const AppAccountsYoutubeRoute = AppAccountsYoutubeRouteImport.update({
+  id: '/youtube',
+  path: '/youtube',
+  getParentRoute: () => AppAccountsRoute,
+} as any)
 const AppAppsIndexRoute = AppAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
@@ -148,6 +155,11 @@ const ConnectMetaCallbackRoute = ConnectMetaCallbackRouteImport.update({
 const ConnectTiktokCallbackRoute = ConnectTiktokCallbackRouteImport.update({
   id: '/connect/tiktok/callback',
   path: '/connect/tiktok/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectYoutubeCallbackRoute = ConnectYoutubeCallbackRouteImport.update({
+  id: '/connect/youtube/callback',
+  path: '/connect/youtube/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAppsAppIdIndexRoute = AppAppsAppIdIndexRouteImport.update({
@@ -178,10 +190,12 @@ export interface FileRoutesByFullPath {
   '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
   '/accounts/search-console': typeof AppAccountsSearchConsoleRoute
   '/accounts/tiktok': typeof AppAccountsTiktokRoute
+  '/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/apps/new': typeof AppAppsNewRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
+  '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/accounts/': typeof AppAccountsIndexRoute
   '/apps/': typeof AppAppsIndexRoute
   '/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
@@ -203,9 +217,11 @@ export interface FileRoutesByTo {
   '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
   '/accounts/search-console': typeof AppAccountsSearchConsoleRoute
   '/accounts/tiktok': typeof AppAccountsTiktokRoute
+  '/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/apps/new': typeof AppAppsNewRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
+  '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/accounts': typeof AppAccountsIndexRoute
   '/apps': typeof AppAppsIndexRoute
   '/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
@@ -230,10 +246,12 @@ export interface FileRoutesById {
   '/_app/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
   '/_app/accounts/search-console': typeof AppAccountsSearchConsoleRoute
   '/_app/accounts/tiktok': typeof AppAccountsTiktokRoute
+  '/_app/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/_app/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/_app/apps/new': typeof AppAppsNewRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
+  '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/apps/': typeof AppAppsIndexRoute
   '/_app/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
@@ -258,10 +276,12 @@ export interface FileRouteTypes {
     | '/accounts/revenuecat'
     | '/accounts/search-console'
     | '/accounts/tiktok'
+    | '/accounts/youtube'
     | '/apps/$appId'
     | '/apps/new'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
+    | '/connect/youtube/callback'
     | '/accounts/'
     | '/apps/'
     | '/apps/$appId/settings'
@@ -283,9 +303,11 @@ export interface FileRouteTypes {
     | '/accounts/revenuecat'
     | '/accounts/search-console'
     | '/accounts/tiktok'
+    | '/accounts/youtube'
     | '/apps/new'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
+    | '/connect/youtube/callback'
     | '/accounts'
     | '/apps'
     | '/apps/$appId/settings'
@@ -309,10 +331,12 @@ export interface FileRouteTypes {
     | '/_app/accounts/revenuecat'
     | '/_app/accounts/search-console'
     | '/_app/accounts/tiktok'
+    | '/_app/accounts/youtube'
     | '/_app/apps/$appId'
     | '/_app/apps/new'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
+    | '/connect/youtube/callback'
     | '/_app/accounts/'
     | '/_app/apps/'
     | '/_app/apps/$appId/settings'
@@ -325,6 +349,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ConnectMetaCallbackRoute: typeof ConnectMetaCallbackRoute
   ConnectTiktokCallbackRoute: typeof ConnectTiktokCallbackRoute
+  ConnectYoutubeCallbackRoute: typeof ConnectYoutubeCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -455,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsTiktokRouteImport
       parentRoute: typeof AppAccountsRoute
     }
+    '/_app/accounts/youtube': {
+      id: '/_app/accounts/youtube'
+      path: '/youtube'
+      fullPath: '/accounts/youtube'
+      preLoaderRoute: typeof AppAccountsYoutubeRouteImport
+      parentRoute: typeof AppAccountsRoute
+    }
     '/_app/apps/': {
       id: '/_app/apps/'
       path: '/apps'
@@ -490,6 +522,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectTiktokCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/connect/youtube/callback': {
+      id: '/connect/youtube/callback'
+      path: '/connect/youtube/callback'
+      fullPath: '/connect/youtube/callback'
+      preLoaderRoute: typeof ConnectYoutubeCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/apps/$appId/': {
       id: '/_app/apps/$appId/'
       path: '/'
@@ -514,6 +553,7 @@ interface AppAccountsRouteChildren {
   AppAccountsRevenuecatRoute: typeof AppAccountsRevenuecatRoute
   AppAccountsSearchConsoleRoute: typeof AppAccountsSearchConsoleRoute
   AppAccountsTiktokRoute: typeof AppAccountsTiktokRoute
+  AppAccountsYoutubeRoute: typeof AppAccountsYoutubeRoute
   AppAccountsIndexRoute: typeof AppAccountsIndexRoute
 }
 
@@ -524,6 +564,7 @@ const AppAccountsRouteChildren: AppAccountsRouteChildren = {
   AppAccountsRevenuecatRoute: AppAccountsRevenuecatRoute,
   AppAccountsSearchConsoleRoute: AppAccountsSearchConsoleRoute,
   AppAccountsTiktokRoute: AppAccountsTiktokRoute,
+  AppAccountsYoutubeRoute: AppAccountsYoutubeRoute,
   AppAccountsIndexRoute: AppAccountsIndexRoute,
 }
 
@@ -581,6 +622,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ConnectMetaCallbackRoute: ConnectMetaCallbackRoute,
   ConnectTiktokCallbackRoute: ConnectTiktokCallbackRoute,
+  ConnectYoutubeCallbackRoute: ConnectYoutubeCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

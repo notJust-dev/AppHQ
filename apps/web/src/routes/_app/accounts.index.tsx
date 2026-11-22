@@ -1,7 +1,7 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Search, Smartphone, ThumbsUp } from 'lucide-react'
+import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Search, Smartphone, ThumbsUp, Youtube } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import {
@@ -130,7 +130,7 @@ function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFam
   const parts = connected
     ? [
         whoIsConnected(family),
-        assets.total > 0 && source.family !== 'meta' && source.family !== 'tiktok'
+        assets.total > 0 && source.family !== 'meta' && source.family !== 'tiktok' && source.family !== 'youtube'
           ? `${formatCount(assets.total)} ${assets.total === 1 ? source.noun[0] : source.noun[1]}`
           : null,
         assets.waiting > 0 ? `${formatCount(assets.waiting)} waiting for a decision` : null,
@@ -294,6 +294,6 @@ function DemoData({ onChanged }: { onChanged: () => void }) {
 
 /** A plain pictogram per source; the names carry the brands. */
 function SourceIcon({ family }: { family: AccountFamily['family'] }) {
-  const Icon = { app_store: Smartphone, google_play: AppWindow, revenuecat: BadgeDollarSign, meta: ThumbsUp, tiktok: Play, search_console: Search }[family]
+  const Icon = { app_store: Smartphone, google_play: AppWindow, revenuecat: BadgeDollarSign, meta: ThumbsUp, tiktok: Play, youtube: Youtube, search_console: Search }[family]
   return <Icon className="size-4" />
 }

@@ -7,6 +7,7 @@ export const SOURCES = [
   'instagram',
   'facebook',
   'search_console',
+  'youtube',
 ] as const
 
 export type Source = (typeof SOURCES)[number]
@@ -19,7 +20,7 @@ export type Source = (typeof SOURCES)[number]
 export const HEADLINE = {
   downloads: { metric: 'downloads', sources: ['app_store', 'google_play'] },
   revenue: { metric: 'revenue', sources: ['revenuecat'] },
-  socialViews: { metric: 'views', sources: ['tiktok', 'instagram', 'facebook'] },
+  socialViews: { metric: 'views', sources: ['tiktok', 'instagram', 'facebook', 'youtube'] },
 } as const satisfies Record<string, { metric: string; sources: readonly Source[] }>
 
 export type HeadlineKey = keyof typeof HEADLINE
@@ -35,7 +36,7 @@ export const TIMELINE = [
     key: 'socialViews',
     label: 'Social views',
     metric: 'views',
-    sources: ['tiktok', 'instagram', 'facebook'],
+    sources: ['tiktok', 'instagram', 'facebook', 'youtube'],
     stage: 'views',
     unit: 'count',
     aggregate: 'sum',
@@ -95,7 +96,7 @@ export const TIMELINE = [
   aggregate: 'sum' | 'last'
 }[]
 
-export const SOCIAL_SOURCES = ['tiktok', 'instagram', 'facebook'] as const satisfies readonly Source[]
+export const SOCIAL_SOURCES = ['tiktok', 'instagram', 'facebook', 'youtube'] as const satisfies readonly Source[]
 export const STORE_SOURCES = ['app_store', 'google_play'] as const satisfies readonly Source[]
 
 /**

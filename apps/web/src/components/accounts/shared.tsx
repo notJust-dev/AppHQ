@@ -26,6 +26,7 @@ export const SOURCES: {
     | '/accounts/meta'
     | '/accounts/tiktok'
     | '/accounts/search-console'
+    | '/accounts/youtube'
   brings: string
   /** What it finds, one and many. */
   noun: [string, string]
@@ -64,6 +65,13 @@ export const SOURCES: {
     to: '/accounts/tiktok',
     brings: 'Video views and followers.',
     noun: ['account', 'accounts'],
+  },
+  {
+    family: 'youtube',
+    title: 'YouTube',
+    to: '/accounts/youtube',
+    brings: 'Daily views, subscribers and videos for your channels.',
+    noun: ['channel', 'channels'],
   },
   {
     family: 'search_console',
@@ -200,7 +208,7 @@ export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (acc
   )
 }
 
-const PROVIDER_NAMES = { tiktok: 'TikTok', meta: 'Facebook and Instagram' } as const
+const PROVIDER_NAMES = { tiktok: 'TikTok', meta: 'Facebook and Instagram', youtube: 'YouTube' } as const
 
 /**
  * The outcome of a sign-in, read once when the browser comes back from the provider. `clear`

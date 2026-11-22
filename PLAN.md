@@ -619,6 +619,15 @@ Status on 2026-11-22 (merged to `main` and deployed):
   day and by app; its top queries and pages are read live (`searchConsole.top`), not stored.
   Checked read-only: the Google Play service account authenticates against the API but no
   property is shared with it yet. Demo apps have websites and search numbers.
+- YouTube (2026-11-22, not deployed, not tried against Google: it needs an OAuth client). A
+  Google sign-in per channel (`youtube.readonly`, `yt-analytics.readonly`, offline access, so a
+  refresh token is kept and the hour-long access token is renewed by the sync). Each channel is a
+  `youtube_channel` social asset, linked to its app on the Apps page like a Facebook Page. The
+  `youtube` connector writes daily `views`, `likes`, `comments` and `shares` from YouTube
+  Analytics, `followers` from the subscriber count, and a year of videos as posts (the Data API
+  gives no shares per video). YouTube is a social source everywhere: social views on the
+  portfolio, the app timeline, the Social page and the top posts. Env: `GOOGLE_OAUTH_CLIENT_ID`,
+  `GOOGLE_OAUTH_CLIENT_SECRET`; the redirect URI is `/connect/youtube/callback`.
 
 ### Phase 3 — Reviews inbox
 

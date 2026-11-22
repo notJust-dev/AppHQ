@@ -7,13 +7,14 @@ export const KIND_LABEL: Record<string, string> = {
   facebook_page: 'Facebook Page',
   instagram_account: 'Instagram account',
   tiktok_account: 'TikTok account',
+  youtube_channel: 'YouTube channel',
   search_console_site: 'Website',
 }
 
 /** An app holds at most one of each of these. */
 export const ONE_SLOT_KINDS = ['ios_app', 'android_app', 'revenuecat_project', 'search_console_site'] as const
 /** And any number of these; they may also belong to the portfolio. */
-export const SOCIAL_KINDS = ['facebook_page', 'instagram_account', 'tiktok_account'] as const
+export const SOCIAL_KINDS = ['facebook_page', 'instagram_account', 'tiktok_account', 'youtube_channel'] as const
 
 /** Where to go to get an asset of a kind. */
 export const SOURCE_OF_KIND: Record<string, string> = {
@@ -23,6 +24,7 @@ export const SOURCE_OF_KIND: Record<string, string> = {
   facebook_page: 'Facebook and Instagram',
   instagram_account: 'Facebook and Instagram',
   tiktok_account: 'TikTok',
+  youtube_channel: 'YouTube',
   search_console_site: 'Google Search Console',
 }
 
@@ -36,6 +38,7 @@ export const PLATFORM_OF_KIND: Record<string, string> = {
   facebook_page: 'Facebook',
   instagram_account: 'Instagram',
   tiktok_account: 'TikTok',
+  youtube_channel: 'YouTube',
 }
 
 /** The account states that need the person to do something, in their words. */

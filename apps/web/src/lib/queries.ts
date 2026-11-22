@@ -4,6 +4,7 @@ import { getSyncStatusFn, listAccountsFn, listAppsFn } from '@/fns/settings'
 import { listAssetsFn } from '@/fns/assets'
 import { metaSetupFn } from '@/fns/meta'
 import { tiktokSetupFn } from '@/fns/tiktok'
+import { youtubeSetupFn } from '@/fns/youtube'
 import { getMonetisationPerformanceFn, getSocialPerformanceFn, getStorePerformanceFn } from '@/fns/performance'
 import { listReviewsFn, reviewSummaryFn, unreadReviewsFn } from '@/fns/reviews'
 import { getSearchPerformanceFn, searchTopFn } from '@/fns/search'
@@ -28,6 +29,9 @@ export const postsQuery = (appId: string, dates: { from: string; to: string }) =
 
 export const tiktokSetupQuery = () =>
   queryOptions({ queryKey: ['tiktok-setup'], queryFn: () => tiktokSetupFn() })
+
+export const youtubeSetupQuery = () =>
+  queryOptions({ queryKey: ['youtube-setup'], queryFn: () => youtubeSetupFn() })
 
 export const metaSetupQuery = () =>
   queryOptions({ queryKey: ['meta-setup'], queryFn: () => metaSetupFn() })
@@ -133,4 +137,5 @@ export type AccountFamily = Awaited<ReturnType<typeof listAccountsFn>>[number]
 export type Post = Awaited<ReturnType<typeof listPostsFn>>[number]
 export type TikTokSetup = Awaited<ReturnType<typeof tiktokSetupFn>>
 export type MetaSetup = Awaited<ReturnType<typeof metaSetupFn>>
+export type YouTubeSetup = Awaited<ReturnType<typeof youtubeSetupFn>>
 export type Asset = Awaited<ReturnType<typeof listAssetsFn>>[number]

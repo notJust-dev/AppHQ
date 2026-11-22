@@ -247,7 +247,7 @@ function SocialRow(props: {
           <p className="text-xs text-muted-foreground">
             To add more,{' '}
             <Link to="/accounts" className="font-medium text-foreground underline underline-offset-4">
-              connect Facebook, Instagram or TikTok
+              connect Facebook, Instagram, TikTok or YouTube
             </Link>
             .
           </p>

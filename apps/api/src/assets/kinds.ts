@@ -9,6 +9,7 @@ export const ASSET_KINDS = {
   facebook_page: { label: 'Facebook Page', provider: 'facebook', slot: 'many', social: true, backfillDays: 365 },
   instagram_account: { label: 'Instagram account', provider: 'instagram', slot: 'many', social: true, backfillDays: 90 },
   tiktok_account: { label: 'TikTok account', provider: 'tiktok', slot: 'many', social: true, backfillDays: 7 },
+  youtube_channel: { label: 'YouTube channel', provider: 'youtube', slot: 'many', social: true, backfillDays: 365 },
   search_console_site: { label: 'Website', provider: 'search_console', slot: 'one', social: false, backfillDays: 480 },
 } as const
 

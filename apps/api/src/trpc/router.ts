@@ -28,6 +28,9 @@ import {
   getStorePerformance,
 } from '../queries/performance.js'
 import { connectSearchConsole } from '../services/connect-search-console.js'
+import { connectYouTube } from '../services/connect-youtube.js'
+import { YouTubeError, createYouTubeClient } from '../connectors/youtube/client.js'
+import { YouTubeNotConfiguredError, youtubeConfig } from '../connectors/youtube/config.js'
 import { searchTop } from '../services/search-top.js'
 import { SEARCH_CONSOLE, SEARCH_CONSOLE_HISTORY_DAYS, SearchConsoleError } from '../connectors/search-console/client.js'
 import { getReviewSummary, listReviews, reviewConditions, reviewFilters } from '../queries/reviews.js'
@@ -68,7 +71,7 @@ function connectError(err: unknown): TRPCError {
   if (err instanceof ConnectInputError) {
     return new TRPCError({ code: 'BAD_REQUEST', message: err.message })
   }
-  if (err instanceof TikTokNotConfiguredError || err instanceof MetaNotConfiguredError) {
+  if (err instanceof TikTokNotConfiguredError || err instanceof MetaNotConfiguredError || err instanceof YouTubeNotConfiguredError) {
     return new TRPCError({ code: 'PRECONDITION_FAILED', message: err.message })
   }
   if (err instanceof MetaError) {
@@ -108,6 +111,24 @@ function connectError(err: unknown): TRPCError {
       code: 'BAD_REQUEST',
       message: `TikTok rejected the connection (${err.code}): ${err.message}`,
     })
+  }
+  if (err instanceof YouTubeError) {
+    if (err.code === 'invalid_client' || err.code === 'unauthorized_client') {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Google did not accept the OAuth client. Check GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET on the api app.',
+      })
+    }
+    if (err.code === 'invalid_grant') {
+      return new TRPCError({ code: 'BAD_REQUEST', message: 'The Google sign-in expired or was already used. Connect again.' })
+    }
+    if (err.code === 'accessNotConfigured' || err.code === 'SERVICE_DISABLED') {
+      return new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Enable the YouTube Data API v3 and the YouTube Analytics API in the OAuth client’s Google Cloud project.',
+      })
+    }
+    return new TRPCError({ code: 'BAD_REQUEST', message: `Google rejected the connection (${err.code}): ${err.message}` })
   }
   if (err instanceof AppStoreError) {
     if (err.status === 401) {
@@ -396,6 +417,31 @@ export const appRouter = t.router({
     search: t.procedure
       .input(getSearchPerformance.input)
       .query(({ ctx, input }) => getSearchPerformance.handler(ctx, input)),
+  }),
+  /**
+   * YouTube channels, through a Google sign-in. Like Meta, the dashboard owns the browser side
+   * and the API owns the client secret and the tokens; channels wait for an app on the Apps page.
+   */
+  youtube: t.router({
+    setup: t.procedure.query(() => ({ configured: youtubeConfig() !== null })),
+
+    authorizeUrl: t.procedure
+      .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
+      .query(({ input }) => {
+        const config = youtubeConfig()
+        if (!config) throw connectError(new YouTubeNotConfiguredError())
+        return { url: createYouTubeClient({ config }).authorizeUrl(input) }
+      }),
+
+    /** Finishes the sign-in and saves the channel, waiting for an app. */
+    connect: t.procedure
+      .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url() }))
+      .mutation(({ ctx, input }) =>
+        connectYouTube(ctx, input).catch((err: unknown) => {
+          ctx.log.error(`connect YouTube failed: ${err instanceof Error ? err.message : err}`)
+          throw connectError(err)
+        }),
+      ),
   }),
   /**
    * Google Search Console, through a service account added to the person's properties: the
