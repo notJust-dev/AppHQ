@@ -1,3 +1,5 @@
+import { and, eq, inArray } from 'drizzle-orm'
+import { posts as postsTable } from '../../db/schema.js'
 import { addDays, todayUtc, type IsoDate } from '../../lib/dates.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
 import { savePosts, storedPosts, type PostReading } from '../../posts/save.js'
@@ -74,7 +76,7 @@ export function createFacebookConnector(
             }
           }
 
-          const readings = await readPosts(client, token, pageId, {
+          const { readings, duplicateReels } = await readPosts(client, token, pageId, {
             appId: app.id,
             connectionId: account.id,
             today,
@@ -82,6 +84,12 @@ export function createFacebookConnector(
             warn: (message) => warnings.push(`${name}: ${message}`),
           })
           rowsWritten += await savePosts(db, readings, today)
+          // Reels saved on their own before they were recognised as posts too.
+          if (duplicateReels.length > 0) {
+            await db
+              .delete(postsTable)
+              .where(and(eq(postsTable.platform, FACEBOOK), inArray(postsTable.externalId, duplicateReels)))
+          }
           await markAccount(db, account.id, { ok: true, now: now() })
         } catch (err) {
           await markAccount(db, account.id, { ok: false, err, now: now() })
@@ -114,7 +122,7 @@ async function readPosts(
     today: IsoDate
     warn: (message: string) => void
   },
-): Promise<PostReading[]> {
+): Promise<{ readings: PostReading[]; duplicateReels: string[] }> {
   const since = pacificMidnight(addDays(ctx.today, -POST_HISTORY_DAYS))
   const freshSince = Date.parse(`${addDays(ctx.today, -FRESH_POST_DAYS)}T00:00:00Z`)
 
@@ -124,19 +132,31 @@ async function readPosts(
     ctx.warn(`reels: ${describe(err)}`)
     return []
   })
+  // A reel is listed twice: in /published_posts (views counting replays, with reactions,
+  // comments and shares) and in /video_reels (plays without replays, and the length). Both
+  // carry the same /reel/<id>/ permalink. The post is kept; the reel only lends its length.
+  const reelIdIn = (url: string | null | undefined) => /\/reel\/([^/?#]+)/.exec(url ?? '')?.[1]
+  const reelLengths = new Map(reels.map((reel) => [reel.id, reel.length]))
+  const covered = new Set(
+    posts.map((post) => reelIdIn(post.permalink_url)).filter((id): id is string => !!id && reelLengths.has(id)),
+  )
+
   const items = [
-    ...posts.map((post) => ({
+    ...posts.map((post) => {
+      const length = reelLengths.get(reelIdIn(post.permalink_url) ?? '')
+      return {
       id: post.id,
       at: parseMetaTime(post.created_time),
       caption: post.message ?? null,
       url: post.permalink_url ?? null,
-      duration: null as number | null,
+      duration: length ? Math.round(length) : null,
       likes: post.reactions?.summary?.total_count ?? 0,
       comments: post.comments?.summary?.total_count ?? 0,
       shares: post.shares?.count ?? 0,
       insights: { path: `/${post.id}/insights`, metric: 'post_media_view' },
-    })),
-    ...reels.map((reel) => ({
+      }
+    }),
+    ...reels.filter((reel) => !covered.has(reel.id)).map((reel) => ({
       id: reel.id,
       at: parseMetaTime(reel.created_time ?? reel.updated_time ?? new Date().toISOString()),
       caption: reel.description ?? null,
@@ -181,7 +201,7 @@ async function readPosts(
     })
   }
   if (insightFailures > 0) ctx.warn(`views missing for ${insightFailures} posts`)
-  return readings
+  return { readings, duplicateReels: [...covered] }
 }
 
 const maxDay = (a: IsoDate, b: IsoDate) => (a > b ? a : b)

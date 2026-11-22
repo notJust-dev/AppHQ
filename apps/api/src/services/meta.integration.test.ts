@@ -33,7 +33,13 @@ const metaTime = (seconds: number) => new Date(seconds * 1000).toISOString().rep
  */
 function fakeMeta(suffix: string) {
   const ids = { pageA: `pa-${suffix}`, pageB: `pb-${suffix}`, ig: `ig-${suffix}`, igOnly: `io-${suffix}` }
-  const state = { userTokenWorks: true, pageTokensWork: true, igTokensUsed: [] as string[] }
+  const state = {
+    userTokenWorks: true,
+    pageTokensWork: true,
+    igTokensUsed: [] as string[],
+    /** Facebook lists a reel in /video_reels and, as a post, in /published_posts. */
+    reelAlsoPosted: false,
+  }
   const DAILY: Record<string, number> = {
     page_media_view: 100,
     page_total_media_view_unique: 80,
@@ -121,9 +127,23 @@ function fakeMeta(suffix: string) {
             comments: { summary: { total_count: 4 } },
             shares: { count: 2 },
           },
+          ...(state.reelAlsoPosted
+            ? [
+                {
+                  id: `${ids.pageA}_2`,
+                  created_time: '2026-11-12T16:00:00+0000',
+                  message: 'A reel',
+                  permalink_url: `https://www.facebook.com/reel/v-${suffix}/`,
+                  reactions: { summary: { total_count: 50 } },
+                  comments: { summary: { total_count: 5 } },
+                  shares: { count: 3 },
+                },
+              ]
+            : []),
         ],
       })
     }
+    if (path === `/${ids.pageA}_2/insights`) return json({ data: [{ name: 'post_media_view', values: [{ value: 1200 }] }] })
     if (path === `/${ids.pageA}/video_reels`) {
       return json({ data: [{ id: `v-${suffix}`, created_time: '2026-11-12T16:00:00+0000', description: 'A reel', permalink_url: '/reel/1' }] })
     }
@@ -252,6 +272,24 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
       { caption: 'A reel', views: 900, likes: 0, comments: 0 },
     ])
     expect((await row(meta.ids.pageA)).status).toBe('ok')
+  })
+
+  it('keeps a reel once when Facebook also lists it as a post, and removes the earlier copy', async () => {
+    meta.state.reelAlsoPosted = true
+    const connector = createFacebookConnector({ fetch: meta.impl, env, now: at('2026-11-13T18:00:00Z') })
+    await connector.sync({ db, app: await app(), range, log, secrets })
+
+    const saved = await db
+      .select({ caption: posts.caption, views: posts.views, likes: posts.likes, duration: posts.durationSeconds })
+      .from(posts)
+      .where(and(eq(posts.appId, appId), eq(posts.platform, 'facebook')))
+      .orderBy(posts.publishedAt)
+    // The post's numbers win (views with replays, reactions); the reel lends only its length.
+    expect(saved).toEqual([
+      { caption: 'Kick counting tip', views: 500, likes: 33, duration: null },
+      { caption: 'A reel', views: 1200, likes: 50, duration: null },
+    ])
+    meta.state.reelAlsoPosted = false
   })
 
   it('reads Instagram day by day, falling back to the user token when the Page token is refused', async () => {

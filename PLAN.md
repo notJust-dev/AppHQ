@@ -338,8 +338,10 @@ Pages. Graph API v27.0 (out 2026-11-04).
   → `engagements`, `page_follows` → `followers`. `page_impressions*` and `page_fans` were removed
   on 2025-11-15 and `page_impressions_unique` on 2026-06-15. Insights need 100+ Page likes.
 - Facebook posts: `/published_posts` with reaction, comment and share counts, and views from
-  `post_media_view`; reels from `/video_reels` with `blue_reels_play_count`. Open: whether reels
-  also appear in `/published_posts` (they would then show twice).
+  `post_media_view`; reels from `/video_reels` with `blue_reels_play_count`. Confirmed with real
+  data: a reel appears in both, with the same `/reel/<id>/` permalink. The post entry is kept
+  (its views count replays and it has reactions, comments, shares); the reel lends its length,
+  and copies saved before this was handled are deleted on the next sync.
 - Instagram daily: `views` comes only as `total_value`, so one request per day; Meta keeps 90
   days. Followers from the account's `followers_count`, once per sync.
 - Instagram media: `/media` with likes and comments, plus `views`, `shares`, `saved` insights.
@@ -349,9 +351,10 @@ Pages. Graph API v27.0 (out 2026-11-04).
   under the Pacific day they cover, so they sit a few hours off the UTC sources.
 - Rate limits: 4,800 × engaged users (Pages) or impressions (Instagram) per 24 hours; error codes
   4, 17, 32, 613, 80001, 80002 fail the run rather than being retried.
-- Unconfirmed until the first real sign-in: whether a Page token works for Instagram calls,
-  whether `instagram_manage_insights` is offered by the Instagram use case's Facebook-login
-  setup, and the Instagram day boundary.
+- First real sign-in (2026-11-22, Unified login): the first configuration granted only
+  `pages_show_list`; a new one, created from the Unified login setup, granted all essential
+  permissions. Two Pages and two Instagram accounts, a token without expiry, 90 days of
+  Instagram views and posts with real counts. Still unconfirmed: the Instagram day boundary.
 
 ## 7. Query layer
 
@@ -490,8 +493,9 @@ Status on 2026-11-22 (merged to `main` and deployed):
 - Steps 1 and 3, plus step 7 (merged and deployed 2026-11-22): "Connect Facebook and
   Instagram" in Settings and the two connectors described under Data sources. Tested with unit
   tests, database tests and a browser run against a stand-in Graph API (connect, pick apps,
-  backfill, cancel). Not yet run against Meta. The Meta app uses Unified login, and its
-  configuration offers Pages and Instagram accounts as assets, so one sign-in covers both.
+  backfill, cancel), then against Meta: TinyKicks and ZenFit, each with a Page and an Instagram
+  account. The Meta app uses Unified login, and its configuration offers Pages and Instagram
+  accounts as assets, so one sign-in covers both.
 
 ### Phase 3 — Reviews inbox
 
