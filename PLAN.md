@@ -291,8 +291,13 @@ Pages. Graph API v27.0 (out 2026-11-04).
   `read_insights`, `instagram_basic`, `instagram_manage_insights`, `business_management`.
   Without `META_LOGIN_CONFIG_ID` the same list is sent as `scope`. People with a role on the app
   get Standard Access: no App Review, no Business Verification. Redirect URIs: HTTPS, exact match.
-- Tokens: code → short-lived user token → long-lived user token (about 60 days, no server-side
-  refresh; signing in again renews it). `/me/accounts` returns a Page token per Page, which does
+- Unified login (Meta's recommended Instagram setup since 2026; "API setup with Facebook login" is
+  legacy, no retirement date): the same dialog and code exchange, but the token is a system-user
+  token owned by the business portfolio, usually without expiry, and Instagram accounts come from
+  `/me/assigned_instagram_accounts`, with or without a Page. The app must belong to a business
+  portfolio. The connector handles both setups: a token valid for more than a week is not swapped.
+- Tokens (Facebook login setup): code → short-lived user token → long-lived user token (about 60
+  days, no server-side refresh; signing in again renews it). `/me/accounts` returns a Page token per Page, which does
   not expire. Instagram accounts keep both; the connector tries the Page token and falls back to
   the user token (Meta documents the user token). So after ~60 days Instagram may stop until the
   next sign-in, while Facebook keeps going; Settings shows the date. Every call carries an

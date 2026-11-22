@@ -60,9 +60,12 @@ export function createInstagramConnector(
         }
         try {
           const igId = account.externalAccountId ?? ''
+          // Without a linked Page both places hold the same sign-in token; try it once.
           const call = tokenFallback([
-            secrets.decrypt(account.accessTokenEnc),
-            ...(account.refreshTokenEnc ? [secrets.decrypt(account.refreshTokenEnc)] : []),
+            ...new Set([
+              secrets.decrypt(account.accessTokenEnc),
+              ...(account.refreshTokenEnc ? [secrets.decrypt(account.refreshTokenEnc)] : []),
+            ]),
           ])
 
           const profile = await call((token) => client.instagramAccount(token, igId))

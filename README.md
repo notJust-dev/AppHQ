@@ -68,8 +68,9 @@ can sign in.
 To try the flow without TikTok, point the API at a stand-in with `TIKTOK_API_URL` and
 `TIKTOK_AUTH_URL`.
 
-For Facebook Pages and Instagram, create a Business app at developers.facebook.com with Facebook
-Login for Business. Add the redirect URI that Settings shows under "Connect Facebook and
+For Facebook Pages and Instagram, create an app at developers.facebook.com, owned by your business
+portfolio, with the use cases "Manage everything on your Page" and "Manage messaging & content on
+Instagram" (API setup with Unified login; the Facebook login setup also works). Add the redirect URI that Settings shows under "Connect Facebook and
 Instagram", and create a login configuration (user access token) with `pages_show_list`,
 `pages_read_engagement`, `pages_read_user_content`, `read_insights`, `instagram_basic`,
 `instagram_manage_insights` and `business_management`. Set `META_APP_ID`, `META_APP_SECRET` and

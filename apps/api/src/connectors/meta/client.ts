@@ -289,6 +289,16 @@ export function createMetaClient(options: MetaClientOptions) {
       return typeof value === 'number' ? value : null
     },
 
+    /**
+     * Instagram accounts given to the app directly, as Unified Login does: they need no
+     * Facebook Page, so they do not show up through `pages`.
+     */
+    assignedInstagramAccounts: (token: string) =>
+      list(
+        z.object({ id: z.string(), username: z.string().optional() }),
+        graph('/me/assigned_instagram_accounts', token, { fields: 'id,username', limit: 100 }),
+      ),
+
     async instagramAccount(token: string, igId: string) {
       return igAccountSchema.parse(
         await graph(`/${igId}`, token, { fields: 'id,username,followers_count' }),

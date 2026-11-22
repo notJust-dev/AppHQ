@@ -32,7 +32,7 @@ const metaTime = (seconds: number) => new Date(seconds * 1000).toISOString().rep
  * refuses the Page token (as Meta may), so the connector has to fall back to the user token.
  */
 function fakeMeta(suffix: string) {
-  const ids = { pageA: `pa-${suffix}`, pageB: `pb-${suffix}`, ig: `ig-${suffix}` }
+  const ids = { pageA: `pa-${suffix}`, pageB: `pb-${suffix}`, ig: `ig-${suffix}`, igOnly: `io-${suffix}` }
   const state = { userTokenWorks: true, pageTokensWork: true, igTokensUsed: [] as string[] }
   const DAILY: Record<string, number> = {
     page_media_view: 100,
@@ -51,7 +51,15 @@ function fakeMeta(suffix: string) {
     if (path === '/oauth/access_token') {
       if (q.get('code') === 'good-code') return json({ access_token: 'short-1', expires_in: 3600 })
       if (q.get('fb_exchange_token') === 'short-1') return json({ access_token: 'user-long', expires_in: 5_183_944 })
+      // Unified login: a system-user token with no expiry, which cannot be swapped.
+      if (q.get('code') === 'unified-code') return json({ access_token: 'suat-1', token_type: 'bearer' })
       return json({ error: { message: 'Invalid verification code format.', code: 100 } }, 400)
+    }
+    if (token === 'suat-1') {
+      if (path === '/me/accounts') return json({ error: { message: 'Missing permission', code: 200 } }, 403)
+      if (path === '/me/assigned_instagram_accounts') {
+        return json({ data: [{ id: ids.igOnly, username: 'quillnote.app' }] })
+      }
     }
     if (path === '/me/accounts') {
       return json({
@@ -156,7 +164,9 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
     await db.delete(apps).where(eq(apps.id, appId))
     await db
       .delete(connections)
-      .where(inArray(connections.externalAccountId, [meta.ids.pageA, meta.ids.pageB, meta.ids.ig]))
+      .where(
+        inArray(connections.externalAccountId, [meta.ids.pageA, meta.ids.pageB, meta.ids.ig, meta.ids.igOnly]),
+      )
     await sql.end({ timeout: 5 })
   })
 
@@ -176,6 +186,16 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
     expect(listed.filter((a) => [meta.ids.pageA, meta.ids.pageB, meta.ids.ig].includes(a.id) || a.displayName === 'Other Page').length).toBeGreaterThan(0)
     const accountWide = await listAccounts.handler({ db })
     expect(accountWide.some((a) => a.provider === 'facebook' || a.provider === 'instagram')).toBe(false)
+  })
+
+  it('connects with Unified login: a lasting token and an Instagram account without a Page', async () => {
+    const result = await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'unified-code', redirectUri })
+    expect(result).toEqual({ pages: 0, instagram: 1, expiresAt: null })
+
+    const ig = await row(meta.ids.igOnly)
+    expect(ig).toMatchObject({ provider: 'instagram', displayName: '@quillnote.app', expiresAt: null })
+    expect(secrets.decrypt(ig.accessTokenEnc ?? '')).toBe('suat-1')
+    expect(secrets.decrypt(ig.refreshTokenEnc ?? '')).toBe('suat-1')
   })
 
   it('assigns accounts to an app and keeps that through a reconnect', async () => {

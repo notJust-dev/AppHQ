@@ -113,7 +113,7 @@ function SettingsPage() {
 
       <Section
         title="Connect Facebook and Instagram"
-        intro="One Facebook sign-in finds the Pages you manage and the Instagram accounts linked to them. Then choose the app each one promotes. Facebook brings up to a year of daily views, reach and followers; Instagram brings 90 days of daily views. Both bring posts and reels with their views."
+        intro="One sign-in, with Facebook or Instagram, finds the Pages and Instagram accounts you share with the dashboard. Then choose the app each one promotes. Facebook brings up to a year of daily views, reach and followers; Instagram brings 90 days of daily views. Both bring posts and reels with their views."
       >
         <ConnectMeta apps={apps} setup={metaSetup} accounts={metaAccounts} onChanged={dataChanged} />
       </Section>
