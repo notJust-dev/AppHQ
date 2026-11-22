@@ -68,7 +68,8 @@ something fetches its history.
 An app's Overview also has a funnel (social views, downloads, trials started, trials converted,
 with the rate between each step; widths on a log scale, since the stages span orders of
 magnitude) and, as an experiment, a Sankey of where its downloads went: by store, into a trial,
-straight to a paid subscription, or neither, and what became of the trials. The trial outcomes
+straight to paid, or neither, and what became of the trials (paid, still running, expired). Paid
+has two ways in: after a trial, or straight from a download. The trial outcomes
 come from RevenueCat's trial conversion chart, counted by the day each trial started, and are
 read back 45 days on every sync, since a trial can still convert after it starts. Social views
 stay out of the Sankey: nothing ties a view to a download, and a flow would pretend it does.

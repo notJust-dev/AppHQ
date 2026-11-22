@@ -34,8 +34,9 @@ const STORE_LABEL: Record<string, string> = { app_store: 'App Store', google_pla
 
 /**
  * Downloads by store, what share went on to a trial or straight to a paid subscription, and what
- * became of the trials. Every link is a count of the same people, so widths add up; social views
- * are left out, since nothing ties a view to a download.
+ * became of the trials. Paid has two ways in: after a trial, or straight from a download. Every
+ * link is a count of the same people, so widths add up; social views are left out, since nothing
+ * ties a view to a download.
  */
 function graphOf(flow: Flow): { nodes: FlowNode[]; links: FlowLink[]; overflow: boolean } | null {
   const downloads = flow.downloads.total
@@ -45,32 +46,34 @@ function graphOf(flow: Flow): { nodes: FlowNode[]; links: FlowLink[]; overflow: 
   const trials = outcomes ?? flow.trials
   if (!downloads || trials === null) return null
 
-  const nodes: FlowNode[] = []
   const links: FlowLink[] = []
-  const add = (node: FlowNode, from: string, value: number | null) => {
-    if (!value || value <= 0) return
-    nodes.push(node)
-    links.push({ source: from, target: node.id, value })
+  const flowTo = (source: string, target: string, value: number | null) => {
+    if (value && value > 0) links.push({ source, target, value })
   }
-
-  for (const [store, value] of Object.entries(flow.downloads.bySource)) {
-    if (value > 0) {
-      nodes.push({ id: store, label: STORE_LABEL[store] ?? store, tone: 'downloads' })
-      links.push({ source: store, target: 'downloads', value })
-    }
-  }
-  nodes.push({ id: 'downloads', label: 'Downloads', tone: 'downloads' })
-  // In the order they stack in the last column: the trials' outcomes, then the other downloads.
-  add({ id: 'trial', label: 'Started a trial', tone: 'trial' }, 'downloads', trials)
-  add({ id: 'converted', label: 'Converted', tone: 'paid' }, 'trial', converted)
-  add({ id: 'running', label: 'Still in trial', tone: 'running' }, 'trial', running)
-  add({ id: 'expired', label: 'Trial expired', tone: 'left' }, 'trial', expired)
-  add({ id: 'direct', label: 'Paid without a trial', tone: 'paid' }, 'downloads', flow.directSubscriptions)
+  const stores = Object.keys(flow.downloads.bySource)
+  for (const store of stores) flowTo(store, 'downloads', flow.downloads.bySource[store] ?? 0)
+  flowTo('downloads', 'trial', trials)
+  flowTo('trial', 'paid', converted)
+  flowTo('downloads', 'paid', flow.directSubscriptions)
+  flowTo('trial', 'running', running)
+  flowTo('trial', 'expired', expired)
   // More trials and purchases than downloads happens (reinstalls, a second device), so the
   // rest is only drawn when there is one.
   const rest = downloads - trials - (flow.directSubscriptions ?? 0)
-  add({ id: 'none', label: 'No purchase', tone: 'left' }, 'downloads', rest)
-  return { nodes, links, overflow: rest < 0 }
+  flowTo('downloads', 'none', rest)
+
+  // In the order they stack: stores, then downloads and the trial, then the last column, paid first.
+  const catalog: FlowNode[] = [
+    ...stores.map((store) => ({ id: store, label: STORE_LABEL[store] ?? store, tone: 'downloads' as const })),
+    { id: 'downloads', label: 'Downloads', tone: 'downloads' },
+    { id: 'trial', label: 'Started a trial', tone: 'trial' },
+    { id: 'paid', label: 'Paid', tone: 'paid' },
+    { id: 'running', label: 'Still in trial', tone: 'running' },
+    { id: 'expired', label: 'Trial expired', tone: 'left' },
+    { id: 'none', label: 'No purchase', tone: 'left' },
+  ]
+  const linked = new Set(links.flatMap((entry) => [entry.source, entry.target]))
+  return { nodes: catalog.filter((node) => linked.has(node.id)), links, overflow: rest < 0 }
 }
 
 /** Whether the app has the downloads and trials this flow needs. */
@@ -111,11 +114,19 @@ export function AppFlow({ flow }: { flow: Flow }) {
             const label = (node: Laid) =>
               where(node) === 'after' ? `${node.data.label} · ${formatCount(node.value)}` : node.data.label
             const amount = (node: Laid) => formatCount(node.value)
+            // Above a middle node, both lines clear its top, where its links leave. The first
+            // middle column's label reaches left and the next one's right, so the two never meet
+            // however narrow the chart.
+            const reachesLeft = (node: Laid) => node.layer === 1
             const x = (node: Laid) =>
-              ({ before: node.x0 - 8, after: node.x1 + 8, above: (node.x0 + node.x1) / 2 })[where(node)]
-            // Above a middle node, both lines clear its top, where its links leave.
+              ({
+                before: node.x0 - 8,
+                after: node.x1 + 8,
+                above: reachesLeft(node) ? node.x1 : node.x0,
+              })[where(node)]
             const y = (node: Laid) => (where(node) === 'above' ? node.y0 - 20 : node.y)
-            const anchor = (node: Laid) => ({ before: 'end', after: 'start', above: 'middle' } as const)[where(node)]
+            const anchor = (node: Laid) =>
+              ({ before: 'end', after: 'start', above: reachesLeft(node) ? 'end' : 'start' } as const)[where(node)]
             return [
               link(links, {
                 id: 'links',
