@@ -147,7 +147,8 @@ async function writeDailyViews(db: Db, appId: string) {
 /**
  * TikTok accounts, each connected to the app it promotes. Every sync reads each account's
  * public videos and saves their lifetime totals as today's snapshot; daily views are the gains
- * between days. TikTok keeps no history, so the series starts the day an account is connected.
+ * between days. TikTok keeps no history, so before an account was connected each video's views
+ * sit on the day it was posted (see `dailyViews`).
  */
 export function createTikTokConnector(
   options: {

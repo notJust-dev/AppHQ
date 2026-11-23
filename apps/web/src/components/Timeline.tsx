@@ -82,7 +82,7 @@ function emptyReason(
   if (reported.length > 0) return `${reported.map(sourceLabel).join(' and ')} reported none in this range.`
   const linked = from.filter((source) => connected.has(source))
   if (linked.includes('tiktok')) {
-    return 'TikTok is connected. Daily views start the day after connecting, once there are two readings to compare.'
+    return 'TikTok is connected, with no views in this range yet. Videos posted before connecting count on the day they went up.'
   }
   if (linked.length > 0) return `${linked.map(sourceLabel).join(' and ')} connected, with nothing reported in this range yet.`
   return WHERE_FROM[series.key] ?? 'Not connected yet.'
@@ -103,6 +103,7 @@ export function Timeline({
   series,
   posts = [],
   connected = new Set(),
+  tiktokDailyFrom = null,
 }: {
   days: string[]
   series: Series[]
@@ -110,6 +111,8 @@ export function Timeline({
   posts?: Post[]
   /** Providers with an account connected to this app, so an empty row can say why it is empty. */
   connected?: ReadonlySet<string>
+  /** The first day TikTok views are daily; before it they sit on each video's post day. */
+  tiktokDailyFrom?: string | null
 }) {
   const [active, setActive] = useState<number | null>(null)
   const [showTable, setShowTable] = useState(false)
@@ -197,6 +200,11 @@ export function Timeline({
             onPoint={pointAt}
             reporting={reporting}
             connected={connected}
+            dailyFrom={
+              entry.key === 'socialViews' && entry.sources.some((source) => source.source === 'tiktok')
+                ? tiktokDailyFrom
+                : null
+            }
           />
         ))}
         <DateAxis days={days} percent={percent} />
@@ -464,8 +472,15 @@ function Track(props: {
   /** Sources that reported anything for this app in the range. */
   reporting: ReadonlySet<string>
   connected: ReadonlySet<string>
+  /**
+   * For social views: the first day TikTok's numbers are daily. Before it they are each video's
+   * views on its post day, which the row says, with a line where daily views begin.
+   */
+  dailyFrom?: string | null
 }) {
   const { series, days, active, percent } = props
+  const dailyFrom = props.dailyFrom && days[0] !== undefined && days[0] < props.dailyFrom ? props.dailyFrom : null
+  const dailyFromIndex = dailyFrom ? days.indexOf(dailyFrom) : -1
   const stage = STAGE[series.stage]
   const empty = series.sources.length === 0
 
@@ -514,6 +529,11 @@ function Track(props: {
               {headline === null ? '–' : formatValue(headline, series.unit)}
             </p>
             <p className="text-xs text-muted-foreground">{caption}</p>
+            {dailyFrom && (
+              <p className="mt-1 max-w-[12rem] text-xs text-muted-foreground">
+                TikTok before {formatDay(dailyFrom)}: each video&apos;s views on the day it was posted.
+              </p>
+            )}
             {series.sources.length > 1 && (
               <dl className="mt-2 grid grid-cols-[auto_auto] justify-start gap-x-4 text-xs">
                 {series.sources.map((source) => {
@@ -583,6 +603,15 @@ function Track(props: {
               {formatTick(tick, series.unit)}
             </span>
           ))}
+
+          {dailyFromIndex > 0 && (
+            <span
+              className="pointer-events-none absolute inset-y-0 border-l border-dashed border-muted-foreground/60"
+              style={{ left: `${percent(dailyFromIndex)}%` }}
+              title={`TikTok views are daily from ${formatDay(dailyFrom ?? '')}`}
+              aria-hidden="true"
+            />
+          )}
 
           {active !== null && (
             <span

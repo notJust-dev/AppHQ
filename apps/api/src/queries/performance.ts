@@ -9,6 +9,7 @@ import { defineQuery } from './define.js'
 import { buildSeries, type MetricRow, type SeriesDefinition } from './get-app-timeline.js'
 import { downloadLifts } from './list-posts.js'
 import { checkRange, rangeFields } from './range.js'
+import { tiktokDailyFrom } from './tiktok-history.js'
 
 const input = z
   .object({
@@ -247,6 +248,8 @@ export const getSocialPerformance = defineQuery({
 
     return {
       ...section,
+      /** The first day TikTok views are daily; before it they sit on each video's post day. */
+      tiktokDailyFrom: await tiktokDailyFrom(db, range.appId),
       posts: {
         byPlatform: [...platforms.values()].sort((a, b) => b.views - a.views),
         perDay: postsPerDay(postRows, section.days),

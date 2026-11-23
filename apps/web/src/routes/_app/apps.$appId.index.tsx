@@ -52,7 +52,13 @@ function AppOverview() {
         </p>
         <RangeSwitch current={range} />
       </div>
-      <Timeline days={data.days} series={data.series} posts={posts} connected={connected} />
+      <Timeline
+        days={data.days}
+        series={data.series}
+        posts={posts}
+        connected={connected}
+        tiktokDailyFrom={data.tiktokDailyFrom ?? null}
+      />
       {/* Hidden while neither can draw, as for an app with only a store connected. */}
       {flow && (canDrawFunnel(flow) || canDrawFlow(flow)) && (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">

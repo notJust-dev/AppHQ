@@ -11,6 +11,7 @@ import { assetOf } from '../test/assets.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { ConnectInputError } from './connect-app-store.js'
 import { connectTikTok } from './connect-tiktok.js'
+import { tiktokDailyFrom } from '../queries/tiktok-history.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
 const url = testDatabaseUrl()
@@ -114,6 +115,12 @@ function fakeTikTok(openId: string) {
 describe.skipIf(!url)('TikTok, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
   const secrets = createSecrets('d'.repeat(64))
+  /** The views the two videos had when the account was connected, on the days they went up. */
+  const history = [
+    { date: '2026-10-01', value: 50_000 },
+    { date: '2026-11-01', value: 8_000 },
+  ]
+  const nonZero = (rows: { date: string; value: number }[]) => rows.filter((row) => row.value !== 0)
   const log = { info() {}, warn() {}, error() {} }
   const appId = `tt-${randomUUID().slice(0, 8)}`
   const openId = `open-${randomUUID().slice(0, 8)}`
@@ -183,7 +190,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
       .where(eq(connections.id, row.id))
   })
 
-  it('takes the first snapshot on the day it is connected, without daily views yet', async () => {
+  it('takes the first snapshot on the day it is connected, with each video on its post day', async () => {
     const connector = createTikTokConnector({ fetch: tiktok.impl, env, now: at('2026-11-10T09:00:00Z') })
     expect(await connector.isConfigured(await app(), db)).toBe(true)
 
@@ -194,8 +201,15 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
       [`Video ${openId}-v1`, 50_000],
       [`Video ${openId}-v2`, 8_000],
     ])
-    expect(await metric('views')).toEqual([])
+    // No daily gain yet, but the history is there: each video's views on the day it went up, and
+    // zero on the days between with no post, through the connection day.
+    const views = await metric('views')
+    expect(nonZero(views)).toEqual(history)
+    expect(views).toHaveLength(41)
+    expect(views[1]).toEqual({ date: '2026-10-02', value: 0 })
     expect(await metric('followers')).toEqual([{ date: '2026-11-10', value: 1200 }])
+    // Real daily views begin the day after the connection.
+    expect(await tiktokDailyFrom(db, appId)).toBe('2026-11-11')
   })
 
   it('refreshes the expired token, keeps the new refresh token, and derives the next day', async () => {
@@ -218,7 +232,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     expect(row.expiresAt).toEqual(new Date('2026-11-11T23:00:00Z'))
 
     // 400 + 100 of growth on the old videos, plus all 2,500 of the one posted that day.
-    expect(await metric('views')).toEqual([{ date: '2026-11-11', value: 3_000 }])
+    expect(nonZero(await metric('views'))).toEqual([...history, { date: '2026-11-11', value: 3_000 }])
 
     const snapshots = await db
       .select({ date: postSnapshots.date })
@@ -243,6 +257,8 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     ).rejects.toThrow(/1 of 1 TikTok accounts failed/)
     expect((await connection()).status).toBe('needs_reauth')
     // Days already derived stay; the days without a reading stay empty instead of turning to 0.
-    expect(await metric('views')).toEqual([{ date: '2026-11-11', value: 3_000 }])
+    const views = await metric('views')
+    expect(nonZero(views)).toEqual([...history, { date: '2026-11-11', value: 3_000 }])
+    expect(views.at(-1)?.date).toBe('2026-11-11')
   })
 })

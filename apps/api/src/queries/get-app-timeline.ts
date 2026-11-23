@@ -6,6 +6,7 @@ import { TIMELINE } from '../metrics/catalog.js'
 import { lastCompleteDay } from '../metrics/complete.js'
 import { defineQuery } from './define.js'
 import { checkRange, rangeFields } from './range.js'
+import { tiktokDailyFrom } from './tiktok-history.js'
 
 type Values = (number | null)[]
 
@@ -173,6 +174,8 @@ export const getAppTimeline = defineQuery({
       range: { from: input.from, to: input.to },
       days,
       series: buildTimeline(rows, days),
+      /** The first day TikTok views are daily; before it they sit on each video's post day. */
+      tiktokDailyFrom: await tiktokDailyFrom(db, app.id),
     }
   },
 })

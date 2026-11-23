@@ -137,8 +137,10 @@ Register the redirect URI that the TikTok page shows under "Setting up the TikTo
 set `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` on the API (a sandbox has its own pair). Then
 pick the app an account promotes (or Shared accounts) and press Connect TikTok. Every sync saves each video's
 lifetime totals as that day's snapshot; daily views are the gains between days, so they start
-the day after an account is connected. With a sandbox, only the accounts added as target users
-can sign in.
+the day after an account is connected. TikTok keeps no daily history, so before that each video's
+views as first read sit on the day it was posted (zero on days with no post, from the first post
+the account still has); the charts say so and draw a line where daily views begin. Every view
+counts once either way. With a sandbox, only the accounts added as target users can sign in.
 
 To try the flow without TikTok, point the API at a stand-in with `TIKTOK_API_URL` and
 `TIKTOK_AUTH_URL`.

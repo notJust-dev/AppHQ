@@ -57,6 +57,14 @@ function SocialPage() {
   const perThousand = (ratio: number | null) => (ratio === null ? null : ratio * 1000)
 
   const hasSocial = (views?.summary ?? null) !== null || postCount > 0
+  // TikTok keeps no daily history: before an account was connected, its views sit on each
+  // video's post day. Said when the range reaches back that far. `?? null` covers a dashboard
+  // briefly newer than the API during a deploy.
+  const tiktokDailyFrom = data.tiktokDailyFrom ?? null
+  const tiktokNote =
+    tiktokDailyFrom && dates.from < tiktokDailyFrom
+      ? ` TikTok views before ${formatDay(tiktokDailyFrom)} are each video's views on the day it was posted, as TikTok keeps no daily history.`
+      : ''
 
   return (
     <>
@@ -101,7 +109,7 @@ function SocialPage() {
 
             <Panel
               title="From posts to downloads"
-              description="Each day's posts, social views and store downloads on one day axis. Views that jump after a post, and downloads that follow a day or two later, are the funnel at work."
+              description={`Each day's posts, social views and store downloads on one day axis. Views that jump after a post, and downloads that follow a day or two later, are the funnel at work.${tiktokNote}`}
               bodyClassName="pb-3"
             >
               <ChartStack>
