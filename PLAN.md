@@ -126,12 +126,21 @@ Still to verify:
 | Resource | Id | Address |
 |---|---|---|
 | Velocity server `appdashboard` (Starter, $20/month, Frankfurt, 25 GB) | `1690499` | |
-| App `api` (PostgreSQL attached) | `6797147` | https://nodejs-1690499-6797147.cloudwaysnodeapps.com |
-| App `web` | `6797158` | https://nodejs-1690499-6797158.cloudwaysnodeapps.com |
+| App `api` (PostgreSQL attached, `PORT` 3002) | `6801126` | https://nodejs-1690499-6801126.cloudwaysnodeapps.com |
+| App `web` (`PORT` 3003) | `6801135` | https://nodejs-1690499-6801135.cloudwaysnodeapps.com |
+
+These replaced the first two apps (`6797147` and `6797158`) on 2026-11-23. Moving the repository
+to `notJust-dev/AppHQ` left those apps unable to deploy, and their repository could not be
+changed, so both apps were created again from the new repository. The data came across with
+`POST /internal/copy-database` (see `apps/api/src/db/copy.ts`), every table with the same row
+count, and the old apps were deleted. The dashboard's address changed with it, so the sign-in
+redirect addresses at TikTok, Meta and Google point at the new `web` app.
 
 Env variables set: `INTERNAL_API_TOKEN` on both apps, `ENCRYPTION_KEY` on `api`, and
-`SESSION_SECRET` and `DASHBOARD_PASSWORD` on `web`, as private random values; `API_URL` on `web`. The dashboard
-password is also recorded locally in the git-ignored `apps/web/.env.velocity`.
+`SESSION_SECRET` and `DASHBOARD_PASSWORD` on `web`, as private values; `API_URL` and `PORT` on
+both. Each secret is also recorded locally in the git-ignored `apps/api/.env.velocity` and
+`apps/web/.env.velocity`, which is what made the move possible: Velocity never shows a private
+value again.
 `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` (the sandbox's pair) are private variables on
 `api` since 2026-11-22, copied from the git-ignored `apps/api/.env.velocity`. So are
 `META_APP_ID`, `META_APP_SECRET` and `META_LOGIN_CONFIG_ID` (the Unified login configuration,
@@ -149,8 +158,9 @@ the server and apps, attach PostgreSQL, set env variables, add a domain and read
 Nothing is created without the owner's confirmation.
 
 - Repository: `notJust-dev/AppHQ` (private), branch `main`. Moved there from
-  `VadimNotJustDev/AppDashboardPOC` on 2026-11-23; Velocity's GitHub access has to cover the
-  `notJust-dev` organization for deploys.
+  `VadimNotJustDev/AppDashboardPOC` on 2026-11-23; Velocity's GitHub app has to be installed on
+  the `notJust-dev` organization for deploys. An app keeps the repository it was created from:
+  relinking one through the API changes the name it shows but not where it deploys from.
 - GitHub is linked to the Cloudways account. That OAuth step has to be done in the Cloudways
   console; it cannot be done through the MCP.
 - Ids for the create calls: Starter plan `1` ($20/month, trial-eligible, 5 apps, 2 GB, 2 vCPU);
