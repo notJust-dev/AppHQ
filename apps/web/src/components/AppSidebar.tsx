@@ -86,7 +86,8 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="AppHQ">
               <Link to="/">
-                <BrandMark className="size-8 shrink-0" />
+                {/* The button sizes every svg inside it to size-4; the mark is the whole tile. */}
+                <BrandMark className="size-8! shrink-0" />
                 <BrandName className="truncate text-[16px]" />
               </Link>
             </SidebarMenuButton>
