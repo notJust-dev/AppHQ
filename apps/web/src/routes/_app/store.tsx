@@ -1,7 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Store } from 'lucide-react'
-import { NoData } from '@/components/NoData'
+import { FunnelChart, type FunnelStage } from '@/components/FunnelChart'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
 import { SourceLogo } from '@/components/SourceLogo'
@@ -16,7 +16,6 @@ import { formatCompact, formatCount, formatDay } from '@/lib/format'
 import { pairedRatio } from '@/lib/performance'
 import { storePerformanceQuery, type PerformanceSeries } from '@/lib/queries'
 import { performanceSearchSchema, rangeToDates } from '@/lib/range'
-import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_app/store')({
   validateSearch: performanceSearchSchema,
@@ -76,15 +75,15 @@ function StorePage() {
           <Stat label="Store page views" swatch="bg-views" value={pageViews?.summary ?? null} previous={pageViews?.previous} format={formatCompact} />
           <Stat label="Downloads" swatch="bg-downloads" value={downloads?.summary ?? null} previous={downloads?.previous} format={formatCompact} />
           <Stat
-            label="Page view to download"
-            value={storeRate('downloads', 'pageViews')}
-            previous={storeRate('downloads', 'pageViews', { period: 'previous' })}
-            format={percent}
-          />
-          <Stat
             label="Impression to page view"
             value={storeRate('pageViews', 'impressions', { source: 'app_store' })}
             previous={storeRate('pageViews', 'impressions', { source: 'app_store', period: 'previous' })}
+            format={percent}
+          />
+          <Stat
+            label="Page view to download"
+            value={storeRate('downloads', 'pageViews')}
+            previous={storeRate('downloads', 'pageViews', { period: 'previous' })}
             format={percent}
           />
           <Stat
@@ -106,11 +105,11 @@ function StorePage() {
                 source={store.source}
                 label={store.label}
                 steps={[
-                  ...(store.source === 'app_store'
-                    ? [{ key: 'impressions', label: 'Impressions', value: fromStore(impressions, store.source), swatch: 'bg-views/50' }]
-                    : []),
-                  { key: 'pageViews', label: store.visits, value: fromStore(pageViews, store.source), swatch: 'bg-views' },
-                  { key: 'downloads', label: 'Downloads', value: fromStore(downloads, store.source), swatch: 'bg-downloads' },
+                  // Always a step, so both funnels' rows stay level: Google Play never reports
+                  // impressions, and the App Store may have none in a short range.
+                  storeImpressions(store.source, fromStore(impressions, store.source)),
+                  { key: 'pageViews', label: store.visits, value: fromStore(pageViews, store.source), color: 'var(--views)' },
+                  { key: 'downloads', label: 'Downloads', value: fromStore(downloads, store.source), color: 'var(--downloads)' },
                 ]}
                 stepRate={(key, before) => storeRate(key, before, { source: store.source })}
               />
@@ -176,45 +175,60 @@ function through(series: PerformanceSeries | undefined) {
 }
 
 /** One store's funnel: a bar per step, as long as its share of the first step. */
+/** Impressions come before the page, so they take a lighter shade of the views colour. */
+const IMPRESSIONS_COLOR = 'color-mix(in oklab, var(--views) 50%, var(--card))'
+
+/** The impressions step of a store's funnel, with why it has no number when it has none. */
+function storeImpressions(source: string, value: number | null) {
+  const missing =
+    source !== 'app_store' ? 'Not reported by Google Play' : value === null ? 'None reported in this range' : undefined
+  return { key: 'impressions', label: 'Impressions', value: source === 'app_store' ? value : null, color: IMPRESSIONS_COLOR, missing }
+}
+
+/**
+ * One store's funnel as a chart: the steps it reported, each with its share of the step before.
+ * The share pairs app by app (over the apps that report both steps), so it can differ from
+ * dividing the two totals.
+ */
 function StoreFunnel(props: {
   source: string
   label: string
-  steps: { key: string; label: string; value: number | null; swatch: string }[]
+  /** `missing` says why a step has no number when the store never reports it. */
+  steps: { key: string; label: string; value: number | null; color: string; missing?: string }[]
   /** A step as a share of the one before it, over the apps that report both. */
   stepRate: (key: string, before: string) => number | null
 }) {
-  const first = props.steps.find((step) => step.value !== null)?.value ?? null
-  const reported = props.steps.some((step) => step.value !== null)
+  // A step the store never reports stays in, so the rows line up with the other store's funnel;
+  // one it could report but did not this time is left out.
+  const steps = props.steps.filter((step) => step.value !== null || step.missing)
+  const measured = steps.filter((step) => step.value !== null)
+  const stages: FunnelStage[] = steps.map((step, index) => {
+    const before = steps[index - 1]
+    const share = step.value !== null && before?.value != null ? props.stepRate(step.key, before.key) : null
+    return {
+      key: step.key,
+      label: step.label,
+      value: step.value,
+      color: step.color,
+      rate: step.missing ?? (share === null || !before ? undefined : `${percent(share)} of ${before.label.toLowerCase()}`),
+    }
+  })
+
   return (
     <section aria-label={`${props.label} funnel`}>
-      <h3 className="flex items-center gap-2 font-medium">
+      <h3 className="mb-3 flex items-center gap-2 font-medium">
         <SourceLogo source={props.source} decorative className="size-4 text-muted-foreground" />
         {props.label}
       </h3>
-      {!reported ? (
-        <p className="mt-2 text-muted-foreground">Nothing reported in this range.</p>
+      {measured.length === 0 ? (
+        <p className="text-muted-foreground">Nothing reported in this range.</p>
+      ) : measured.length === 1 ? (
+        <p className="text-muted-foreground">
+          Only {measured[0]!.label.toLowerCase()} reported in this range ({formatCount(measured[0]!.value!)}), so there is
+          no funnel to draw yet.
+        </p>
       ) : (
-        <ol className="mt-3 space-y-3">
-          {props.steps.map((step, index) => {
-            const before = index > 0 ? props.steps[index - 1] : undefined
-            const stepShare = before ? props.stepRate(step.key, before.key) : null
-            const share = step.value !== null && first ? step.value / first : null
-            return (
-              <li key={step.label}>
-                <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{step.label}</span>
-                  <span className="figures font-medium">
-                    {step.value === null ? <NoData /> : formatCount(step.value)}
-                    {stepShare !== null && <span className="ml-2 font-normal text-muted-foreground">{percent(stepShare)}</span>}
-                  </span>
-                </div>
-                <div className="mt-1.5 h-2 rounded-full bg-muted" aria-hidden="true">
-                  <div className={cn('h-full rounded-full', step.swatch)} style={{ width: `${share === null ? 0 : Math.max(1, share * 100)}%` }} />
-                </div>
-              </li>
-            )
-          })}
-        </ol>
+        <FunnelChart stages={stages} ariaLabel={`${props.label} funnel shape`} />
       )}
     </section>
   )
