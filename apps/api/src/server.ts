@@ -15,6 +15,7 @@ const app = await buildApp({
   secrets: createSecrets(env.ENCRYPTION_KEY),
   pingDb: () => sql`select 1`,
   internalApiToken: env.INTERNAL_API_TOKEN,
+  sourceDatabaseUrl: env.SOURCE_DATABASE_URL,
 })
 
 // The process manager sends SIGTERM on every deploy and restart.

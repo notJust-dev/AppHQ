@@ -14,6 +14,9 @@ const schema = z
     PGHOST: z.string().optional(),
     PGDATABASE: z.string().optional(),
     PGUSER: z.string().optional(),
+    // Only while moving to a new Velocity app: the old app's database, on the same server, for
+    // POST /internal/copy-database to copy into this one (see db/copy.ts). Remove it afterwards.
+    SOURCE_DATABASE_URL: z.url().optional(),
     INTERNAL_API_TOKEN: z.string().min(32, 'must be at least 32 characters'),
     // Encrypts API keys and OAuth tokens stored in the database. Optional so that the API still
     // boots without it; connecting a source then fails with a clear message.
