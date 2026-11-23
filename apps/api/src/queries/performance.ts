@@ -181,7 +181,8 @@ function postsPerDay(rows: { platform: string; publishedAt: Date }[], days: IsoD
   return [...byPlatform].map(([platform, values]) => ({ platform, values }))
 }
 
-const TOP_POSTS = 10
+/** Per platform, so the dashboard can show the top posts of any one platform, not only of all. */
+const TOP_POSTS_PER_PLATFORM = 10
 
 export const getSocialPerformance = defineQuery({
   name: 'get_social_performance',
@@ -189,7 +190,8 @@ export const getSocialPerformance = defineQuery({
     'Social media performance over a date range, for one app or all: daily social views and ' +
     'followers by platform (TikTok, Instagram, Facebook), daily store downloads to set them ' +
     'against, how many posts went up (per platform and per day) with their lifetime views, ' +
-    'likes, comments and shares, and the most viewed posts of the range with the download lift ' +
+    'likes, comments and shares, and the most viewed posts of the range (the top ten of each ' +
+    'platform, most viewed first) with the download lift ' +
     'after each (downloads over the post’s day and the two after, against the week before; ' +
     'lift against a baseline, not attribution). ' +
     SERIES_NOTE,
@@ -230,7 +232,14 @@ export const getSocialPerformance = defineQuery({
       platforms.set(post.platform, entry)
     }
 
-    const top = postRows.slice(0, TOP_POSTS)
+    // The rows come most viewed first, so the first of each platform are its top. The top ten of
+    // all platforms together is the first ten of this list.
+    const shown = new Map<string, number>()
+    const top = postRows.filter((post) => {
+      const count = shown.get(post.platform) ?? 0
+      shown.set(post.platform, count + 1)
+      return count < TOP_POSTS_PER_PLATFORM
+    })
     const lifts = new Map(
       await Promise.all(
         [...new Set(top.map((post) => post.appId))].map(

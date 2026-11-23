@@ -4,8 +4,8 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 /**
- * A card with an optional header (title, a line of description, actions on the right) and
- * footer. The page's sections are cards; the page itself is not.
+ * A card with an optional header (title, a line of description, actions on the right, or under
+ * the description in a narrow card) and footer. The page's sections are cards; the page itself is not.
  */
 export function Panel(props: {
   title?: ReactNode
@@ -29,12 +29,18 @@ export function Panel(props: {
       {hasHeader && (
         <CardHeader className="border-b pt-4 [.border-b]:pb-4">
           {props.title !== undefined && (
-            <CardTitle>
+            // Kept in the first column, so moving the actions under them leaves them in place.
+            <CardTitle className="col-start-1">
               <h2>{props.title}</h2>
             </CardTitle>
           )}
-          {props.description && <CardDescription className="max-w-prose">{props.description}</CardDescription>}
-          {props.actions && <CardAction className="flex flex-wrap items-center gap-2">{props.actions}</CardAction>}
+          {props.description && <CardDescription className="col-start-1 max-w-prose">{props.description}</CardDescription>}
+          {props.actions && (
+            // Beside the title, or under the description when the card is too narrow for both.
+            <CardAction className="flex flex-wrap items-center gap-2 @max-xl/card-header:col-start-1 @max-xl/card-header:row-span-1 @max-xl/card-header:row-start-3 @max-xl/card-header:mt-2 @max-xl/card-header:justify-self-start">
+              {props.actions}
+            </CardAction>
+          )}
         </CardHeader>
       )}
       <div className={props.bodyClassName ?? 'p-5'}>{props.children}</div>

@@ -1,9 +1,11 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
+import { useMemo } from 'react'
+import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
-import { Private } from '@/components/Private'
 import { AppComparison } from '@/components/performance/AppComparison'
 import { ChartRow, ChartStack } from '@/components/performance/ChartStack'
 import { DailyChart } from '@/components/performance/DailyChart'
@@ -12,7 +14,6 @@ import { Stat, StatGrid } from '@/components/performance/Stat'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table'
 import { formatCompact, formatCount, formatDay } from '@/lib/format'
 import { usePrivacy } from '@/lib/privacy'
 import { searchPerformanceQuery, searchTopQuery, type PerformanceSeries } from '@/lib/queries'
@@ -155,19 +156,14 @@ function TopPanel(props: {
   app: string | undefined
 }) {
   const { data, isPending } = useQuery(searchTopQuery({ ...props.dates, appId: props.app, dimension: props.dimension }))
-  const privacy = usePrivacy()
-  const label = (key: string) => {
-    if (props.dimension === 'query') return key
-    try {
-      const url = new URL(key)
-      return `${url.host}${url.pathname === '/' ? '' : url.pathname}`
-    } catch {
-      return key
-    }
-  }
+  const hasRows = data?.ok === true && data.connected && data.rows.length > 0
 
   return (
-    <Panel title={props.title} description="By clicks over the range, read from Search Console." bodyClassName="">
+    <Panel
+      title={props.title}
+      description={`The most clicked over the range, read from Search Console.${hasRows ? ' Select a column heading to sort by it.' : ''}`}
+      bodyClassName=""
+    >
       {isPending ? (
         <div className="space-y-2 px-5 py-4" aria-label="Loading">
           {[0, 1, 2, 3, 4].map((index) => (
@@ -187,44 +183,86 @@ function TopPanel(props: {
       ) : data.rows.length === 0 ? (
         <p className="px-5 py-4 text-muted-foreground">Nothing in this range.</p>
       ) : (
-        <Table className="table-fixed">
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col">{props.heading}</TableHead>
-              <TableHead scope="col" className="w-20 text-right">
-                Clicks
-              </TableHead>
-              <TableHead scope="col" className="w-28 text-right">
-                Impressions
-              </TableHead>
-              <TableHead scope="col" className="w-20 text-right">
-                Position
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.rows.map((row) => (
-              <TableRow key={row.key}>
-                {/* A search term or page names the site; a native tooltip could not be blurred. */}
-                <TableRowHead className="truncate font-normal" title={privacy ? undefined : row.key}>
-                  {props.dimension === 'page' ? (
-                    <a href={row.key} target="_blank" rel="noreferrer" data-private="" className="hover:underline">
-                      {label(row.key)}
-                    </a>
-                  ) : (
-                    <Private>{label(row.key)}</Private>
-                  )}
-                </TableRowHead>
-                <TableCell className="figures text-right">{formatCount(row.clicks)}</TableCell>
-                <TableCell className="figures text-right">{formatCount(row.impressions)}</TableCell>
-                <TableCell className="figures text-right">{position(row.position)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <SearchTopTable rows={data.rows} heading={props.heading} dimension={props.dimension} />
       )}
     </Panel>
   )
+}
+
+interface SearchTopRow {
+  key: string
+  clicks: number
+  impressions: number
+  position: number
+}
+
+const topHelper = createColumnHelper<SortableFeatures, SearchTopRow>()
+
+const topCount = (key: 'clicks' | 'impressions', label: string, width: string) =>
+  topHelper.accessor(key, {
+    header: label,
+    sortDescFirst: true,
+    meta: { align: 'right', headClassName: width, cellClassName: 'figures' },
+    cell: (info) => formatCount(info.getValue()),
+  })
+
+/** A page as people read it: its host and path, without the scheme. */
+const pageLabel = (key: string) => {
+  try {
+    const url = new URL(key)
+    return `${url.host}${url.pathname === '/' ? '' : url.pathname}`
+  } catch {
+    return key
+  }
+}
+
+function SearchTopTable(props: { rows: SearchTopRow[]; heading: string; dimension: 'query' | 'page' }) {
+  const privacy = usePrivacy()
+  const { heading, dimension } = props
+  const columns = useMemo(
+    () =>
+      topHelper.columns([
+        topHelper.accessor('key', {
+          header: heading,
+          sortFn: 'alphanumeric',
+          meta: { cellClassName: 'truncate font-normal' },
+          cell: (info) => {
+            const key = info.getValue()
+            // A search term or page names the site; a native tooltip could not be blurred.
+            const title = privacy ? undefined : key
+            return dimension === 'page' ? (
+              <a href={key} target="_blank" rel="noreferrer" data-private="" title={title} className="hover:underline">
+                {pageLabel(key)}
+              </a>
+            ) : (
+              <span data-private="" title={title}>
+                {key}
+              </span>
+            )
+          },
+        }),
+        topCount('clicks', 'Clicks', 'w-20'),
+        topCount('impressions', 'Impressions', 'w-28'),
+        // Lower is better, so the best rank comes first.
+        topHelper.accessor('position', {
+          header: 'Position',
+          sortDescFirst: false,
+          meta: { align: 'right', headClassName: 'w-28', cellClassName: 'figures' },
+          cell: (info) => position(info.getValue()),
+        }),
+      ]),
+    [heading, dimension, privacy],
+  )
+
+  const table = useTable({
+    features: sortableFeatures,
+    columns,
+    data: props.rows,
+    initialState: { sorting: [{ id: 'clicks', desc: true }] },
+    enableSortingRemoval: false,
+  })
+
+  return <DataTable table={table} className="table-fixed" />
 }
 
 function NoSearch() {

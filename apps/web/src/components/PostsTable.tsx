@@ -1,107 +1,186 @@
 import { Link } from '@tanstack/react-router'
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
+import { useMemo, type ReactNode } from 'react'
+import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
+import { Panel } from '@/components/Panel'
+import { PlatformFilter, usePlatformFilter } from '@/components/PlatformFilter'
+import { Private } from '@/components/Private'
 import { formatCount, formatDay } from '@/lib/format'
-import { liftSentence, liftShort } from '@/lib/lift'
-import type { Post } from '@/lib/queries'
+import { liftSentence, liftShort, type Lift } from '@/lib/lift'
+import type { RangeKey } from '@/lib/range'
 import { sourceLabel } from '@/lib/sources'
 import { cn } from '@/lib/utils'
 
+/** What a posts table shows of a post; lists across apps also name the post's app. */
+export interface PostRow {
+  id: string
+  platform: string
+  url: string | null
+  caption: string | null
+  publishedAt: string
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  downloadLift: Lift
+  appId?: string
+  appName?: string
+}
+
+const helper = createColumnHelper<SortableFeatures, PostRow>()
+
+/** A lifetime total; bigger first when sorted. */
+const totalColumn = (key: 'views' | 'likes' | 'comments' | 'shares', label: string) =>
+  helper.accessor(key, {
+    header: label,
+    sortDescFirst: true,
+    meta: { align: 'right', cellClassName: 'figures' },
+    cell: (info) => formatCount(info.getValue()),
+  })
+
 /**
- * The app's posts published in the range, newest first. The totals are lifetime numbers from
- * the last sync, so a post from yesterday has had far less time than one from last month.
+ * Posts in a card, with a platform filter in its header when they come from more than one. The
+ * totals are lifetime numbers from the last sync, so a post from yesterday has had far less time
+ * than one from last month.
  */
-export function PostsTable(props: { posts: Post[]; hasSocialAccount: boolean; appId: string }) {
-  if (props.posts.length === 0) {
-    return (
-      <p className="px-5 py-6 text-muted-foreground">
-        {props.hasSocialAccount ? (
-          'No posts were published in this range.'
-        ) : (
-          <>
-            No social account is linked to this app yet.{' '}
-            <Link
-              to="/apps/$appId/settings"
-              params={{ appId: props.appId }}
-              search={(previous) => previous}
-              className="font-medium text-foreground underline underline-offset-4"
-            >
-              Link one in Settings
-            </Link>
-          </>
-        )}
-      </p>
-    )
-  }
+export function PostsPanel(props: {
+  title: string
+  description: string
+  posts: PostRow[]
+  /** The column the table starts sorted by, newest or biggest first. */
+  sortBy: 'posted' | 'views'
+  /** Names the table for screen readers. */
+  label: string
+  /** Shown in place of the table when there are no posts at all. */
+  empty: ReactNode
+  /**
+   * At most this many posts show: the first of the list, of the chosen platform. The list comes
+   * most viewed first, so this is the top of the platform.
+   */
+  limit?: number
+  /** Names each post's app under its caption, linked to the app's page over this range. */
+  appRange?: RangeKey
+  footer?: ReactNode
+}) {
+  const filter = usePlatformFilter(props.posts)
+  const { limit } = props
+  const shown = useMemo(() => (limit ? filter.shown.slice(0, limit) : filter.shown), [filter.shown, limit])
 
   return (
-    <Table className="min-w-[760px]">
-      <TableCaption className="sr-only">
-        Posts published in this range, newest first, with lifetime totals and download lift
-      </TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead scope="col">Posted</TableHead>
-          <TableHead scope="col">Post</TableHead>
-          {['Views', 'Likes', 'Comments', 'Shares'].map((label) => (
-            <TableHead key={label} scope="col" className="text-right">
-              {label}
-            </TableHead>
-          ))}
-          <TableHead scope="col" className="text-right">
-            Download lift
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {props.posts.map((post) => (
-          <TableRow key={post.id} className="align-top">
-            <TableCell className="figures align-top whitespace-nowrap">
-              {formatDay(post.publishedAt.slice(0, 10))}
-              <span className="block text-xs text-muted-foreground">{sourceLabel(post.platform)}</span>
-            </TableCell>
-            <TableCell className="max-w-[22rem] align-top">
-              {post.url ? (
-                <a
-                  href={post.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  // Captions name the app and its account: privacy mode blurs them.
-                  data-private=""
-                  className="line-clamp-2 underline decoration-border underline-offset-4 hover:decoration-foreground"
-                >
-                  {post.caption || 'Untitled post'}
-                </a>
-              ) : (
-                <span data-private="" className="line-clamp-2">
-                  {post.caption || 'Untitled post'}
-                </span>
-              )}
-            </TableCell>
-            {[post.views, post.likes, post.comments, post.shares].map((value, index) => (
-              <TableCell key={index} className="figures text-right align-top">
-                {formatCount(value)}
-              </TableCell>
-            ))}
-            <TableCell
-              className={cn(
-                'figures text-right align-top whitespace-nowrap',
-                post.downloadLift.status !== 'ok' && 'text-muted-foreground',
-              )}
-              title={liftSentence(post.downloadLift, post.publishedAt.slice(0, 10))}
-            >
-              {liftShort(post.downloadLift)}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <Panel
+      title={props.title}
+      description={props.description}
+      actions={
+        filter.platforms.length > 1 ? (
+          <PlatformFilter platforms={filter.platforms} value={filter.platform} onChange={filter.setPlatform} />
+        ) : undefined
+      }
+      footer={props.footer}
+      bodyClassName=""
+    >
+      {props.posts.length === 0 ? (
+        props.empty
+      ) : (
+        <PostsTable posts={shown} sortBy={props.sortBy} label={props.label} appRange={props.appRange} />
+      )}
+    </Panel>
+  )
+}
+
+/** The posts, sorted by any column but the caption. */
+function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label: string; appRange?: RangeKey }) {
+  const { appRange } = props
+  const columns = useMemo(
+    () =>
+      helper.columns([
+        helper.accessor((post) => Date.parse(post.publishedAt), {
+          id: 'posted',
+          header: 'Posted',
+          sortDescFirst: true,
+          meta: { cellClassName: 'figures whitespace-nowrap' },
+          cell: (info) => (
+            <>
+              {formatDay(info.row.original.publishedAt.slice(0, 10))}
+              <span className="block text-xs text-muted-foreground">{sourceLabel(info.row.original.platform)}</span>
+            </>
+          ),
+        }),
+        helper.display({
+          id: 'post',
+          header: 'Post',
+          meta: { cellClassName: 'max-w-[22rem] font-normal' },
+          cell: (info) => <Caption post={info.row.original} appRange={appRange} />,
+        }),
+        totalColumn('views', 'Views'),
+        totalColumn('likes', 'Likes'),
+        totalColumn('comments', 'Comments'),
+        totalColumn('shares', 'Shares'),
+        // By downloads above the week before's pace; posts with no number to compare go last.
+        helper.accessor((post) => (post.downloadLift.status === 'ok' ? post.downloadLift.change : undefined), {
+          id: 'lift',
+          header: 'Download lift',
+          sortDescFirst: true,
+          sortUndefined: 'last',
+          meta: { align: 'right', cellClassName: 'figures whitespace-nowrap' },
+          cell: (info) => {
+            const { downloadLift, publishedAt } = info.row.original
+            return (
+              <span
+                className={cn(downloadLift.status !== 'ok' && 'text-muted-foreground')}
+                title={liftSentence(downloadLift, publishedAt.slice(0, 10))}
+              >
+                {liftShort(downloadLift)}
+              </span>
+            )
+          },
+        }),
+      ]),
+    [appRange],
+  )
+
+  const table = useTable({
+    features: sortableFeatures,
+    columns,
+    data: props.posts,
+    initialState: { sorting: [{ id: props.sortBy, desc: true }] },
+    enableSortingRemoval: false,
+  })
+
+  // The caption names the post, so it heads each row; cells line up at the top, as captions
+  // run to two lines.
+  return <DataTable table={table} minWidth={760} label={props.label} rowHeader="post" rowClassName="*:align-top" />
+}
+
+function Caption({ post, appRange }: { post: PostRow; appRange?: RangeKey }) {
+  const text = post.caption || 'Untitled post'
+  return (
+    <>
+      {post.url ? (
+        <a
+          href={post.url}
+          target="_blank"
+          rel="noreferrer"
+          // Captions name the app and its account: privacy mode blurs them.
+          data-private=""
+          className="line-clamp-2 underline decoration-border underline-offset-4 hover:decoration-foreground"
+        >
+          {text}
+        </a>
+      ) : (
+        <span data-private="" className="line-clamp-2">
+          {text}
+        </span>
+      )}
+      {appRange && post.appId && (
+        <Link
+          to="/apps/$appId"
+          params={{ appId: post.appId }}
+          search={{ range: appRange }}
+          className="mt-0.5 block w-fit text-xs text-muted-foreground hover:text-foreground"
+        >
+          <Private>{post.appName ?? post.appId}</Private>
+        </Link>
+      )}
+    </>
   )
 }

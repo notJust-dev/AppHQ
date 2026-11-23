@@ -81,6 +81,10 @@ as a funnel per store, and the share of page views that end in a download) and M
 (revenue, MRR, subscriptions and trials). Each compares with the period before. A rate such as
 revenue per download only counts the apps, and stores, that report both of its numbers.
 
+The tables of numbers (apps, platforms, posts, search queries and pages) sort by their column
+headings; a number nobody reported stays at the bottom either way. The posts tables, an app's posts and the Social page's top posts, also filter by platform:
+the top posts are the ten most viewed of the range, or of the chosen platform.
+
 Reviews collects the written App Store and Google Play reviews of the apps you track, newest
 first, with any reply you gave. Filter by app, store, rating or unread, and mark reviews read as
 you deal with them; the sidebar counts the unread ones. Reviews come with the store accounts you

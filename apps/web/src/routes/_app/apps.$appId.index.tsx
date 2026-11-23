@@ -1,13 +1,14 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { Link, createFileRoute, notFound } from '@tanstack/react-router'
 import { AppFlow, canDrawFlow } from '@/components/AppFlow'
 import { AppFunnel, canDrawFunnel } from '@/components/AppFunnel'
 import { DownloadsByStore } from '@/components/DownloadsByStore'
-import { PostsTable } from '@/components/PostsTable'
+import { PostsPanel } from '@/components/PostsTable'
 import { RangeSwitch } from '@/components/RangeSwitch'
 import { Timeline } from '@/components/Timeline'
 import { Panel } from '@/components/Panel'
-import { formatDay } from '@/lib/format'
+import { POSTS_LIMIT } from '@/fns/portfolio'
+import { formatCount, formatDay } from '@/lib/format'
 import { appsQuery, flowQuery, postsQuery, timelineQuery } from '@/lib/queries'
 import { RANGE_DAYS, rangeToDates } from '@/lib/range'
 
@@ -77,13 +78,39 @@ function AppOverview() {
         </div>
       )}
       <DownloadsByStore timeline={data} />
-      <Panel
+      <PostsPanel
         title="Posts"
-        description="Published in this range, newest first. Totals are lifetime numbers from the last sync. Download lift compares downloads on the post's day and the two after with the week before's pace; posts close together share those days."
-        bodyClassName=""
-      >
-        <PostsTable posts={posts} hasSocialAccount={hasSocialAccount} appId={appId} />
-      </Panel>
+        description="Published in this range, newest first; select a column heading to sort by it. Totals are lifetime numbers from the last sync. Download lift compares downloads on the post's day and the two after with the week before's pace; posts close together share those days."
+        posts={posts}
+        sortBy="posted"
+        label="Posts published in this range, with lifetime totals and download lift"
+        empty={<NoPosts hasSocialAccount={hasSocialAccount} appId={appId} />}
+        footer={
+          posts.length >= POSTS_LIMIT ? `The newest ${formatCount(POSTS_LIMIT)} posts of the range.` : undefined
+        }
+      />
     </>
+  )
+}
+
+function NoPosts(props: { hasSocialAccount: boolean; appId: string }) {
+  return (
+    <p className="px-5 py-6 text-muted-foreground">
+      {props.hasSocialAccount ? (
+        'No posts were published in this range.'
+      ) : (
+        <>
+          No social account is linked to this app yet.{' '}
+          <Link
+            to="/apps/$appId/settings"
+            params={{ appId: props.appId }}
+            search={(previous) => previous}
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Link one in Settings
+          </Link>
+        </>
+      )}
+    </p>
   )
 }

@@ -1,9 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { Megaphone } from 'lucide-react'
+import { useMemo } from 'react'
+import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
+import { NoData } from '@/components/NoData'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
-import { Private } from '@/components/Private'
+import { PostsPanel } from '@/components/PostsTable'
 import { AppComparison } from '@/components/performance/AppComparison'
 import { ChartRow, ChartStack } from '@/components/performance/ChartStack'
 import { DailyChart } from '@/components/performance/DailyChart'
@@ -11,23 +15,11 @@ import { PerformanceHeader } from '@/components/performance/PerformanceHeader'
 import { Stat, StatGrid } from '@/components/performance/Stat'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableRowHead,
-} from '@/components/ui/table'
 import { formatCompact, formatCount, formatDay, formatRatio } from '@/lib/format'
 import { pairedRatio } from '@/lib/performance'
-import { liftSentence, liftShort } from '@/lib/lift'
 import { socialPerformanceQuery, type SocialPerformance } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates, type RangeKey } from '@/lib/range'
+import { performanceSearchSchema, rangeToDates } from '@/lib/range'
 import { sourceLabel } from '@/lib/sources'
-import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_app/social')({
   validateSearch: performanceSearchSchema,
@@ -38,6 +30,8 @@ export const Route = createFileRoute('/_app/social')({
 })
 
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`
+/** Top posts shown at once. The API sends this many of each platform, for the platform filter. */
+const TOP_POSTS = 10
 
 function SocialPage() {
   const { range, app } = Route.useSearch()
@@ -135,19 +129,23 @@ function SocialPage() {
 
             <Panel
               title="By platform"
-              description="Daily views as each platform reports them; posts, their lifetime totals and engagement for the posts published in this range."
+              description="Daily views as each platform reports them; posts, their lifetime totals and engagement for the posts published in this range. Select a column heading to sort by it."
               bodyClassName=""
             >
               <PlatformTable data={data} />
             </Panel>
 
-            <Panel
+            <PostsPanel
               title="Top posts"
-              description="This range's most viewed posts. Download lift compares downloads on the post's day and the two after with the week before's pace; posts close together share those days."
-              bodyClassName=""
-            >
-              <TopPosts posts={top} range={range} />
-            </Panel>
+              description="The ten most viewed posts of the range, or of one platform; select a column heading to sort them. Download lift compares downloads on the post's day and the two after with the week before's pace; posts close together share those days."
+              posts={top}
+              sortBy="views"
+              limit={TOP_POSTS}
+              // Across apps, each post names its app.
+              appRange={app ? undefined : range}
+              label="This range's most viewed posts, with their lifetime totals and download lift"
+              empty={<p className="px-5 py-6 text-muted-foreground">No posts were published in this range.</p>}
+            />
 
             {!app && data.apps.length > 1 && (
               <Panel title="By app" description="Each app's social numbers over the same days. Select a column heading to sort by it." bodyClassName="">
@@ -179,136 +177,109 @@ function SocialPage() {
   )
 }
 
-function PlatformTable({ data }: { data: SocialPerformance }) {
-  const views = data.series.find((entry) => entry.key === 'views')
-  const followers = data.series.find((entry) => entry.key === 'followers')
-  const platforms = [
-    ...new Set([...(views?.sources.map((part) => part.source) ?? []), ...data.posts.byPlatform.map((entry) => entry.platform)]),
-  ]
-  const most = Math.max(1, ...platforms.map((platform) => views?.sources.find((part) => part.source === platform)?.summary ?? 0))
-
-  return (
-    <Table className="min-w-[720px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead scope="col">Platform</TableHead>
-          <TableHead scope="col" className="w-1/4">
-            Daily views
-          </TableHead>
-          <TableHead scope="col" className="text-right">
-            Posts
-          </TableHead>
-          <TableHead scope="col" className="text-right">
-            Views per post
-          </TableHead>
-          <TableHead scope="col" className="text-right">
-            Engagement
-          </TableHead>
-          <TableHead scope="col" className="text-right">
-            Followers
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {platforms.map((platform) => {
-          const daily = views?.sources.find((part) => part.source === platform)?.summary ?? null
-          const posted = data.posts.byPlatform.find((entry) => entry.platform === platform)
-          const follower = followers?.sources.find((part) => part.source === platform)?.summary ?? null
-          return (
-            <TableRow key={platform}>
-              <TableRowHead>{sourceLabel(platform)}</TableRowHead>
-              <TableCell>
-                {daily === null ? (
-                  <span className="text-faint">–</span>
-                ) : (
-                  // The bar is the number's length against the biggest platform; the number says it.
-                  <span className="flex items-center gap-3">
-                    <span className="h-2 rounded-full bg-views" style={{ width: `${Math.max(2, (daily / most) * 100)}%` }} aria-hidden="true" />
-                    <span className="figures shrink-0">{formatCompact(daily)}</span>
-                  </span>
-                )}
-              </TableCell>
-              <TableCell className="figures text-right">{posted ? formatCount(posted.posts) : 0}</TableCell>
-              <TableCell className="figures text-right">
-                {posted && posted.posts > 0 ? formatCompact(posted.views / posted.posts) : <span className="text-faint">–</span>}
-              </TableCell>
-              <TableCell className="figures text-right">
-                {posted && posted.views > 0 ? percent((posted.likes + posted.comments + posted.shares) / posted.views) : <span className="text-faint">–</span>}
-              </TableCell>
-              <TableCell className="figures text-right">{follower === null ? <span className="text-faint">–</span> : formatCount(follower)}</TableCell>
-            </TableRow>
-          )
-        })}
-      </TableBody>
-    </Table>
-  )
+/** One platform's numbers over the range; a number nobody reported is undefined. */
+interface PlatformRow {
+  platform: string
+  dailyViews: number | undefined
+  posts: number
+  viewsPerPost: number | undefined
+  engagement: number | undefined
+  followers: number | undefined
 }
 
-function TopPosts({ posts, range }: { posts: SocialPerformance['posts']['top']; range: RangeKey }) {
-  if (posts.length === 0) {
-    return <p className="px-5 py-6 text-muted-foreground">No posts were published in this range.</p>
-  }
-  return (
-    <Table className="min-w-[760px]">
-      <TableCaption className="sr-only">This range's most viewed posts, with their lifetime totals and download lift</TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead scope="col">Post</TableHead>
-          {['Views', 'Likes', 'Comments', 'Shares', 'Download lift'].map((label) => (
-            <TableHead key={label} scope="col" className="text-right">
-              {label}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {posts.map((post) => (
-          <TableRow key={post.id} className="align-top">
-            <TableCell className="max-w-[26rem] align-top">
-              {post.url ? (
-                <a
-                  href={post.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  data-private=""
-                  className="line-clamp-2 underline decoration-border underline-offset-4 hover:decoration-foreground"
-                >
-                  {post.caption || 'Untitled post'}
-                </a>
-              ) : (
-                <span data-private="" className="line-clamp-2">
-                  {post.caption || 'Untitled post'}
-                </span>
-              )}
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                {sourceLabel(post.platform)} ·{' '}
-                <Link
-                  to="/apps/$appId"
-                  params={{ appId: post.appId }}
-                  search={{ range }}
-                  className="hover:text-foreground"
-                >
-                  <Private>{post.appName}</Private>
-                </Link>{' '}
-                · {formatDay(post.publishedAt.slice(0, 10))}
+const platformHelper = createColumnHelper<SortableFeatures, PlatformRow>()
+
+/** A number column: bigger first when sorted, unreported ones last either way. */
+const platformNumber = (
+  key: 'posts' | 'viewsPerPost' | 'engagement' | 'followers',
+  label: string,
+  format: (value: number) => string,
+) =>
+  platformHelper.accessor(key, {
+    header: label,
+    sortDescFirst: true,
+    sortUndefined: 'last',
+    meta: { align: 'right', cellClassName: 'figures' },
+    cell: (info) => {
+      const value = info.getValue()
+      return value === undefined ? (
+        <span className="text-faint">
+          <NoData />
+        </span>
+      ) : (
+        format(value)
+      )
+    },
+  })
+
+function PlatformTable({ data }: { data: SocialPerformance }) {
+  const rows = useMemo(() => {
+    const views = data.series.find((entry) => entry.key === 'views')
+    const followers = data.series.find((entry) => entry.key === 'followers')
+    const summary = (series: typeof views, platform: string) =>
+      series?.sources.find((part) => part.source === platform)?.summary ?? undefined
+    const platforms = [
+      ...new Set([...(views?.sources.map((part) => part.source) ?? []), ...data.posts.byPlatform.map((entry) => entry.platform)]),
+    ]
+    return platforms.map((platform): PlatformRow => {
+      const posted = data.posts.byPlatform.find((entry) => entry.platform === platform)
+      return {
+        platform,
+        dailyViews: summary(views, platform),
+        posts: posted?.posts ?? 0,
+        viewsPerPost: posted && posted.posts > 0 ? posted.views / posted.posts : undefined,
+        engagement: posted && posted.views > 0 ? (posted.likes + posted.comments + posted.shares) / posted.views : undefined,
+        followers: summary(followers, platform),
+      }
+    })
+  }, [data])
+  const most = Math.max(1, ...rows.map((row) => row.dailyViews ?? 0))
+
+  const columns = useMemo(
+    () =>
+      platformHelper.columns([
+        platformHelper.accessor((row) => sourceLabel(row.platform), {
+          id: 'platform',
+          header: 'Platform',
+          sortFn: 'alphanumeric',
+        }),
+        platformHelper.accessor('dailyViews', {
+          header: 'Daily views',
+          sortDescFirst: true,
+          sortUndefined: 'last',
+          meta: { headClassName: 'w-1/4' },
+          cell: (info) => {
+            const daily = info.getValue()
+            return daily === undefined ? (
+              <span className="text-faint">
+                <NoData />
               </span>
-            </TableCell>
-            {[post.views, post.likes, post.comments, post.shares].map((value, index) => (
-              <TableCell key={index} className="figures text-right align-top">
-                {formatCount(value)}
-              </TableCell>
-            ))}
-            <TableCell
-              className={cn('figures text-right align-top whitespace-nowrap', post.downloadLift.status !== 'ok' && 'text-muted-foreground')}
-              title={liftSentence(post.downloadLift, post.publishedAt.slice(0, 10))}
-            >
-              {liftShort(post.downloadLift)}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            ) : (
+              // The bar is the number's length against the biggest platform; the number says it.
+              <span className="flex items-center gap-3">
+                <span className="h-2 rounded-full bg-views" style={{ width: `${Math.max(2, (daily / most) * 100)}%` }} aria-hidden="true" />
+                <span className="figures shrink-0">{formatCompact(daily)}</span>
+              </span>
+            )
+          },
+        }),
+        platformNumber('posts', 'Posts', formatCount),
+        platformNumber('viewsPerPost', 'Views per post', formatCompact),
+        platformNumber('engagement', 'Engagement', percent),
+        platformNumber('followers', 'Followers', formatCount),
+      ]),
+    [most],
   )
+
+  const table = useTable({
+    features: sortableFeatures,
+    columns,
+    data: rows,
+    initialState: { sorting: [{ id: 'dailyViews', desc: true }] },
+    enableSortingRemoval: false,
+  })
+
+  return <DataTable table={table} minWidth={720} />
 }
 
 function NoSocial() {

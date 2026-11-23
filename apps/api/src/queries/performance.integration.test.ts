@@ -16,6 +16,8 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
   const suffix = randomUUID().slice(0, 8)
   const one = `perf-one-${suffix}`
   const two = `perf-two-${suffix}`
+  /** Posts a lot on one platform and once on another, for the top posts of each. */
+  const three = `perf-three-${suffix}`
   // The range, and the week before it for comparison.
   const range = { from: '2026-10-08', to: '2026-10-14' }
 
@@ -24,6 +26,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
     await db.insert(apps).values([
       { id: one, name: 'Perf One' },
       { id: two, name: 'Perf Two' },
+      { id: three, name: 'Perf Three' },
     ])
     const metrics = []
     for (let day = 1; day <= 14; day++) {
@@ -66,11 +69,26 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
         publishedAt: new Date('2026-10-02T12:00:00Z'),
         views: 9000,
       },
+      // Twelve TikTok videos, every one more viewed than the single Instagram post.
+      ...Array.from({ length: 12 }, (_, index) => ({
+        platform: 'tiktok',
+        externalId: `perf-three-${index}-${suffix}`,
+        appId: three,
+        publishedAt: new Date('2026-10-10T12:00:00Z'),
+        views: 1000 + index,
+      })),
+      {
+        platform: 'instagram',
+        externalId: `perf-three-ig-${suffix}`,
+        appId: three,
+        publishedAt: new Date('2026-10-11T12:00:00Z'),
+        views: 5,
+      },
     ])
   })
 
   afterAll(async () => {
-    await db.delete(apps).where(inArray(apps.id, [one, two]))
+    await db.delete(apps).where(inArray(apps.id, [one, two, three]))
     await sql.end({ timeout: 5 })
   })
 
@@ -106,6 +124,15 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
     expect(result.posts.top[0]?.downloadLift).toMatchObject({ status: 'ok', change: 0 })
     const perDay = result.posts.perDay.find((entry) => entry.platform === 'tiktok')?.values
     expect(perDay).toEqual([0, 1, 0, 0, 1, 0, 0])
+  })
+
+  it('keeps the top ten posts of each platform, so a less viewed platform still has its own', async () => {
+    const result = await getSocialPerformance.handler({ db }, { ...range, appId: three })
+    const views = result.posts.top.map((post) => post.views)
+    expect(views).toEqual([1011, 1010, 1009, 1008, 1007, 1006, 1005, 1004, 1003, 1002, 5])
+    expect(result.posts.top.at(-1)?.platform).toBe('instagram')
+    // Every post still counts in the platform totals.
+    expect(result.posts.byPlatform.find((entry) => entry.platform === 'tiktok')?.posts).toBe(12)
   })
 
   it('splits the store funnel by store', async () => {

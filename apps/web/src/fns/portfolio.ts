@@ -9,11 +9,14 @@ export const getOverviewFn = createServerFn({ method: 'GET' })
   .validator(z.object({ from: z.iso.date(), to: z.iso.date() }))
   .handler(({ data }) => api().overview.get.query(data))
 
+/** The most posts one app's page lists, the newest of the range; as many as the API gives. */
+export const POSTS_LIMIT = 200
+
 /** One app's social posts published in the range, newest first. */
 export const listPostsFn = createServerFn({ method: 'GET' })
   .middleware([requireSession])
   .validator(z.object({ appId: z.string().min(1).max(64), from: z.iso.date(), to: z.iso.date() }))
-  .handler(({ data }) => api().apps.posts.query({ ...data, limit: 100 }))
+  .handler(({ data }) => api().apps.posts.query({ ...data, limit: POSTS_LIMIT }))
 
 /** One app's totals for the funnel and flow charts, or null when there is no such app. */
 export const getAppFlowFn = createServerFn({ method: 'GET' })
