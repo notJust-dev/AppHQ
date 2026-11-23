@@ -11,6 +11,7 @@
 @import '@fontsource-variable/ibm-plex-sans';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/geist/600.css';
 
 /*
  * The dark theme applies when the person picked it in the sidebar, or when the system is dark
@@ -165,6 +166,8 @@
   --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-heading: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Only the name "AppHQ" is set in Geist. */
+  --font-brand: 'Geist', ui-sans-serif, system-ui, sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

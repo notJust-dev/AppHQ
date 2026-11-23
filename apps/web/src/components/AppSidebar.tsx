@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { AppIcon } from '@/components/AppIcon'
-import { BrandMark } from '@/components/Brand'
+import { BrandMark, BrandName } from '@/components/Brand'
 import { Private } from '@/components/Private'
 import {
   DropdownMenu,
@@ -84,12 +84,10 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="AppDashboard">
+            <SidebarMenuButton asChild size="lg" tooltip="AppHQ">
               <Link to="/">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg border bg-card">
-                  <BrandMark className="size-4" />
-                </span>
-                <span className="truncate text-[15px] font-semibold tracking-tight">AppDashboard</span>
+                <BrandMark className="size-8 shrink-0" />
+                <BrandName className="truncate text-[16px]" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

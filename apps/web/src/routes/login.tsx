@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
-import { BrandMark } from '@/components/Brand'
+import { BrandMark, BrandName } from '@/components/Brand'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
@@ -31,9 +31,9 @@ function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 pb-24">
-      <p className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
-        <BrandMark />
-        AppDashboard
+      <p className="flex items-center gap-2.5">
+        <BrandMark className="size-8" />
+        <BrandName className="text-lg" />
       </p>
       <Card className="mt-8 [--card-spacing:--spacing(6)]">
         <CardHeader>

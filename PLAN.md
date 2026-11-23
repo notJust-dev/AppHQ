@@ -1,4 +1,4 @@
-# AppDashboard — project plan
+# AppHQ — project plan
 
 Last updated: 2026-11-20. Status: Phase 0 is built and both apps are deployed on Velocity. Still
 open from Phase 0: a cron entry, custom domains, and the TikTok and Meta spikes. The production

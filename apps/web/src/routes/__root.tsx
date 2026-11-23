@@ -21,11 +21,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'AppDashboard' },
+      { title: 'AppHQ' },
       // A private tool: keep it out of search engines.
       { name: 'robots', content: 'noindex, nofollow' },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+    ],
   }),
   component: RootComponent,
   // An error in the root route itself replaces the whole document, so it brings its own shell.

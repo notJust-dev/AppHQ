@@ -1,4 +1,4 @@
-# AppDashboard
+# AppHQ
 
 One dashboard for a portfolio of mobile apps: organic social views, store downloads and revenue
 on one page. The plan, decisions and current status are in [PLAN.md](PLAN.md).
