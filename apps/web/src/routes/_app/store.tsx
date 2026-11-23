@@ -4,6 +4,7 @@ import { Store } from 'lucide-react'
 import { NoData } from '@/components/NoData'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
+import { SourceLogo } from '@/components/SourceLogo'
 import { AppComparison } from '@/components/performance/AppComparison'
 import { ChartRow, ChartStack } from '@/components/performance/ChartStack'
 import { DailyChart } from '@/components/performance/DailyChart'
@@ -102,6 +103,7 @@ function StorePage() {
             {STORES.map((store) => (
               <StoreFunnel
                 key={store.source}
+                source={store.source}
                 label={store.label}
                 steps={[
                   ...(store.source === 'app_store'
@@ -175,6 +177,7 @@ function through(series: PerformanceSeries | undefined) {
 
 /** One store's funnel: a bar per step, as long as its share of the first step. */
 function StoreFunnel(props: {
+  source: string
   label: string
   steps: { key: string; label: string; value: number | null; swatch: string }[]
   /** A step as a share of the one before it, over the apps that report both. */
@@ -184,7 +187,10 @@ function StoreFunnel(props: {
   const reported = props.steps.some((step) => step.value !== null)
   return (
     <section aria-label={`${props.label} funnel`}>
-      <h3 className="font-medium">{props.label}</h3>
+      <h3 className="flex items-center gap-2 font-medium">
+        <SourceLogo source={props.source} decorative className="size-4 text-muted-foreground" />
+        {props.label}
+      </h3>
       {!reported ? (
         <p className="mt-2 text-muted-foreground">Nothing reported in this range.</p>
       ) : (

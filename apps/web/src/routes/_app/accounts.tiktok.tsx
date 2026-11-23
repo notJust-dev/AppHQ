@@ -46,6 +46,7 @@ function TikTokPage() {
 
   return (
     <SourcePage
+      family="tiktok"
       title="TikTok"
       intro="Views and followers for each TikTok account you connect. TikTok keeps no daily history, so daily views start the day after an account is connected: the sooner it is connected, the more history the charts have."
     >

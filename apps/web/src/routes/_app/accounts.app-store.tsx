@@ -36,6 +36,7 @@ function AppStorePage() {
 
   return (
     <SourcePage
+      family="app_store"
       title="App Store Connect"
       intro="Daily downloads from Apple's sales reports, store page views and impressions from its analytics reports, and customer reviews, for the iOS apps you track. Downloads and reviews go back a year, page views to January 2024."
     >

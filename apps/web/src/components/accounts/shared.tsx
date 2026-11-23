@@ -10,6 +10,7 @@ import { CircleAlert, CircleCheck } from 'lucide-react'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
 import { Private } from '@/components/Private'
+import { FamilyLogo, SourceLogo } from '@/components/SourceLogo'
 import { Status } from '@/components/Status'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
@@ -126,10 +127,16 @@ export function useWatch() {
 }
 
 /** The frame of one source's page: where it sits, what it brings, and its panels. */
-export function SourcePage(props: { title: string; intro: string; children: ReactNode }) {
+export function SourcePage(props: { family: FamilyName; title: string; intro: string; children: ReactNode }) {
   return (
     <>
-      <PageHeader narrow crumbs={[{ label: 'Accounts', to: '/accounts' }]} title={props.title} description={props.intro} />
+      <PageHeader
+        narrow
+        crumbs={[{ label: 'Accounts', to: '/accounts' }]}
+        title={props.title}
+        icon={<FamilyLogo family={props.family} className="size-6" />}
+        description={props.intro}
+      />
       <PageBody narrow>{props.children}</PageBody>
     </>
   )
@@ -193,7 +200,7 @@ export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (acc
                 <span className="font-medium">{sourceLabel(account.provider)}</span>
               )}
               {(account.provider === 'facebook' || account.provider === 'instagram') && (
-                <span className="text-muted-foreground"> · {sourceLabel(account.provider)}</span>
+                <SourceLogo source={account.provider} className="ml-2 text-muted-foreground" />
               )}
               {detail && <Private className="block text-xs text-muted-foreground">{detail}</Private>}
               {account.note && <span className="mt-1.5 block max-w-prose text-xs text-warning">{account.note}</span>}

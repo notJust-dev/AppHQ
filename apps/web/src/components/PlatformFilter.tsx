@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { SourceLogo } from '@/components/SourceLogo'
 import { sourceLabel } from '@/lib/sources'
 
 /** Social platforms in the order the filter lists them, so each keeps its place. */
@@ -33,7 +34,8 @@ export function usePlatformFilter<T extends { platform: string }>(items: T[]) {
 
 /**
  * Narrows a table to one platform. Drawn like the range switch, as a row of pressed and
- * unpressed buttons; nothing to choose between with one platform, so then it is not drawn.
+ * unpressed buttons, each platform by its logo; nothing to choose between with one platform, so
+ * then it is not drawn.
  */
 export function PlatformFilter(props: {
   platforms: string[]
@@ -57,7 +59,7 @@ export function PlatformFilter(props: {
             onClick={() => props.onChange(platform)}
             className="inline-flex h-full cursor-pointer items-center rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors hover:text-foreground aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-sm dark:aria-pressed:bg-input"
           >
-            {platform === null ? 'All' : sourceLabel(platform)}
+            {platform === null ? 'All' : <SourceLogo source={platform} className="size-4" />}
           </button>
         )
       })}

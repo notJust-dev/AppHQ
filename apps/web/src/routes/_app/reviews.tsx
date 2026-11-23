@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { AppIcon } from '@/components/AppIcon'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Private } from '@/components/Private'
+import { SourceLogo } from '@/components/SourceLogo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -168,12 +169,25 @@ function Filters({ search }: { search: Search }) {
         onValueChange={(value) => set({ store: value === ANY ? undefined : (value as Search['store']) })}
       >
         <SelectTrigger aria-label="Store" className="w-40 bg-card">
-          <SelectValue>{search.store ? sourceLabel(search.store) : 'Both stores'}</SelectValue>
+          <SelectValue>
+            {search.store ? (
+              <>
+                <SourceLogo source={search.store} decorative />
+                {sourceLabel(search.store)}
+              </>
+            ) : (
+              'Both stores'
+            )}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ANY}>Both stores</SelectItem>
-          <SelectItem value="app_store">App Store</SelectItem>
-          <SelectItem value="google_play">Google Play</SelectItem>
+          {(['app_store', 'google_play'] as const).map((store) => (
+            <SelectItem key={store} value={store}>
+              <SourceLogo source={store} decorative />
+              {sourceLabel(store)}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Select
@@ -260,7 +274,9 @@ function ReviewCard(props: {
         <Link to="/apps/$appId" params={{ appId: review.appId }} search={{ range: '28d' }} className="font-medium text-foreground hover:underline">
           <Private>{review.appName}</Private>
         </Link>
-        {[sourceLabel(review.store), place, review.appVersion && `version ${review.appVersion}`]
+        {' · '}
+        <SourceLogo source={review.store} />
+        {[place, review.appVersion && `version ${review.appVersion}`]
           .filter(Boolean)
           .map((part) => ` · ${part}`)
           .join('')}

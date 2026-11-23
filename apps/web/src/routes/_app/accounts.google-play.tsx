@@ -39,6 +39,7 @@ function GooglePlayPage() {
 
   return (
     <SourcePage
+      family="google_play"
       title="Google Play"
       intro="Installs, store listing visitors and written reviews for every Android app in your developer account, from the monthly reports Google Play keeps in a Cloud Storage bucket. Google posts the numbers 3 to 7 days late."
     >

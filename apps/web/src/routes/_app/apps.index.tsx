@@ -6,6 +6,7 @@ import { AppIcon } from '@/components/AppIcon'
 import { NoData } from '@/components/NoData'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Private } from '@/components/Private'
+import { SourceLogo } from '@/components/SourceLogo'
 import { Panel } from '@/components/Panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,7 +25,7 @@ import { useAssetActions, type AssetActions } from '@/components/useAssetActions
 import {
   ATTENTION,
   KIND_LABEL,
-  PLATFORM_OF_KIND,
+  LOGO_OF_KIND,
   PORTFOLIO_APP_ID,
   assetDetail,
 } from '@/lib/assets'
@@ -297,8 +298,11 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                   <ul className="space-y-1">
                     {social.map((asset) => (
                       <li key={asset.id}>
-                        <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span>{' '}
-                        <Private className="whitespace-nowrap">{asset.name}</Private>
+                        {/* The logo stays on the handle's line. */}
+                        <span className="whitespace-nowrap">
+                          <SourceLogo source={LOGO_OF_KIND[asset.kind] ?? asset.kind} className="mr-1.5 text-muted-foreground" />
+                          <Private>{asset.name}</Private>
+                        </span>
                         <Attention status={asset.status} />
                       </li>
                     ))}

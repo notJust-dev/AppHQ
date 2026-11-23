@@ -28,6 +28,7 @@ function RevenueCatPage() {
 
   return (
     <SourcePage
+      family="revenuecat"
       title="RevenueCat"
       intro="Revenue, MRR, trials and subscribers. A RevenueCat key belongs to one project, and a project to one app, so each app connects its own key in its Settings. About a year of history is fetched when it does."
     >

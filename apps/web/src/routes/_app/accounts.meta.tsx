@@ -47,6 +47,7 @@ function MetaPage() {
 
   return (
     <SourcePage
+      family="meta"
       title="Facebook and Instagram"
       intro="One sign-in, with Facebook or Instagram, finds the Pages and Instagram accounts you share with the dashboard. Facebook brings up to a year of daily views, reach and followers; Instagram brings 90 days of daily views. Both bring posts and reels with their views."
     >

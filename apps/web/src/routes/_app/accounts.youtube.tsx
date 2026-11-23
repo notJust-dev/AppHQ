@@ -43,6 +43,7 @@ function YouTubePage() {
 
   return (
     <SourcePage
+      family="youtube"
       title="YouTube"
       intro="Daily views, likes, comments and shares from YouTube Analytics, subscribers, and a year of videos with their views, for each channel you connect. YouTube views count toward social views, like TikTok's and Instagram's."
     >

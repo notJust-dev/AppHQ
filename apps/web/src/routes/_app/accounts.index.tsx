@@ -2,7 +2,7 @@ import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import type { ReactNode } from 'react'
-import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Search, Smartphone, ThumbsUp, Youtube } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Clock, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import {
@@ -15,6 +15,7 @@ import {
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
 import { Private } from '@/components/Private'
+import { FamilyLogo, SourceLogo } from '@/components/SourceLogo'
 import { Status } from '@/components/Status'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -33,6 +34,7 @@ import { loadDemoDataFn, removeDemoDataFn, runSyncFn } from '@/fns/settings'
 import { formatCount, formatDay, formatMoment } from '@/lib/format'
 import { metaHealth } from '@/lib/meta'
 import { accountsQuery, syncStatusQuery, type AccountFamily, type SyncRun } from '@/lib/queries'
+import { BRAND_LOGOS } from '@/lib/brand-logos'
 import { sourceLabel } from '@/lib/sources'
 
 export const Route = createFileRoute('/_app/accounts/')({
@@ -144,7 +146,7 @@ function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFam
     <Item asChild className="rounded-none px-5 py-4 focus-visible:ring-inset">
       <Link to={source.to}>
         <ItemMedia className="size-9 rounded-lg border bg-muted text-muted-foreground" aria-hidden="true">
-          <SourceIcon family={source.family} />
+          <FamilyLogo family={source.family} className={source.family === 'meta' ? 'size-3.5' : 'size-4'} />
         </ItemMedia>
         <ItemContent className="min-w-0 basis-56">
           <ItemTitle>{source.title}</ItemTitle>
@@ -247,7 +249,17 @@ function SyncStatus({ runs, onStarted }: { runs: SyncRun[]; onStarted: () => voi
           <TableBody>
             {runs.map((run) => (
               <TableRow key={run.source}>
-                <TableRowHead>{sourceLabel(run.source)}</TableRowHead>
+                <TableRowHead>
+                  <span className="inline-flex items-center gap-2">
+                    {/* The cron check has no brand: a clock instead, so the names line up. */}
+                    {BRAND_LOGOS[run.source] ? (
+                      <SourceLogo source={run.source} decorative className="size-4 text-muted-foreground" />
+                    ) : (
+                      <Clock aria-hidden="true" className="size-4 text-muted-foreground" />
+                    )}
+                    {sourceLabel(run.source)}
+                  </span>
+                </TableRowHead>
                 <TableCell className="figures">{formatMoment(run.startedAt)}</TableCell>
                 <TableCell>
                   <Status tone={run.status === 'error' ? 'danger' : 'ok'}>{RUN_STATUS[run.status] ?? run.status}</Status>
@@ -308,10 +320,4 @@ function DemoData({ onChanged }: { onChanged: () => void }) {
       </Button>
     </div>
   )
-}
-
-/** A plain pictogram per source; the names carry the brands. */
-function SourceIcon({ family }: { family: AccountFamily['family'] }) {
-  const Icon = { app_store: Smartphone, google_play: AppWindow, revenuecat: BadgeDollarSign, meta: ThumbsUp, tiktok: Play, youtube: Youtube, search_console: Search }[family]
-  return <Icon className="size-4" />
 }

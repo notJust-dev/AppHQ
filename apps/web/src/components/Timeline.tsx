@@ -1,4 +1,5 @@
 import { useState, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { SourceLogo } from '@/components/SourceLogo'
 import { formatCount, formatDay, formatTick, formatValue } from '@/lib/format'
 import { liftSentence } from '@/lib/lift'
 import type { Post, Timeline as TimelineData } from '@/lib/queries'
@@ -442,7 +443,8 @@ function PostDetail({ group, onClose }: { group: PostDay; onClose: () => void })
               )}
             </p>
             <p className="figures mt-1 text-sm text-muted-foreground">
-              {sourceLabel(post.platform)} · {formatCount(post.views)} views ·{' '}
+              <SourceLogo source={post.platform} className="mr-1.5" />
+              {formatCount(post.views)} views ·{' '}
               {formatCount(post.likes)} likes · {formatCount(post.comments)} comments ·{' '}
               {formatCount(post.shares)} shares
             </p>
@@ -540,7 +542,9 @@ function Track(props: {
                   const value = active === null ? source.summary : source.values[active]
                   return (
                     <div key={source.source} className="contents">
-                      <dt className="text-muted-foreground">{sourceLabel(source.source)}</dt>
+                      <dt className="text-muted-foreground">
+                        <SourceLogo source={source.source} />
+                      </dt>
                       <dd className="figures text-right">
                         {value === null || value === undefined ? '–' : formatValue(value, series.unit)}
                       </dd>

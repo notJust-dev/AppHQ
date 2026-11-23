@@ -5,10 +5,10 @@ import { DataTable, sortableFeatures, type SortableFeatures } from '@/components
 import { Panel } from '@/components/Panel'
 import { PlatformFilter, usePlatformFilter } from '@/components/PlatformFilter'
 import { Private } from '@/components/Private'
+import { SourceLogo } from '@/components/SourceLogo'
 import { formatCount, formatDay } from '@/lib/format'
 import { liftSentence, liftShort, type Lift } from '@/lib/lift'
 import type { RangeKey } from '@/lib/range'
-import { sourceLabel } from '@/lib/sources'
 import { cn } from '@/lib/utils'
 
 /** What a posts table shows of a post; lists across apps also name the post's app. */
@@ -98,11 +98,12 @@ function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label
           header: 'Posted',
           sortDescFirst: true,
           meta: { cellClassName: 'figures whitespace-nowrap' },
+          // The platform's logo first, so the logos line up down the column.
           cell: (info) => (
-            <>
+            <span className="inline-flex items-center gap-2">
+              <SourceLogo source={info.row.original.platform} className="size-4 text-muted-foreground" />
               {formatDay(info.row.original.publishedAt.slice(0, 10))}
-              <span className="block text-xs text-muted-foreground">{sourceLabel(info.row.original.platform)}</span>
-            </>
+            </span>
           ),
         }),
         helper.display({

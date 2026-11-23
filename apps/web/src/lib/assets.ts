@@ -33,12 +33,16 @@ export const PORTFOLIO_APP_ID = 'portfolio'
 
 export const isSocial = (kind: string) => (SOCIAL_KINDS as readonly string[]).includes(kind)
 
-/** The short name of the platform a social account is on. */
-export const PLATFORM_OF_KIND: Record<string, string> = {
-  facebook_page: 'Facebook',
-  instagram_account: 'Instagram',
-  tiktok_account: 'TikTok',
-  youtube_channel: 'YouTube',
+/** The source whose logo an asset of a kind wears, such as a social account's platform (see `SourceLogo`). */
+export const LOGO_OF_KIND: Record<string, string> = {
+  ios_app: 'app_store',
+  android_app: 'google_play',
+  revenuecat_project: 'revenuecat',
+  facebook_page: 'facebook',
+  instagram_account: 'instagram',
+  tiktok_account: 'tiktok',
+  youtube_channel: 'youtube',
+  search_console_site: 'search_console',
 }
 
 /** The account states that need the person to do something, in their words. */

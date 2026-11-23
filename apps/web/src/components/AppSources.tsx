@@ -5,6 +5,7 @@ import { useId, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/Panel'
 import { Private } from '@/components/Private'
+import { SourceLogo } from '@/components/SourceLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +16,7 @@ import { connectRevenueCatFn } from '@/fns/settings'
 import {
   ATTENTION,
   KIND_LABEL,
-  PLATFORM_OF_KIND,
+  LOGO_OF_KIND,
   SOURCE_OF_KIND,
   assetDetail,
 } from '@/lib/assets'
@@ -202,7 +203,7 @@ function SocialRow(props: {
             {linked.map((asset) => (
               <li key={asset.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2">
                 <span className="min-w-0 break-words">
-                  <span className="text-muted-foreground">{PLATFORM_OF_KIND[asset.kind]}</span>{' '}
+                  <SourceLogo source={LOGO_OF_KIND[asset.kind] ?? asset.kind} className="mr-1.5 text-muted-foreground" />
                   <Private>{asset.name}</Private>
                   {ATTENTION[asset.status] && (
                     <span className="block text-xs font-medium text-warning">The account {ATTENTION[asset.status]}.</span>
@@ -243,7 +244,8 @@ function SocialRow(props: {
               <SelectContent>
                 {candidates.map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
-                    {PLATFORM_OF_KIND[asset.kind]} <Private>{asset.name}</Private>
+                    <SourceLogo source={LOGO_OF_KIND[asset.kind] ?? asset.kind} className="text-muted-foreground" />
+                    <Private>{asset.name}</Private>
                     {whereNow(asset, appName)}
                   </SelectItem>
                 ))}

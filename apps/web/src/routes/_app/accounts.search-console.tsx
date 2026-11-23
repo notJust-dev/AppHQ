@@ -35,6 +35,7 @@ function SearchConsolePage() {
 
   return (
     <SourcePage
+      family="search_console"
       title="Google Search Console"
       intro="Clicks, impressions and average position from Google search, for the website of each app you track, and its top queries and pages. Google keeps 16 months and posts each day two or three days late."
     >

@@ -8,6 +8,7 @@ import { NoData } from '@/components/NoData'
 import { PageBody } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
 import { PostsPanel } from '@/components/PostsTable'
+import { SourceLogo } from '@/components/SourceLogo'
 import { AppComparison } from '@/components/performance/AppComparison'
 import { ChartRow, ChartStack } from '@/components/performance/ChartStack'
 import { DailyChart } from '@/components/performance/DailyChart'
@@ -242,6 +243,12 @@ function PlatformTable({ data }: { data: SocialPerformance }) {
           id: 'platform',
           header: 'Platform',
           sortFn: 'alphanumeric',
+          cell: (info) => (
+            <span className="inline-flex items-center gap-2">
+              <SourceLogo source={info.row.original.platform} decorative className="size-4" />
+              {info.getValue()}
+            </span>
+          ),
         }),
         platformHelper.accessor('dailyViews', {
           header: 'Daily views',
