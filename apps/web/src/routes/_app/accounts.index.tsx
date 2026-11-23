@@ -1,6 +1,7 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import type { ReactNode } from 'react'
 import { AlertTriangle, AppWindow, BadgeDollarSign, ChevronRight, Play, RefreshCw, Search, Smartphone, ThumbsUp, Youtube } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -13,6 +14,7 @@ import {
 } from '@/components/accounts/shared'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
+import { Private } from '@/components/Private'
 import { Status } from '@/components/Status'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -127,9 +129,9 @@ function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFam
     .sort()
     .at(-1)
 
+  const who = connected ? whoIsConnected(family) : null
   const parts = connected
     ? [
-        whoIsConnected(family),
         assets.total > 0 && source.family !== 'meta' && source.family !== 'tiktok' && source.family !== 'youtube'
           ? `${formatCount(assets.total)} ${assets.total === 1 ? source.noun[0] : source.noun[1]}`
           : null,
@@ -146,7 +148,12 @@ function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFam
         </ItemMedia>
         <ItemContent className="min-w-0 basis-56">
           <ItemTitle>{source.title}</ItemTitle>
-          <ItemDescription className="break-words">{parts.join(' · ')}</ItemDescription>
+          <ItemDescription className="break-words">
+            {/* Names of accounts are private; a count of them is not. */}
+            {who && (who.named ? <Private>{who.text}</Private> : who.text)}
+            {who && parts.length > 0 && ' · '}
+            {parts.join(' · ')}
+          </ItemDescription>
           {attention && <p className="max-w-prose text-xs text-warning">{attention}</p>}
         </ItemContent>
         <ItemActions>
@@ -164,33 +171,39 @@ function SourceRow(props: { source: (typeof SOURCES)[number]; family: AccountFam
   )
 }
 
-/** Who is signed in, as briefly as the list allows. */
-function whoIsConnected({ family, accounts }: AccountFamily): string {
+/** Who is signed in, as briefly as the list allows, and whether that names them. */
+function whoIsConnected({ family, accounts }: AccountFamily): { text: string; named: boolean } {
   const names = accounts.map((account) => account.displayName ?? sourceLabel(account.provider))
   switch (family) {
     case 'meta': {
       const pages = accounts.filter((account) => account.provider === 'facebook').length
       const instagram = accounts.filter((account) => account.provider === 'instagram').length
-      return [
+      const text = [
         pages > 0 ? `${pages} ${pages === 1 ? 'Page' : 'Pages'}` : null,
         instagram > 0 ? `${instagram} Instagram ${instagram === 1 ? 'account' : 'accounts'}` : null,
       ]
         .filter(Boolean)
         .join(' and ')
+      return { text, named: false }
     }
     case 'revenuecat':
-      return names.length <= 2 ? names.join(', ') : `${names.length} projects`
+      return names.length <= 2 ? { text: names.join(', '), named: true } : { text: `${names.length} projects`, named: false }
     default:
-      return names.length <= 2 ? names.join(', ') : `${names.length} accounts`
+      return names.length <= 2 ? { text: names.join(', '), named: true } : { text: `${names.length} accounts`, named: false }
   }
 }
 
 /** The one thing about a source that needs the person, if any. */
-function attentionOf(family: AccountFamily): string | null {
+function attentionOf(family: AccountFamily): ReactNode {
   const broken = family.accounts.find((account) => account.status !== 'ok')
   if (broken) {
-    const who = broken.displayName ?? sourceLabel(broken.provider)
-    return `${who}: ${(CONNECTION_STATUS[broken.status] ?? broken.status).toLowerCase()}.`
+    const what = `${(CONNECTION_STATUS[broken.status] ?? broken.status).toLowerCase()}.`
+    if (!broken.displayName) return `${sourceLabel(broken.provider)}: ${what}`
+    return (
+      <>
+        <Private>{broken.displayName}</Private>: {what}
+      </>
+    )
   }
   const noted = family.accounts.find((account) => account.note)
   if (noted?.note) return noted.note
@@ -238,7 +251,12 @@ function SyncStatus({ runs, onStarted }: { runs: SyncRun[]; onStarted: () => voi
                 <TableCell className="figures">{formatMoment(run.startedAt)}</TableCell>
                 <TableCell>
                   <Status tone={run.status === 'error' ? 'danger' : 'ok'}>{RUN_STATUS[run.status] ?? run.status}</Status>
-                  {run.error && <span className="mt-1 block text-xs text-muted-foreground">{run.error}</span>}
+                  {/* An error can name an app or account. */}
+                  {run.error && (
+                    <span data-private="" className="mt-1 block text-xs text-muted-foreground">
+                      {run.error}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="figures text-right">{formatCount(run.rowsWritten)}</TableCell>
               </TableRow>
