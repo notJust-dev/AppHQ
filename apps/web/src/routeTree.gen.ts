@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as WaitlistRouteImport } from './routes/waitlist'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppMonetisationRouteImport } from './routes/_app/monetisation'
@@ -49,6 +50,11 @@ const HealthRoute = HealthRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WaitlistRoute = WaitlistRouteImport.update({
+  id: '/waitlist',
+  path: '/waitlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/waitlist': typeof WaitlistRoute
   '/accounts': typeof AppAccountsRouteWithChildren
   '/monetisation': typeof AppMonetisationRoute
   '/reviews': typeof AppReviewsRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/waitlist': typeof WaitlistRoute
   '/monetisation': typeof AppMonetisationRoute
   '/reviews': typeof AppReviewsRoute
   '/seo': typeof AppSeoRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/waitlist': typeof WaitlistRoute
   '/_app/accounts': typeof AppAccountsRouteWithChildren
   '/_app/monetisation': typeof AppMonetisationRoute
   '/_app/reviews': typeof AppReviewsRoute
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/'
     | '/health'
     | '/login'
+    | '/waitlist'
     | '/accounts'
     | '/monetisation'
     | '/reviews'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
   to:
     | '/health'
     | '/login'
+    | '/waitlist'
     | '/monetisation'
     | '/reviews'
     | '/seo'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/health'
     | '/login'
+    | '/waitlist'
     | '/_app/accounts'
     | '/_app/monetisation'
     | '/_app/reviews'
@@ -347,6 +359,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
+  WaitlistRoute: typeof WaitlistRoute
   ConnectMetaCallbackRoute: typeof ConnectMetaCallbackRoute
   ConnectTiktokCallbackRoute: typeof ConnectTiktokCallbackRoute
   ConnectYoutubeCallbackRoute: typeof ConnectYoutubeCallbackRoute
@@ -373,6 +386,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/waitlist': {
+      id: '/waitlist'
+      path: '/waitlist'
+      fullPath: '/waitlist'
+      preLoaderRoute: typeof WaitlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -620,6 +640,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
+  WaitlistRoute: WaitlistRoute,
   ConnectMetaCallbackRoute: ConnectMetaCallbackRoute,
   ConnectTiktokCallbackRoute: ConnectTiktokCallbackRoute,
   ConnectYoutubeCallbackRoute: ConnectYoutubeCallbackRoute,

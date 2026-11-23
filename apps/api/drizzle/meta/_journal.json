@@ -57,6 +57,20 @@
       "when": 1795363026569,
       "tag": "0007_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795462834240,
+      "tag": "0008_waitlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795463612628,
+      "tag": "0009_waitlist_answers",
+      "breakpoints": true
     }
   ]
 }

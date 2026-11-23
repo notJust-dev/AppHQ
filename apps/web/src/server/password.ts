@@ -11,7 +11,7 @@ const failures = new Map<string, { count: number; resetAt: number }>()
 
 const digest = (value: string) => createHash('sha256').update(value).digest()
 
-function clientAddress(): string {
+export function clientAddress(): string {
   // Velocity sits behind Cloudflare, which sets cf-connecting-ip.
   return (
     getRequestHeader('cf-connecting-ip') ??

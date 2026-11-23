@@ -234,6 +234,29 @@ export const syncRuns = pgTable(
   (t) => [index('sync_runs_source_started_idx').on(t.source, t.startedAt)],
 )
 
+/**
+ * People who asked to hear when AppHQ opens, from the public landing page. `email` is stored
+ * lowercased, so one address signs up once.
+ */
+export const waitlist = pgTable('waitlist', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  email: text('email').notNull().unique(),
+  /** Where the sign-up came from, e.g. 'landing'. */
+  source: text('source').notNull().default('landing'),
+  /**
+   * Handed to the browser on sign-up, so the follow-up questions can be saved to this row without
+   * revealing or trusting the address. A new sign-up with the same address replaces it.
+   */
+  answerToken: uuid('answer_token'),
+  /** The optional follow-up questions (apps, MRR, platforms…); see `waitlistAnswers` in the API. */
+  answers: jsonb('answers'),
+  /** When an answer last changed; answers are saved one at a time as they are given. */
+  answeredAt: timestamp('answered_at', { withTimezone: true }),
+  /** When they reached the end of the questions, so unfinished ones can be told apart. */
+  answersCompletedAt: timestamp('answers_completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type App = typeof apps.$inferSelect
 export type NewApp = typeof apps.$inferInsert
 export type NewMetric = typeof metricDaily.$inferInsert
@@ -244,3 +267,4 @@ export type NewPost = typeof posts.$inferInsert
 export type Asset = typeof assets.$inferSelect
 export type Review = typeof reviews.$inferSelect
 export type NewReview = typeof reviews.$inferInsert
+export type WaitlistEntry = typeof waitlist.$inferSelect

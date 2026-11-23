@@ -51,6 +51,7 @@ import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
 import { assignAsset, createApp, removeApp, renameApp, setIgnored } from '../assets/store.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
+import { answerWaitlist, answerWaitlistInput, joinWaitlist, joinWaitlistInput } from '../waitlist/join.js'
 
 /** Everything a procedure can use. Read-only queries only need the `db` part. */
 export interface ApiContext extends QueryContext {
@@ -533,6 +534,22 @@ export const appRouter = t.router({
   }),
   // Velocity has no shell, so the generated demo data is loaded and removed through the API.
   // Both only ever touch apps whose id starts with `demo-`.
+  waitlist: t.router({
+    /** Adds an address from the public landing page; a repeat sign-up is not an error. */
+    join: t.procedure.input(joinWaitlistInput).mutation(async ({ ctx, input }) => {
+      const { added, answerToken } = await joinWaitlist(ctx.db, input)
+      if (added) ctx.log.info(`waitlist: new sign-up from ${input.source}`)
+      return { answerToken }
+    }),
+
+    /** Saves the optional follow-up questions for the sign-up that received `answerToken`. */
+    answer: t.procedure.input(answerWaitlistInput).mutation(async ({ ctx, input }) => {
+      if (!(await answerWaitlist(ctx.db, input))) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'That sign-up has no questions waiting.' })
+      }
+      return { ok: true as const }
+    }),
+  }),
   demo: t.router({
     seed: t.procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(200) }))
