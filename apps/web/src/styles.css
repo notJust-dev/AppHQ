@@ -296,3 +296,46 @@
   filter: blur(0.55em);
   user-select: none;
 }
+
+/*
+ * The landing page's hub (components/ConnectionsHub.tsx): a dot travels from each source to the
+ * centre, and the centre breathes. Both are decoration, so they stop for reduced motion.
+ */
+.hub-flow {
+  opacity: 0;
+  animation: hub-flow linear infinite;
+}
+@keyframes hub-flow {
+  0% {
+    transform: translate(var(--from-x), var(--from-y));
+    opacity: 0;
+  }
+  12%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+}
+.hub-pulse {
+  opacity: 0;
+  animation: hub-pulse 3.2s ease-out infinite;
+}
+@keyframes hub-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-flow,
+  .hub-pulse {
+    animation: none;
+  }
+}

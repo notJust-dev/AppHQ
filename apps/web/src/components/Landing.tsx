@@ -2,6 +2,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { CheckCircle2, Inbox, MessageSquareText, Waypoints } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { BrandMark, BrandName } from '@/components/Brand'
+import { ConnectionsHub } from '@/components/ConnectionsHub'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -33,17 +34,20 @@ export function LandingPage() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6">
-        <section className="max-w-2xl pt-16 pb-14 sm:pt-24">
-          <Funnel />
-          <h1 className="mt-6 font-brand text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-            Every app you run, from first view to revenue.
-          </h1>
-          <p className="mt-5 text-lg text-muted-foreground text-pretty">
-            AppHQ joins your TikTok, Instagram and YouTube posts with App Store, Google Play and
-            RevenueCat numbers, so you can see which post brought the downloads and what they earned.
-            One dashboard for the whole portfolio.
-          </p>
-          <WaitlistForm />
+        <section className="grid items-center gap-12 pt-16 pb-14 sm:pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16">
+          <div className="max-w-2xl">
+            <Funnel />
+            <h1 className="mt-6 font-brand text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              Every app you run, from first view to revenue.
+            </h1>
+            <p className="mt-5 text-lg text-muted-foreground text-pretty">
+              AppHQ joins your TikTok, Instagram and YouTube posts with App Store, Google Play and
+              RevenueCat numbers, so you can see which post brought the downloads and what they earned.
+              One dashboard for the whole portfolio.
+            </p>
+            <WaitlistForm />
+          </div>
+          <ConnectionsHub className="mx-auto max-w-[22rem] lg:max-w-none" />
         </section>
 
         <section className="grid gap-4 border-t py-12 sm:grid-cols-3">
