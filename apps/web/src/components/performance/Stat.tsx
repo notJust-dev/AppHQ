@@ -30,6 +30,8 @@ export function Stat(props: {
   hint?: string
   /** Whether a rise is the kind of change shown; levels such as MRR compare their latest values. */
   compared?: boolean
+  /** Which way of moving is good; 'down' for something like search position. */
+  better?: 'up' | 'down'
 }) {
   const comparable = props.compared !== false && props.value !== null && props.previous !== undefined && props.previous !== null
   return (
@@ -46,7 +48,7 @@ export function Stat(props: {
           'No data in this range'
         ) : comparable ? (
           <>
-            <Delta change={change(props.value!, props.previous!)} /> vs previous period
+            <Delta change={change(props.value!, props.previous!)} better={props.better} /> vs previous period
           </>
         ) : (
           (props.hint ?? 'Nothing to compare with')

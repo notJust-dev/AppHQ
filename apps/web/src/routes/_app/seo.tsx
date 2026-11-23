@@ -82,6 +82,7 @@ function SeoPage() {
             value={ratio(positionSum?.summary, impressions.summary)}
             previous={ratio(positionSum?.previous, impressions.previous)}
             format={position}
+            better="down"
           />
         </StatGrid>
 

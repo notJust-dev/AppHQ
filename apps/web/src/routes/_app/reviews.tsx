@@ -364,7 +364,7 @@ function SummaryCard({ summary }: { summary: ReviewSummary }) {
         <p className="mt-0.5 text-xs text-muted-foreground">
           {summary.previous.count > 0 ? (
             <>
-              <Delta change={change(summary.recent.count, summary.previous.count)} /> reviews vs the {summary.recentDays} days before
+              <Delta change={change(summary.recent.count, summary.previous.count)} better="neither" /> reviews vs the {summary.recentDays} days before
               {summary.previous.average !== null && `, which averaged ${summary.previous.average.toFixed(1)}`}
             </>
           ) : (

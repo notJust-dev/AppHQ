@@ -55,6 +55,9 @@
   --destructive: #b42318;
   --destructive-soft: #fdeeec;
   --warning: #8a5300;
+  /* A change for the better or worse (Delta): text colours, at least 4.5:1 on cards and canvas. */
+  --positive: #157a3e;
+  --negative: #b42318;
   --warning-soft: #fdf3e1;
   /* Text that only labels, such as a sync time. */
   --faint: #8a909c;
@@ -100,6 +103,8 @@
   --destructive: #f28b82;
   --destructive-soft: #331d1b;
   --warning: #f0b453;
+  --positive: #4cc38a;
+  --negative: #f28b82;
   --warning-soft: #2e2413;
   --faint: #6c727c;
   --border: #2b2d31;
@@ -140,6 +145,8 @@
     --destructive: #f28b82;
     --destructive-soft: #331d1b;
     --warning: #f0b453;
+    --positive: #4cc38a;
+    --negative: #f28b82;
     --warning-soft: #2e2413;
     --faint: #6c727c;
     --border: #2b2d31;
@@ -186,6 +193,8 @@
   --color-destructive: var(--destructive);
   --color-destructive-soft: var(--destructive-soft);
   --color-warning: var(--warning);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
   --color-warning-soft: var(--warning-soft);
   --color-faint: var(--faint);
   --color-border: var(--border);
