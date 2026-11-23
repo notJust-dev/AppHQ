@@ -148,7 +148,9 @@ Checked on 2026-11-20. The Cloudways MCP server has a `velocity_tools` toolset t
 the server and apps, attach PostgreSQL, set env variables, add a domain and read deployments.
 Nothing is created without the owner's confirmation.
 
-- Repository: `VadimNotJustDev/AppDashboardPOC` (private), branch `main`.
+- Repository: `notJust-dev/AppHQ` (private), branch `main`. Moved there from
+  `VadimNotJustDev/AppDashboardPOC` on 2026-11-23; Velocity's GitHub access has to cover the
+  `notJust-dev` organization for deploys.
 - GitHub is linked to the Cloudways account. That OAuth step has to be done in the Cloudways
   console; it cannot be done through the MCP.
 - Ids for the create calls: Starter plan `1` ($20/month, trial-eligible, 5 apps, 2 GB, 2 vCPU);
