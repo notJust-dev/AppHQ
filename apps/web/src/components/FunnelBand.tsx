@@ -14,14 +14,12 @@ export function FunnelBand({
   totals,
   previous,
   reporting,
-  comparedWith,
 }: {
   totals: Totals
   /** Null when history does not cover the previous period. */
   previous: Totals | null
   /** Which totals any source reported; the others are no data, not zero. */
   reporting: Reporting
-  comparedWith: string
 }) {
   // A conversion needs both of its stages to have numbers.
   const downloadsPerThousandViews =
@@ -37,7 +35,6 @@ export function FunnelBand({
         swatch="bg-views"
         value={reporting.socialViews ? formatCompact(totals.socialViews) : null}
         change={previous ? change(totals.socialViews, previous.socialViews) : 'incomparable'}
-        comparedWith={comparedWith}
       />
       <Seam
         value={downloadsPerThousandViews === null ? '–' : formatRatio(downloadsPerThousandViews)}
@@ -48,7 +45,6 @@ export function FunnelBand({
         swatch="bg-downloads"
         value={reporting.downloads ? formatCompact(totals.downloads) : null}
         change={previous ? change(totals.downloads, previous.downloads) : 'incomparable'}
-        comparedWith={comparedWith}
       />
       <Seam
         value={revenuePerDownload === null ? '–' : formatMoney(revenuePerDownload)}
@@ -59,7 +55,6 @@ export function FunnelBand({
         swatch="bg-revenue"
         value={reporting.revenue ? formatMoney(totals.revenue) : null}
         change={previous ? change(totals.revenue, previous.revenue) : 'incomparable'}
-        comparedWith={comparedWith}
       />
       </div>
     </section>
@@ -73,7 +68,6 @@ function Stage(props: {
   value: string | null
   /** Null when there is nothing in either period; 'incomparable' when history is too short. */
   change: Change | null | 'incomparable'
-  comparedWith: string
 }) {
   return (
     <div className="relative flex-1 px-5 pt-5 pb-4">
@@ -98,9 +92,8 @@ function Stage(props: {
         ) : props.change === null ? (
           'No data yet'
         ) : (
-          <>
-            <Delta change={props.change} /> <span>{props.comparedWith}</span>
-          </>
+          // The page header says what the change is against, so each card shows only the change.
+          <Delta change={props.change} />
         )}
       </p>
     </div>

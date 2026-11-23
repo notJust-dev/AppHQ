@@ -64,7 +64,6 @@ function PortfolioPage() {
               totals={data.totals}
               previous={data.comparable ? data.previousTotals : null}
               reporting={reportingOf(data.reporting)}
-              comparedWith={`vs previous ${days} days`}
             />
             <Panel title="Apps" description="Each app's funnel over the same days. Select a column heading to sort by it." bodyClassName="">
               <AppsTable apps={data.apps} range={range} />
