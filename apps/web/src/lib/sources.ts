@@ -8,6 +8,7 @@ const LABELS: Record<string, string> = {
   search_console: 'Search Console',
   youtube: 'YouTube',
   heartbeat: 'Cron check',
+  scheduled: 'Scheduled sync',
 }
 
 /** The name people know a data source by; the raw id if it is one this build has not met. */

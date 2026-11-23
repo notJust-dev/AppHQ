@@ -1,7 +1,7 @@
 # AppHQ — project plan
 
 Last updated: 2026-11-20. Status: Phase 0 is built and both apps are deployed on Velocity. Still
-open from Phase 0: a cron entry, custom domains, and the TikTok and Meta spikes. The production
+open from Phase 0: custom domains, and the TikTok and Meta spikes. The production
 database holds the four generated demo apps; remove them with `demo.clear` before the first real
 sync.
 
@@ -30,7 +30,7 @@ multi-tenant accounts, email reports, replying to reviews, PostHog, Search Conso
 | Dashboard | TanStack Start (React, Vite, Nitro for Node hosting) | Typed URL state and Query-first data fetching suit an interactive private dashboard |
 | Database | Velocity's PostgreSQL, owned by the API only | Velocity attaches Postgres to one application |
 | ORM | Drizzle, migrations run at API boot | No SSH on Velocity, so no manual migration step |
-| Scheduling | Velocity Cron Job Management running Node commands | Official feature, visible in the dashboard, no queue library needed |
+| Scheduling | The API starts its own syncs (every `SYNC_EVERY_HOURS`, default 3) | A Velocity cron command does not get the app's env variables (found 2026-11-23); the always-on API has them |
 | Social data | Own TikTok sandbox app and own Meta app (Standard Access). No Postiz | No third-party dependency |
 | Revenue source | RevenueCat only, in USD | One currency, one definition of revenue |
 | Repo layout | Two independent npm packages, no workspaces | Velocity builds each app from its own root directory; avoids monorepo tooling risk |
@@ -41,7 +41,7 @@ multi-tenant accounts, email reports, replying to reviews, PostHog, Search Conso
 ```
 Velocity server (Starter)
 ├─ api  (Fastify, api.<domain>)
-│    connectors · sync CLI (run by Velocity cron) · tRPC · MCP endpoint
+│    connectors · scheduled sync (in process) · sync CLI · tRPC · MCP endpoint
 │    Telegram webhook · OAuth callbacks (TikTok, Meta) · Postgres owner
 ├─ web  (TanStack Start, app.<domain>)
 │    dashboard UI · login session · server functions that call api
@@ -116,7 +116,10 @@ Found by deploying on 2026-11-20:
 
 Still to verify:
 
-1. Whether a cron command runs in the app's built directory with the app's env variables.
+1. ~~Whether a cron command runs with the app's env variables.~~ It does not: on 2026-11-23 a
+   Velocity cron entry running `dist/cli.js ping` every 5 minutes (Basic form, type Node, run as
+   `cd …/private_html && /usr/bin/node …/dist/cli.js ping`) never wrote a heartbeat. The API now
+   schedules syncs itself (`src/sync/schedule.ts`).
 2. Whether `web` can reach `api` over localhost. Today `API_URL` is the API's public address.
 3. Whether a build of `web` on the 2 GB server disturbs the running `api`.
 4. Whether Postgres can be reached from a laptop (for local debugging against real data).
@@ -467,7 +470,7 @@ Differences from the list above:
   Phases 2 and 5.
 - The overview page (Phase 1 step 6) exists, with charts on the per-app page.
 - Steps 1 and 9 are done: both apps run on Velocity (see section 4).
-- Still open: a cron entry running `node dist/cli.js ping`, custom domains, and the TikTok and
+- Still open: custom domains, and the TikTok and
   Meta spikes (steps 2 and 3).
 
 ### Phase 1 — Downloads and revenue
@@ -479,7 +482,7 @@ Differences from the list above:
 5. App Store Connect analytics connector (impressions, page views) once instances exist. Done 2026-11-22.
 6. Portfolio overview page; per-app page with downloads and revenue charts.
 7. Settings page: connections, sync status, "Sync now".
-8. Velocity cron: `sync` every 6 hours.
+8. Scheduled sync: done 2026-11-23, by the API itself every 3 hours over the last 10 days.
 
 Done when: the overview shows real downloads and revenue for every app for the last 90 days and
 updates without you touching it.
@@ -507,8 +510,10 @@ Status on 2026-11-20 (merged to `main` and deployed):
   users and store listing visitors from the monthly report files. Tested with unit tests,
   database tests and a browser run against a stand-in Google; not yet run against Play.
 - Step 5 (reading the analytics reports) is built, on 2026-11-22; see the App Store section.
-- Not started: step 8 (cron, which needs a Velocity console entry: `node dist/cli.js sync` every
-  six hours).
+- Step 8 is done (2026-11-23), without a cron entry: the API checks every 5 minutes (from 2
+  minutes after boot) and syncs when the last `scheduled` row in `sync_runs` is 3 hours old, so
+  deploys neither skip nor add a sync. A run that found the lock taken counts as an error and is
+  retried at the next check. Each run re-reads 10 days, for Google Play's lag.
 
 ### Phase 2 — Social and the funnel chart
 
@@ -541,7 +546,7 @@ Status on 2026-11-22 (merged to `main` and deployed):
 - Tested with unit tests, database tests and a browser run against a stand-in TikTok: cancel,
   missing permission, connect, revoked account, reconnect. Then against TikTok itself:
   @vadimnotjustdev connected to TinyKicks, 55 videos (2019 to 2026-09-25), real counts.
-- Snapshots happen on every sync, so the 6-hour sync cron covers step 4; no separate
+- Snapshots happen on every sync, so the scheduled sync covers step 4; no separate
   `snapshot` command is needed.
 - The sandbox's client key and secret are on the `api` app. Up to 10 accounts can be target
   users; more, or other people's accounts, need the app to pass TikTok's review.
@@ -686,7 +691,7 @@ that match the dashboard. Check which auth methods Claude's connector UI accepts
 ### Phase 5 — Telegram
 
 1. Bot with a webhook on the API, restricted to your chat id.
-2. Daily brief via Velocity cron: yesterday vs the 7-day average, top post, new reviews, sync
+2. Daily brief, started by the API's scheduler like the sync: yesterday vs the 7-day average, top post, new reviews, sync
    failures.
 3. Alerts: a review of two stars or fewer, a connection needing re-auth.
 4. Questions: a Claude API agent loop using the same tools as MCP. Read the current Claude API
@@ -711,7 +716,7 @@ and Meta Advanced Access.
 | 5 | Deploy the TanStack Start dashboard as a second app on the same server; domain and SSL | Yes |
 | 6 | Fast-forward: stores, TikTok and Instagram connect, the funnel chart | Partly (logs, env variables) |
 | 7 | Reviews inbox | — |
-| 8 | MCP with Claude, then Telegram | Partly (cron for the report) |
+| 8 | MCP with Claude, then Telegram | Partly (env variables, the always-on process) |
 | 9 | Monitoring, resource usage on the $20 plan, cost recap, affiliate link | Yes |
 
 Segments 3, 4, 5 and 9 plus the returns in 6 and 8 are how the 30% is reached.
