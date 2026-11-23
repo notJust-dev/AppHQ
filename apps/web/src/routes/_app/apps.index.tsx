@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { Plus, Settings } from 'lucide-react'
 import { useId, useState } from 'react'
 import { AppIcon } from '@/components/AppIcon'
 import { NoData } from '@/components/NoData'
@@ -21,6 +21,7 @@ import {
   TableRow,
   TableRowHead,
 } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAssetActions, type AssetActions } from '@/components/useAssetActions'
 import {
   ATTENTION,
@@ -237,12 +238,11 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   }
 
   return (
-    <Table className="min-w-[800px]">
+    <Table className="min-w-[700px]">
       <TableHeader>
         <TableRow>
           <TableHead scope="col">App</TableHead>
-          <TableHead scope="col">iOS</TableHead>
-          <TableHead scope="col">Android</TableHead>
+          <TableHead scope="col">Stores</TableHead>
           <TableHead scope="col">Revenue</TableHead>
           <TableHead scope="col">Website</TableHead>
           <TableHead scope="col">Social</TableHead>
@@ -280,13 +280,12 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                 </span>
               </TableRowHead>
               {portfolio ? (
-                <TableCell colSpan={4} className="align-top text-muted-foreground">
+                <TableCell colSpan={3} className="align-top text-muted-foreground">
                   Social accounts only
                 </TableCell>
               ) : (
                 <>
-                  <SlotCell asset={one('ios_app')} detail={(asset) => asset.bundleId ?? asset.name} mono />
-                  <SlotCell asset={one('android_app')} detail={(asset) => asset.externalId} mono />
+                  <StoresCell ios={one('ios_app')} android={one('android_app')} />
                   <SlotCell asset={one('revenuecat_project')} detail={(asset) => asset.name} />
                   <SlotCell asset={one('search_console_site')} detail={(asset) => asset.name} />
                 </>
@@ -310,16 +309,21 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                 )}
               </TableCell>
               <TableCell className="text-right align-top">
-                <Button asChild variant="ghost" size="sm" className="-my-1">
-                  <Link
-                    to="/apps/$appId/settings"
-                    params={{ appId: app.id }}
-                    search={{ range: '28d' }}
-                    aria-label={`Settings for ${app.name}`}
-                  >
-                    Settings
-                  </Link>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button asChild variant="ghost" size="icon-sm" className="-my-1 text-muted-foreground">
+                      <Link
+                        to="/apps/$appId/settings"
+                        params={{ appId: app.id }}
+                        search={{ range: '28d' }}
+                        aria-label={`Settings for ${app.name}`}
+                      >
+                        <Settings />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Settings</TooltipContent>
+                </Tooltip>
               </TableCell>
             </TableRow>
           )
@@ -329,12 +333,39 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
   )
 }
 
-function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => string; mono?: boolean }) {
+/** Which stores the app is in, as their logos; the bundle id and package are on its settings. */
+function StoresCell({ ios, android }: { ios: Asset | undefined; android: Asset | undefined }) {
+  const stores = [
+    { source: 'app_store', asset: ios },
+    { source: 'google_play', asset: android },
+  ].filter((store): store is { source: string; asset: Asset } => store.asset !== undefined)
+
+  return (
+    <TableCell className="align-top">
+      {stores.length === 0 ? (
+        <None />
+      ) : (
+        <>
+          <span className="flex items-center gap-2.5 pt-0.5">
+            {stores.map((store) => (
+              <SourceLogo key={store.source} source={store.source} className="size-[18px]" />
+            ))}
+          </span>
+          {stores.map((store) => (
+            <Attention key={store.source} status={store.asset.status} />
+          ))}
+        </>
+      )}
+    </TableCell>
+  )
+}
+
+function SlotCell(props: { asset: Asset | undefined; detail: (asset: Asset) => string }) {
   return (
     <TableCell className="align-top break-words">
       {props.asset ? (
         <>
-          <Private className={props.mono ? 'font-mono text-xs' : undefined}>{props.detail(props.asset)}</Private>
+          <Private>{props.detail(props.asset)}</Private>
           <Attention status={props.asset.status} />
         </>
       ) : (
