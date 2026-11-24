@@ -91,6 +91,9 @@ in the `waitlist` table). The dashboard itself is always at `/login` and behind 
 deployed from GitHub, which suits AppHQ: the API keeps running between requests, so it can sync
 your data on a schedule. Both apps and the database fit on one Starter server.
 
+> **Disclosure:** the Cloudways sign-up links in this README are affiliate links. If you sign up
+> through them, I may earn a commission at no extra cost to you. [Sign up for Cloudways](https://unified.cloudways.com/signup?id=2228590&data1=notjustdev&data2=sponsorship).
+
 You will create **two Velocity applications from the same repository**: `api` (with
 PostgreSQL attached) and `web`.
 
@@ -101,7 +104,8 @@ deploys from GitHub and redeploys on every push to the branch you choose.
 
 ### 2. Create a Velocity server
 
-1. Sign in to Cloudways and create a **Velocity** server. The **Starter** plan is enough.
+1. [Create a Cloudways account](https://unified.cloudways.com/signup?id=2228590&data1=notjustdev&data2=sponsorship) (or sign in) and create a **Velocity** server. The
+   **Starter** plan is enough.
 2. Pick the region closest to you and a storage size (25 GB is plenty).
 3. Connect your GitHub account to Cloudways when it asks, and give the Cloudways GitHub app
    access to your fork.
