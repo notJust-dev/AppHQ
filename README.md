@@ -227,16 +227,46 @@ can't be done through the MCP.
 
 **2. Create a Cloudways access token** for the MCP, as the article above describes.
 
-**3. Add the MCP server to your agent.** For Claude Code:
+**3. Add the MCP server to your agent.**
+
+**Claude Code** (the `claude` CLI, and the Code tab in the Claude desktop app) connects to it
+directly:
 
 ```bash
 claude mcp add --transport http --header "X-Access-Token: <your-cloudways-access-token>" --header "X-Mcp-Host: claude-code" -s user cloudways https://mcp.cloudways.com/mcp/
 ```
 
-The [Cloudways article](https://support.cloudways.com/en/articles/14654372-how-to-use-cloudways-mcp-server-for-ai-based-server-management)
-has the configuration for Cursor, VS Code, Claude Desktop, Gemini CLI, Codex and others.
+Check it with `claude mcp list`.
 
-**4. Ask the agent to deploy**, from a session opened in your fork:
+**Claude Desktop** (chat) needs the `mcp-remote` bridge, which runs through `npx`, so Node.js
+must be installed. Open `~/Library/Application Support/Claude/claude_desktop_config.json` on
+macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows and add the `cloudways`
+entry (inside `mcpServers` if the file already has one):
+
+```json
+{
+  "mcpServers": {
+    "cloudways": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.cloudways.com/mcp/",
+        "--header", "X-Access-Token:<your-cloudways-access-token>",
+        "--header", "X-Mcp-Host:claude-desktop"
+      ]
+    }
+  }
+}
+```
+
+Write the headers with no space after the colon. Fully quit and reopen Claude Desktop, then check
+that `cloudways` shows as Running under **Settings → Developer**.
+
+For Cursor, VS Code, Gemini CLI, Codex and others, see the
+[Cloudways article](https://support.cloudways.com/en/articles/14654372-how-to-use-cloudways-mcp-server-for-ai-based-server-management).
+
+**4. Ask the agent to deploy.** In Claude Code, start it in your fork so it can read this README.
+Claude Desktop's chat can't see your files, so add your fork's GitHub URL to the prompt.
 
 ```text
 Deploy this repository to Cloudways Velocity, following "Deploy to Cloudways Velocity" in
