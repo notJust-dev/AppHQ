@@ -238,35 +238,10 @@ claude mcp add --transport http --header "X-Access-Token: <your-cloudways-access
 
 Check it with `claude mcp list`.
 
-**Claude Desktop** (chat) needs the `mcp-remote` bridge, which runs through `npx`, so Node.js
-must be installed. Open `~/Library/Application Support/Claude/claude_desktop_config.json` on
-macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows and add the `cloudways`
-entry (inside `mcpServers` if the file already has one):
-
-```json
-{
-  "mcpServers": {
-    "cloudways": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://mcp.cloudways.com/mcp/",
-        "--header", "X-Access-Token:<your-cloudways-access-token>",
-        "--header", "X-Mcp-Host:claude-desktop"
-      ]
-    }
-  }
-}
-```
-
-Write the headers with no space after the colon. Fully quit and reopen Claude Desktop, then check
-that `cloudways` shows as Running under **Settings → Developer**.
-
-For Cursor, VS Code, Gemini CLI, Codex and others, see the
+For Claude Desktop's chat, Cursor, VS Code, Gemini CLI, Codex and others, see the
 [Cloudways article](https://support.cloudways.com/en/articles/14654372-how-to-use-cloudways-mcp-server-for-ai-based-server-management).
 
-**4. Ask the agent to deploy.** In Claude Code, start it in your fork so it can read this README.
-Claude Desktop's chat can't see your files, so add your fork's GitHub URL to the prompt.
+**4. Ask the agent to deploy**, from a session started in your fork so it can read this README:
 
 ```text
 Deploy this repository to Cloudways Velocity, following "Deploy to Cloudways Velocity" in
