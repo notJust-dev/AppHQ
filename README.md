@@ -215,10 +215,6 @@ new dashboard address, and update the redirect URIs registered with TikTok, Meta
 - **Syncs run inside the API**, every `SYNC_EVERY_HOURS`.
 - **Both apps listen on `PORT`** when it is set, and on 3000 otherwise, over IPv4. Velocity
   assigns the ports, so you can leave `PORT` unset.
-- **Leftover files.** Velocity's deploy pulls new commits but does not delete files you removed
-  from the repository. The API builds only from its entry points, so leftovers there are
-  harmless. In `apps/web`, every file in `src/routes` becomes a route, so if you remove a route,
-  replace its contents with a redirect instead of deleting the file.
 
 ## Connecting your data
 
