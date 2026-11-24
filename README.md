@@ -87,7 +87,7 @@ in the `waitlist` table). The dashboard itself is always at `/login` and behind 
 
 ## Deploy to Cloudways Velocity
 
-[Cloudways Velocity](https://www.cloudways.com/en/velocity.php) runs always-on Node.js apps
+[Cloudways Velocity](https://unified.cloudways.com/signup?id=2228590&data1=notjustdev&data2=sponsorship) runs always-on Node.js apps
 deployed from GitHub, which suits AppHQ: the API keeps running between requests, so it can sync
 your data on a schedule. Both apps and the database fit on one Starter server.
 
