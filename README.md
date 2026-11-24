@@ -216,6 +216,50 @@ new dashboard address, and update the redirect URIs registered with TikTok, Meta
 - **Both apps listen on `PORT`** when it is set, and on 3000 otherwise, over IPv4. Velocity
   assigns the ports, so you can leave `PORT` unset.
 
+### Or let an AI agent deploy it (Cloudways MCP)
+
+The [Cloudways MCP server](https://support.cloudways.com/en/articles/14654372-how-to-use-cloudways-mcp-server-for-ai-based-server-management)
+lets an AI agent such as Claude Code, Cursor or Codex create the server and both apps for you,
+following the same steps as above.
+
+**1. Connect GitHub in the Cloudways console** and give Cloudways access to your fork. This step
+can't be done through the MCP.
+
+**2. Create a Cloudways access token** for the MCP, as the article above describes. (The older
+email + API key login is being retired on 15 October 2026.)
+
+**3. Add the MCP server to your agent.** For Claude Code:
+
+```bash
+claude mcp add --transport http --header "X-Access-Token: <your-cloudways-access-token>" --header "X-Mcp-Host: claude-code" -s user cloudways https://mcp.cloudways.com/mcp/
+```
+
+The [Cloudways article](https://support.cloudways.com/en/articles/14654372-how-to-use-cloudways-mcp-server-for-ai-based-server-management)
+has the configuration for Cursor, VS Code, Claude Desktop, Gemini CLI, Codex and others.
+
+**4. Ask the agent to deploy**, from a session opened in your fork:
+
+```text
+Deploy this repository to Cloudways Velocity, following "Deploy to Cloudways Velocity" in
+README.md. Create a Starter Velocity server, then two applications from my fork's main branch:
+"api" (root directory apps/api, the Other framework preset, build command npm run build, start
+command npm run start, with PostgreSQL attached) and "web" (root directory apps/web, the
+TanStack SSR preset). Set the environment variables the README lists for each app. Do not set
+NODE_ENV. List everything you are about to create and wait for my OK before each create call.
+When both are deployed, check /health on both apps.
+```
+
+Good to know:
+
+- **Check the API's framework preset.** If the API app is created with the Fastify preset, the
+  build command is dropped and the TypeScript never compiles. Ask the agent to switch it to
+  **Other**.
+- **Secrets pass through the agent.** Whatever you ask it to set as an environment variable is in
+  its conversation. If you prefer, let the agent create the apps and paste `INTERNAL_API_TOKEN`,
+  `ENCRYPTION_KEY`, `SESSION_SECRET` and `DASHBOARD_PASSWORD` into Velocity yourself.
+- **The MCP can also delete servers and apps**, and deletion can't be undone. Your token has full
+  access to the account, so keep it private and review what the agent proposes before you approve it.
+
 ## Connecting your data
 
 Sign in and open **Accounts**. It lists every source with its state. Each source's page has the
