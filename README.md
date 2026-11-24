@@ -357,3 +357,7 @@ The UI is built from [shadcn/ui](https://ui.shadcn.com) components in
 
 Each connector's base URL can be pointed at a stand-in for testing, for example
 `TIKTOK_API_URL`, `META_GRAPH_URL`, `GOOGLE_STORAGE_URL` and `REVENUECAT_API_URL`.
+
+## License
+
+[MIT](LICENSE)
