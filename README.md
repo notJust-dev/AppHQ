@@ -225,8 +225,7 @@ following the same steps as above.
 **1. Connect GitHub in the Cloudways console** and give Cloudways access to your fork. This step
 can't be done through the MCP.
 
-**2. Create a Cloudways access token** for the MCP, as the article above describes. (The older
-email + API key login is being retired on 15 October 2026.)
+**2. Create a Cloudways access token** for the MCP, as the article above describes.
 
 **3. Add the MCP server to your agent.** For Claude Code:
 
