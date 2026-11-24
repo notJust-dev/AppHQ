@@ -82,6 +82,9 @@ cd apps/web && npm install && npm run dev
 
 Open http://127.0.0.1:3000/login and sign in with `DASHBOARD_PASSWORD`.
 
+Signed-out visitors to `/` see a public landing page with a waitlist form (sign-ups are stored
+in the `waitlist` table). The dashboard itself is always at `/login` and behind the password.
+
 ## Deploy to Cloudways Velocity
 
 [Cloudways Velocity](https://www.cloudways.com/en/velocity.php) runs always-on Node.js apps
