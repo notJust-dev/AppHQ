@@ -96,7 +96,7 @@ PostgreSQL attached) and `web`.
 
 ### 1. Fork the repository
 
-Fork this repository to your GitHub account (or push a copy to a new repository). Velocity
+Fork this repository to your GitHub account. Velocity
 deploys from GitHub and redeploys on every push to the branch you choose.
 
 ### 2. Create a Velocity server
