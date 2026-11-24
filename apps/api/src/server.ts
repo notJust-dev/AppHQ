@@ -18,7 +18,6 @@ const app = await buildApp({
   secrets,
   pingDb: () => sql`select 1`,
   internalApiToken: env.INTERNAL_API_TOKEN,
-  sourceDatabaseUrl: env.SOURCE_DATABASE_URL,
 })
 
 // The API keeps the data fresh itself; see sync/schedule.ts for why not a Velocity cron entry.

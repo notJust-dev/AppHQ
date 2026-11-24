@@ -14,9 +14,6 @@ const schema = z
     PGHOST: z.string().optional(),
     PGDATABASE: z.string().optional(),
     PGUSER: z.string().optional(),
-    // Only while moving to a new Velocity app: the old app's database, on the same server, for
-    // POST /internal/copy-database to copy into this one (see db/copy.ts). Remove it afterwards.
-    SOURCE_DATABASE_URL: z.url().optional(),
     // Hours between the syncs the API starts by itself (see sync/schedule.ts); 0 turns them off.
     SYNC_EVERY_HOURS: z.coerce.number().min(0).max(24).default(3),
     INTERNAL_API_TOKEN: z.string().min(32, 'must be at least 32 characters'),
