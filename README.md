@@ -212,9 +212,7 @@ new dashboard address, and update the redirect URIs registered with TikTok, Meta
 
 - **A push to your deploy branch redeploys both apps**, whichever folder changed. Each restarts
   for a few seconds.
-- **Syncs run inside the API**, every `SYNC_EVERY_HOURS`. You don't need a Velocity cron job.
-  Cron commands on Velocity don't receive the app's environment variables, so a cron sync could
-  not reach the database anyway.
+- **Syncs run inside the API**, every `SYNC_EVERY_HOURS`.
 - **Both apps listen on `PORT`** when it is set, and on 3000 otherwise, over IPv4. Velocity
   assigns the ports, so you can leave `PORT` unset.
 - **Leftover files.** Velocity's deploy pulls new commits but does not delete files you removed
