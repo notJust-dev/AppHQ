@@ -22,6 +22,6 @@ describe('suggestApp', () => {
 
   it('suggests nothing for a name that matches no app', () => {
     expect(suggest('Dev Diaries')).toBeNull()
-    expect(suggest('@vadimnotjustdev')).toBeNull()
+    expect(suggest('@somecreator')).toBeNull()
   })
 })

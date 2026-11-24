@@ -58,7 +58,7 @@ describe('Meta client', () => {
   })
 
   it('signs every call with an appsecret_proof of its token', async () => {
-    const { impl, calls } = fakeFetch([{ body: { id: 'u1', name: 'Vadim' } }])
+    const { impl, calls } = fakeFetch([{ body: { id: 'u1', name: 'Alex' } }])
     await createMetaClient({ config, fetch: impl }).me('user-token')
 
     const expected = createHmac('sha256', 'secret1').update('user-token').digest('hex')
