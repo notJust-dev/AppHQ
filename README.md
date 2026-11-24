@@ -91,9 +91,6 @@ in the `waitlist` table). The dashboard itself is always at `/login` and behind 
 deployed from GitHub, which suits AppHQ: the API keeps running between requests, so it can sync
 your data on a schedule. Both apps and the database fit on one Starter server.
 
-> **Disclosure:** the Cloudways sign-up links in this README are affiliate links. If you sign up
-> through them, I may earn a commission at no extra cost to you. [Sign up for Cloudways](https://unified.cloudways.com/signup?id=2228590&data1=notjustdev&data2=sponsorship).
-
 You will create **two Velocity applications from the same repository**: `api` (with
 PostgreSQL attached) and `web`.
 
@@ -365,3 +362,8 @@ Each connector's base URL can be pointed at a stand-in for testing, for example
 ## License
 
 [MIT](LICENSE)
+
+## Disclosure
+
+The Cloudways links in this README are affiliate links. If you sign up through them, I may earn
+a commission at no extra cost to you.
