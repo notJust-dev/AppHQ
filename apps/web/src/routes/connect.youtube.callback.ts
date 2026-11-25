@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { api } from '@/server/api'
+import { dashboardApi } from '@/server/api'
 import { finishOAuth, youtubeRedirectUri } from '@/server/oauth'
 import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
-import { getAppSession } from '@/server/session'
 
 /**
  * Where Google sends the browser after the YouTube sign-in. Same checks as Meta's: the session,
@@ -12,8 +11,9 @@ export const Route = createFileRoute('/connect/youtube/callback')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const session = await getAppSession()
-        if (!session.signedIn) return redirectTo('/login')
+        // Only the dashboard password connects sources; an account is sent to sign in.
+        const api = await dashboardApi()
+        if (!api) return redirectTo('/login')
 
         const params = new URL(request.url).searchParams
         const attempt = await finishOAuth('youtube', params.get('state'))
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/connect/youtube/callback')({
         }
 
         try {
-          const result = await api().youtube.connect.mutate({ code, redirectUri: youtubeRedirectUri() })
+          const result = await api.youtube.connect.mutate({ code, redirectUri: youtubeRedirectUri() })
           return finish(
             true,
             `Found ${result.channel}. Link it to the app it promotes on the Apps page or in the app's Settings; ` +

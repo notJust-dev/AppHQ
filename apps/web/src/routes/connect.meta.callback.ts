@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { api } from '@/server/api'
+import { dashboardApi } from '@/server/api'
 import { finishOAuth, metaRedirectUri } from '@/server/oauth'
 import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
-import { getAppSession } from '@/server/session'
 
 /**
  * Where Facebook sends the browser after sign-in. Same checks as TikTok's; the difference is
@@ -12,8 +11,9 @@ export const Route = createFileRoute('/connect/meta/callback')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const session = await getAppSession()
-        if (!session.signedIn) return redirectTo('/login')
+        // Only the dashboard password connects sources; an account is sent to sign in.
+        const api = await dashboardApi()
+        if (!api) return redirectTo('/login')
 
         const params = new URL(request.url).searchParams
         const attempt = await finishOAuth('meta', params.get('state'))
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/connect/meta/callback')({
         }
 
         try {
-          const result = await api().meta.connect.mutate({ code, redirectUri: metaRedirectUri() })
+          const result = await api.meta.connect.mutate({ code, redirectUri: metaRedirectUri() })
           const found =
             `${result.pages} ${result.pages === 1 ? 'Page' : 'Pages'} and ${result.instagram} ` +
             `Instagram ${result.instagram === 1 ? 'account' : 'accounts'}`

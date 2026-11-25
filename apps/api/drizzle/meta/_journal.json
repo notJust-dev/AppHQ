@@ -71,6 +71,13 @@
       "when": 1795463612628,
       "tag": "0009_waitlist_answers",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795638320182,
+      "tag": "0010_accounts",
+      "breakpoints": true
     }
   ]
 }

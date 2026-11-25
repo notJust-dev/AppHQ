@@ -3,27 +3,37 @@ import { useEffect } from 'react'
 import { AppSidebar } from '@/components/AppSidebar'
 import { LANDING_META, LandingPage } from '@/components/Landing'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { getAccountFn } from '@/fns/account'
 import { getSessionFn } from '@/fns/auth'
 import { setSignedIn } from '@/lib/analytics'
 import { appsQuery } from '@/lib/queries'
 
 /**
- * Everything behind the login. This guard is for navigation; the data is guarded separately.
- * The one exception is the bare address: a signed-out visitor there gets the public landing
- * page instead of the dashboard, and no private data is loaded for them.
+ * Everything behind the dashboard password. This guard is for navigation; the data is guarded
+ * separately, by `requireDashboardAccess` in every server function and by the API.
+ *
+ * - Signed in with the dashboard password: the dashboard.
+ * - Signed in with an account (Google or GitHub) only: the Request access page, from every
+ *   dashboard address including the bare one. An account never opens the dashboard.
+ * - Neither: the bare address shows the public landing page, with no private data loaded; any
+ *   other address goes to /login.
  */
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ location }) => {
-    const { signedIn, sidebarOpen } = await getSessionFn()
-    if (!signedIn && location.pathname !== '/') throw redirect({ to: '/login' })
-    return { signedIn, sidebarOpen }
+    const { dashboardAccess, sidebarOpen } = await getSessionFn()
+    if (dashboardAccess) return { dashboardAccess, sidebarOpen, accountsOpen: false }
+
+    const { providers, account } = await getAccountFn()
+    if (account) throw redirect({ to: '/request-access' })
+    if (location.pathname !== '/') throw redirect({ to: '/login' })
+    return { dashboardAccess, sidebarOpen, accountsOpen: providers.length > 0 }
   },
   // The sidebar lists the apps; loading them here keeps it from appearing empty.
   loader: async ({ context }) => {
-    if (context.signedIn) await context.queryClient.ensureQueryData(appsQuery())
-    return { signedIn: context.signedIn }
+    if (context.dashboardAccess) await context.queryClient.ensureQueryData(appsQuery())
+    return { dashboardAccess: context.dashboardAccess }
   },
-  head: ({ loaderData }) => (loaderData?.signedIn === false ? { meta: LANDING_META } : {}),
+  head: ({ loaderData }) => (loaderData?.dashboardAccess === false ? { meta: LANDING_META } : {}),
   component: AppShell,
 })
 
@@ -32,9 +42,9 @@ export const Route = createFileRoute('/_app')({
  * the page from the button in each page's top bar.
  */
 function AppShell() {
-  const { signedIn, sidebarOpen } = Route.useRouteContext()
-  useEffect(() => setSignedIn(signedIn), [signedIn])
-  if (!signedIn) return <LandingPage />
+  const { dashboardAccess, sidebarOpen, accountsOpen } = Route.useRouteContext()
+  useEffect(() => setSignedIn(dashboardAccess), [dashboardAccess])
+  if (!dashboardAccess) return <LandingPage accountsOpen={accountsOpen} />
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
       <AppSidebar />

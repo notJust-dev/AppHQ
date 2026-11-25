@@ -11,8 +11,8 @@ import { getSessionFn, signInFn } from '@/fns/auth'
 
 export const Route = createFileRoute('/login')({
   beforeLoad: async () => {
-    const { signedIn } = await getSessionFn()
-    if (signedIn) throw redirect({ to: '/' })
+    const { dashboardAccess } = await getSessionFn()
+    if (dashboardAccess) throw redirect({ to: '/' })
   },
   component: LoginPage,
 })

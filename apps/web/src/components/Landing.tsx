@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { CheckCircle2, Inbox, MessageSquareText, Waypoints } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
@@ -24,15 +25,23 @@ export const LANDING_META = [
   { name: 'robots', content: 'index, follow' },
 ]
 
-/** The public landing page: what AppHQ is, and a form to join the waitlist. */
-export function LandingPage() {
+/**
+ * The public landing page: what AppHQ is, and a form to join the waitlist. With accounts open on
+ * this server, also a way to sign in and ask for access.
+ */
+export function LandingPage({ accountsOpen = false }: { accountsOpen?: boolean }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center px-6 py-5">
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
         <p className="flex items-center gap-2.5">
           <BrandMark className="size-8" />
           <BrandName className="text-lg" />
         </p>
+        {accountsOpen && (
+          <Button asChild variant="outline">
+            <Link to="/request-access">Request access</Link>
+          </Button>
+        )}
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6">

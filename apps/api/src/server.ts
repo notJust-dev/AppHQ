@@ -1,6 +1,10 @@
+import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { buildApp } from './app.js'
+import { createAccounts } from './auth/accounts.js'
+import { authConfigFromEnv, authOptions, createAuth } from './auth/auth.js'
 import { connectors } from './connectors/registry.js'
 import { createDb } from './db/client.js'
+import { account, session, user, verification } from './db/schema.js'
 import { runMigrations } from './db/migrate.js'
 import { loadEnv } from './env.js'
 import { createSecrets } from './lib/crypto.js'
@@ -12,13 +16,22 @@ const { db, sql } = createDb(env.DATABASE_URL)
 await runMigrations({ db, sql })
 
 const secrets = createSecrets(env.ENCRYPTION_KEY)
+
+// Accounts are optional: without their variables /api/auth does not exist, as before.
+const authConfig = authConfigFromEnv(env)
+const auth = authConfig
+  ? createAuth(authOptions(authConfig, drizzleAdapter(db, { provider: 'pg', schema: { user, session, account, verification } })))
+  : null
+
 const app = await buildApp({
   db,
   sql,
   secrets,
   pingDb: () => sql`select 1`,
   internalApiToken: env.INTERNAL_API_TOKEN,
+  accounts: auth && authConfig ? { auth, origin: authConfig.url, accounts: createAccounts(auth, authConfig) } : null,
 })
+app.log.info(authConfig ? `accounts are on, signing in at ${authConfig.url}` : 'accounts are off')
 
 // The API keeps the data fresh itself; see sync/schedule.ts for why not a Velocity cron entry.
 const stopSchedule =

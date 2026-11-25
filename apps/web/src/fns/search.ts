@@ -1,8 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { TRPCClientError } from '@trpc/client'
 import { z } from 'zod'
-import { api } from '@/server/api'
-import { requireSession } from './auth'
+import { requireDashboardAccess } from './auth'
 
 /** The API's own message for a problem with what was entered; a generic line otherwise. */
 function messageFrom(err: unknown, fallback: string): string {
@@ -15,11 +14,11 @@ function messageFrom(err: unknown, fallback: string): string {
 
 /** Connects Search Console with a pasted key, or the key Google Play already uses. */
 export const connectSearchConsoleFn = createServerFn({ method: 'POST' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ serviceAccountJson: z.string().max(10_000).optional(), usePlayKey: z.boolean().optional() }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return { ok: true as const, ...(await api().searchConsole.connect.mutate(data)) }
+      return { ok: true as const, ...(await context.api.searchConsole.connect.mutate(data)) }
     } catch (err) {
       return { ok: false as const, message: messageFrom(err, 'Could not reach the API.') }
     }
@@ -27,13 +26,13 @@ export const connectSearchConsoleFn = createServerFn({ method: 'POST' })
 
 /** Clicks, impressions and position over a range, for all apps or one. */
 export const getSearchPerformanceFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ from: z.iso.date(), to: z.iso.date(), appId: z.string().min(1).max(64).optional() }))
-  .handler(({ data }) => api().performance.search.query(data))
+  .handler(({ data, context }) => context.api.performance.search.query(data))
 
 /** The top queries or pages over a range, read live from Search Console. */
 export const searchTopFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(
     z.object({
       from: z.iso.date(),
@@ -42,9 +41,9 @@ export const searchTopFn = createServerFn({ method: 'GET' })
       dimension: z.enum(['query', 'page']),
     }),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return { ok: true as const, ...(await api().searchConsole.top.query({ ...data, limit: 20 })) }
+      return { ok: true as const, ...(await context.api.searchConsole.top.query({ ...data, limit: 20 })) }
     } catch (err) {
       return { ok: false as const, message: messageFrom(err, 'Could not read Search Console.'), connected: true, rows: [] }
     }

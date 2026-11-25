@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { api } from '@/server/api'
+import { dashboardApi } from '@/server/api'
 import { finishOAuth, tiktokRedirectUri } from '@/server/oauth'
-import { getAppSession } from '@/server/session'
 import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
 
 /**
@@ -14,8 +13,9 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const session = await getAppSession()
-        if (!session.signedIn) return redirectTo('/login')
+        // Only the dashboard password connects sources; an account is sent to sign in.
+        const api = await dashboardApi()
+        if (!api) return redirectTo('/login')
 
         const params = new URL(request.url).searchParams
         const attempt = await finishOAuth('tiktok', params.get('state'))
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
         }
 
         try {
-          const result = await api().tiktok.connect.mutate({
+          const result = await api.tiktok.connect.mutate({
             code,
             redirectUri: tiktokRedirectUri(),
             appId: attempt.appId,

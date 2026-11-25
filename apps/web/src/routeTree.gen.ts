@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as RequestAccessRouteImport } from './routes/request-access'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WaitlistRouteImport } from './routes/waitlist'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
@@ -35,6 +36,7 @@ import { Route as AppAccountsYoutubeRouteImport } from './routes/_app/accounts.y
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
 import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
 import { Route as AppAppsNewRouteImport } from './routes/_app/apps.new'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ConnectMetaCallbackRouteImport } from './routes/connect.meta.callback'
 import { Route as ConnectTiktokCallbackRouteImport } from './routes/connect.tiktok.callback'
 import { Route as ConnectYoutubeCallbackRouteImport } from './routes/connect.youtube.callback'
@@ -58,6 +60,11 @@ const LoginRoute = LoginRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestAccessRoute = RequestAccessRouteImport.update({
+  id: '/request-access',
+  path: '/request-access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -171,6 +178,11 @@ const AppAppsNewRoute = AppAppsNewRouteImport.update({
   path: '/apps/new',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConnectMetaCallbackRoute = ConnectMetaCallbackRouteImport.update({
   id: '/connect/meta/callback',
   path: '/connect/meta/callback',
@@ -202,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/request-access': typeof RequestAccessRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/accounts': typeof AppAccountsRouteWithChildren
@@ -221,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/apps/new': typeof AppAppsNewRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
@@ -233,6 +247,7 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/request-access': typeof RequestAccessRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/monetisation': typeof AppMonetisationRoute
@@ -251,6 +266,7 @@ export interface FileRoutesByTo {
   '/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/apps/new': typeof AppAppsNewRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
@@ -265,6 +281,7 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/request-access': typeof RequestAccessRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/_app/accounts': typeof AppAccountsRouteWithChildren
@@ -285,6 +302,7 @@ export interface FileRoutesById {
   '/_app/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/_app/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/_app/apps/new': typeof AppAppsNewRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
@@ -300,6 +318,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/privacy'
+    | '/request-access'
     | '/terms'
     | '/waitlist'
     | '/accounts'
@@ -319,6 +338,7 @@ export interface FileRouteTypes {
     | '/accounts/youtube'
     | '/apps/$appId'
     | '/apps/new'
+    | '/api/auth/$'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
     | '/connect/youtube/callback'
@@ -331,6 +351,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/privacy'
+    | '/request-access'
     | '/terms'
     | '/waitlist'
     | '/monetisation'
@@ -349,6 +370,7 @@ export interface FileRouteTypes {
     | '/accounts/tiktok'
     | '/accounts/youtube'
     | '/apps/new'
+    | '/api/auth/$'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
     | '/connect/youtube/callback'
@@ -362,6 +384,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/login'
     | '/privacy'
+    | '/request-access'
     | '/terms'
     | '/waitlist'
     | '/_app/accounts'
@@ -382,6 +405,7 @@ export interface FileRouteTypes {
     | '/_app/accounts/youtube'
     | '/_app/apps/$appId'
     | '/_app/apps/new'
+    | '/api/auth/$'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
     | '/connect/youtube/callback'
@@ -396,9 +420,11 @@ export interface RootRouteChildren {
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
+  RequestAccessRoute: typeof RequestAccessRoute
   TermsRoute: typeof TermsRoute
   WaitlistRoute: typeof WaitlistRoute
   IngestSplatRoute: typeof IngestSplatRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ConnectMetaCallbackRoute: typeof ConnectMetaCallbackRoute
   ConnectTiktokCallbackRoute: typeof ConnectTiktokCallbackRoute
   ConnectYoutubeCallbackRoute: typeof ConnectYoutubeCallbackRoute
@@ -432,6 +458,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/request-access': {
+      id: '/request-access'
+      path: '/request-access'
+      fullPath: '/request-access'
+      preLoaderRoute: typeof RequestAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -588,6 +621,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppsNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/connect/meta/callback': {
       id: '/connect/meta/callback'
       path: '/connect/meta/callback'
@@ -701,9 +741,11 @@ const rootRouteChildren: RootRouteChildren = {
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
+  RequestAccessRoute: RequestAccessRoute,
   TermsRoute: TermsRoute,
   WaitlistRoute: WaitlistRoute,
   IngestSplatRoute: IngestSplatRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
   ConnectMetaCallbackRoute: ConnectMetaCallbackRoute,
   ConnectTiktokCallbackRoute: ConnectTiktokCallbackRoute,
   ConnectYoutubeCallbackRoute: ConnectYoutubeCallbackRoute,
