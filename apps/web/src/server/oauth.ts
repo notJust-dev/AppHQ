@@ -12,6 +12,8 @@ interface OAuthData {
   state?: string
   /** The app the account will be connected to. */
   appId?: string
+  /** The organization the sign-in started in, as the API gave it; the API checks it at the end. */
+  organizationId?: string
   startedAt?: number
   /** Shown once on the Accounts page after the redirect back, then cleared. */
   result?: { ok: boolean; message: string; provider?: OAuthProvider }
@@ -61,11 +63,12 @@ export const metaRedirectUri = () => `${publicOrigin()}/connect/meta/callback`
 export const youtubeRedirectUri = () => `${publicOrigin()}/connect/youtube/callback`
 
 /** Remembers a sign-in that is about to leave for the provider. */
-export async function beginOAuth(provider: OAuthProvider, state: string, appId?: string) {
+export async function beginOAuth(provider: OAuthProvider, state: string, organizationId: string, appId?: string) {
   const oauth = await getOAuthSession()
   oauth.provider = provider
   oauth.state = state
   oauth.appId = appId
+  oauth.organizationId = organizationId
   oauth.startedAt = Date.now()
   oauth.result = undefined
   await oauth.save()
@@ -73,21 +76,23 @@ export async function beginOAuth(provider: OAuthProvider, state: string, appId?:
 
 /**
  * Checks a provider's redirect against the sign-in that started it, then forgets the attempt.
- * Returns the app chosen at the start when it matches, or null when it does not (expired, from
+ * Returns the app and organization of the start when it matches, or null when it does not (expired, from
  * another browser, or another provider's).
  */
 export async function finishOAuth(provider: OAuthProvider, returnedState: string | null) {
   const oauth = await getOAuthSession()
-  const { state, appId, startedAt } = oauth
+  const { state, appId, organizationId, startedAt } = oauth
   const fresh = startedAt !== undefined && Date.now() - startedAt < OAUTH_WINDOW_MS
-  const matches = oauth.provider === provider && !!state && returnedState === state && fresh
+  const matches = oauth.provider === provider && !!state && returnedState === state && fresh && !!organizationId
   oauth.provider = undefined
   oauth.state = undefined
   oauth.appId = undefined
+  oauth.organizationId = undefined
   oauth.startedAt = undefined
   return {
     matches,
     appId: appId ?? null,
+    organizationId: organizationId ?? '',
     /** Stores the message the Accounts page shows once, and saves the cookie. */
     async report(ok: boolean, message: string) {
       oauth.result = { ok, message, provider }

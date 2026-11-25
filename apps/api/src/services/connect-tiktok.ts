@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { createTikTokClient } from '../connectors/tiktok/client.js'
 import { REQUIRED_SCOPES, TIKTOK, requireTikTokConfig } from '../connectors/tiktok/config.js'
 import type { Db } from '../db/client.js'
@@ -20,14 +20,14 @@ export interface TikTokConnectResult {
  * promotes. Connecting the same account again replaces its tokens and can move it to another app.
  */
 export async function connectTikTok(
-  deps: { db: Db; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
+  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
   input: { code: string; redirectUri: string; appId: string },
 ): Promise<TikTokConnectResult> {
   const config = requireTikTokConfig(deps.env)
   const [app] = await deps.db
     .select({ id: apps.id, name: apps.name })
     .from(apps)
-    .where(eq(apps.id, input.appId))
+    .where(and(eq(apps.organizationId, deps.organizationId), eq(apps.id, input.appId)))
     .limit(1)
   if (!app) throw new ConnectInputError('That app no longer exists. Pick another and connect again.')
 
@@ -61,20 +61,24 @@ export async function connectTikTok(
   }
   const [connection] = await deps.db
     .insert(connections)
-    .values({ provider: TIKTOK, externalAccountId: tokens.openId, ...values })
+    .values({ organizationId: deps.organizationId, provider: TIKTOK, externalAccountId: tokens.openId, ...values })
     .onConflictDoUpdate({
-      target: [connections.provider, connections.externalAccountId],
+      target: [connections.organizationId, connections.provider, connections.externalAccountId],
       set: values,
     })
     .returning({ id: connections.id })
   if (!connection) throw new Error('could not save the TikTok connection')
 
   // The account goes to the app picked before signing in; connecting it again can move it.
-  const [asset] = await upsertAssets(deps.db, [
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const [asset] = await upsertAssets(scope, [
     { kind: 'tiktok_account', externalId: tokens.openId, name: account, connectionId: connection.id },
   ])
   if (asset) {
-    await deps.db.update(assets).set({ appId: app.id, ignored: false, updatedAt: new Date() }).where(eq(assets.id, asset.id))
+    await deps.db
+      .update(assets)
+      .set({ appId: app.id, ignored: false, updatedAt: new Date() })
+      .where(and(eq(assets.organizationId, deps.organizationId), eq(assets.id, asset.id)))
   }
 
   return { appId: app.id, appName: app.name, account }

@@ -78,6 +78,13 @@
       "when": 1795638320182,
       "tag": "0010_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795642342001,
+      "tag": "0011_organizations",
+      "breakpoints": true
     }
   ]
 }

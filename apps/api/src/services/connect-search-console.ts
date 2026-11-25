@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { GoogleAuthError, serviceAccountSchema, type ServiceAccount } from '../connectors/google-play/auth.js'
 import { findPlayConnection, readPlayCredentials } from '../connectors/google-play/connector.js'
 import { SEARCH_CONSOLE, SearchConsoleError, createSearchConsoleClient } from '../connectors/search-console/client.js'
@@ -17,11 +17,11 @@ export interface SearchConsoleConnectResult {
 
 /** The service account key pasted or dropped, or the one Google Play already uses. */
 function serviceAccountFrom(
-  deps: { db: Db; secrets: Secrets },
+  deps: { db: Db; organizationId: string; secrets: Secrets },
   input: { serviceAccountJson?: string; usePlayKey?: boolean },
 ): Promise<ServiceAccount> | ServiceAccount {
   if (input.usePlayKey) {
-    return findPlayConnection(deps.db).then((play) => {
+    return findPlayConnection({ db: deps.db, organizationId: deps.organizationId }).then((play) => {
       if (!play?.accessTokenEnc) throw new ConnectInputError('Google Play is not connected, so there is no key to reuse.')
       return readPlayCredentials(deps.secrets, play.accessTokenEnc).serviceAccount
     })
@@ -45,7 +45,7 @@ function serviceAccountFrom(
  * properties as websites waiting to be linked to apps.
  */
 export async function connectSearchConsole(
-  deps: { db: Db; secrets: Secrets } & SearchConsoleOptions,
+  deps: { db: Db; organizationId: string; secrets: Secrets } & SearchConsoleOptions,
   input: { serviceAccountJson?: string; usePlayKey?: boolean },
 ): Promise<SearchConsoleConnectResult> {
   const serviceAccount = await serviceAccountFrom(deps, input)
@@ -78,17 +78,20 @@ export async function connectSearchConsole(
     updatedAt: new Date(),
   }
   // One Search Console connection: another service account replaces it.
-  const existing = await findSearchConsoleConnection(deps.db)
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const existing = await findSearchConsoleConnection(scope)
   if (existing && existing.externalAccountId !== email) {
-    await deps.db.delete(connections).where(eq(connections.id, existing.id))
+    await deps.db
+      .delete(connections)
+      .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.id, existing.id)))
   }
   const [connection] = await deps.db
     .insert(connections)
-    .values({ provider: SEARCH_CONSOLE, externalAccountId: email, ...values })
-    .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+    .values({ organizationId: deps.organizationId, provider: SEARCH_CONSOLE, externalAccountId: email, ...values })
+    .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
     .returning()
   if (!connection) throw new Error('could not save the Search Console connection')
 
-  const linked = await saveSites(deps.db, connection.id, sites)
+  const linked = await saveSites(scope, connection.id, sites)
   return { serviceAccount: email, sites: sites.length, linked }
 }

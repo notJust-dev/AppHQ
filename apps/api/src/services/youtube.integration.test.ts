@@ -9,6 +9,8 @@ import { runMigrations } from '../db/migrate.js'
 import { apps, assets, connections, metricDaily, posts } from '../db/schema.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 import { connectYouTube } from './connect-youtube.js'
 
@@ -17,6 +19,7 @@ const url = testDatabaseUrl()
 
 describe.skipIf(!url)('YouTube, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
   const secrets = createSecrets('c'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
   const run = randomUUID().slice(0, 8)
@@ -88,13 +91,14 @@ describe.skipIf(!url)('YouTube, against a real database', () => {
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
-    await db.insert(apps).values({ id: appId, name: 'Habit Tube' })
+    scope = await defaultScope(db)
+    await db.insert(apps).values({ organizationId: scope.organizationId, id: appId, name: 'Habit Tube' })
   })
 
   afterAll(async () => {
     await db.delete(connections).where(and(eq(connections.provider, 'youtube'), eq(connections.externalAccountId, channelId)))
     await db.delete(assets).where(eq(assets.externalId, channelId))
-    await db.delete(apps).where(eq(apps.id, appId))
+    await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await sql.end({ timeout: 5 })
   })
 
@@ -106,12 +110,12 @@ describe.skipIf(!url)('YouTube, against a real database', () => {
 
   it('needs a refresh token, so syncs outlive the hour-long access token', async () => {
     await expect(
-      connectYouTube({ db, secrets, env, fetch: google({ refreshToken: false }) }, { code: 'c', redirectUri: 'https://x/cb' }),
+      connectYouTube({ ...scope, secrets, env, fetch: google({ refreshToken: false }) }, { code: 'c', redirectUri: 'https://x/cb' }),
     ).rejects.toThrow(ConnectInputError)
   })
 
   it('saves the channel, with its tokens encrypted, waiting for an app', async () => {
-    const result = await connectYouTube({ db, secrets, env, fetch: google() }, { code: 'c', redirectUri: 'https://x/cb' })
+    const result = await connectYouTube({ ...scope, secrets, env, fetch: google() }, { code: 'c', redirectUri: 'https://x/cb' })
     expect(result).toEqual({ channel: `@habitshorts${run}`, channelId })
     const [connection] = await db.select().from(connections).where(eq(connections.externalAccountId, channelId))
     expect(connection?.refreshTokenEnc).not.toContain('1//refresh')
@@ -121,15 +125,15 @@ describe.skipIf(!url)('YouTube, against a real database', () => {
 
   it('writes daily views and posts, refreshing an expired token first', async () => {
     const [asset] = await db.select().from(assets).where(eq(assets.externalId, channelId))
-    await assignAsset(db, { assetId: asset?.id ?? '', appId })
+    await assignAsset(scope, { assetId: asset?.id ?? '', appId })
     // The stored access token has run out.
     await db.update(connections).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(connections.externalAccountId, channelId))
 
     const [app] = await db.select().from(apps).where(eq(apps.id, appId))
     const connector = createYouTubeConnector({ env, fetch: google() })
-    expect(await connector.isConfigured(app!, db)).toBe(true)
+    expect(await connector.isConfigured(app!, scope)).toBe(true)
     calls.length = 0
-    await connector.sync({ db, app: app!, range: { from: '2026-11-01', to: '2026-11-02' }, log, secrets })
+    await connector.sync({ ...scope, app: app!, range: { from: '2026-11-01', to: '2026-11-02' }, log, secrets })
     expect(calls[0]).toBe('oauth2.googleapis.com/token')
 
     const views = await db

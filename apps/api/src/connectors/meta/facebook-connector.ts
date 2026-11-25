@@ -39,12 +39,13 @@ export function createFacebookConnector(
     source: FACEBOOK,
     scope: 'app',
 
-    async isConfigured(app, db) {
+    async isConfigured(app, scope) {
       if (!metaConfig(options.env)) return false
-      return (await metaConnections(db, FACEBOOK, app.id)).length > 0
+      return (await metaConnections(scope, FACEBOOK, app.id)).length > 0
     },
 
-    async sync({ db, app, range, log, secrets }) {
+    async sync({ db, organizationId, app, range, log, secrets }) {
+      const scope = { db, organizationId }
       const client = createMetaClient({ config: requireMetaConfig(options.env), fetch: options.fetch })
       const today = todayUtc(now())
       const from = maxDay(range.from, addDays(today, -INSIGHTS_HISTORY_DAYS))
@@ -53,7 +54,7 @@ export function createFacebookConnector(
       const warnings: string[] = []
       let rowsWritten = 0
 
-      const accounts = await metaConnections(db, FACEBOOK, app.id)
+      const accounts = await metaConnections(scope, FACEBOOK, app.id)
       for (const account of accounts) {
         const name = account.displayName ?? 'Facebook Page'
         if (account.status === 'needs_reauth' || !account.accessTokenEnc) {
@@ -80,15 +81,21 @@ export function createFacebookConnector(
             appId: app.id,
             connectionId: account.id,
             today,
-            db,
+            scope,
             warn: (message) => warnings.push(`${name}: ${message}`),
           })
-          rowsWritten += await savePosts(db, readings, today)
+          rowsWritten += await savePosts(scope, readings, today)
           // Reels saved on their own before they were recognised as posts too.
           if (duplicateReels.length > 0) {
             await db
               .delete(postsTable)
-              .where(and(eq(postsTable.platform, FACEBOOK), inArray(postsTable.externalId, duplicateReels)))
+              .where(
+                and(
+                  eq(postsTable.organizationId, organizationId),
+                  eq(postsTable.platform, FACEBOOK),
+                  inArray(postsTable.externalId, duplicateReels),
+                ),
+              )
           }
           await markAccount(db, account.id, { ok: true, now: now() })
         } catch (err) {
@@ -97,7 +104,7 @@ export function createFacebookConnector(
         }
       }
 
-      rowsWritten += await upsertMetrics(db, totals.rows(app.id, FACEBOOK))
+      rowsWritten += await upsertMetrics(scope, totals.rows(app.id, FACEBOOK))
       for (const warning of warnings.slice(0, 5)) log.warn(`facebook ${app.id}: ${warning}`)
       if (failures.length > 0) {
         throw new Error(`${failures.length} of ${accounts.length} Facebook Pages failed. ${failures.join('; ')}`)
@@ -116,7 +123,7 @@ async function readPosts(
   token: string,
   pageId: string,
   ctx: {
-    db: Parameters<typeof storedPosts>[0]
+    scope: Parameters<typeof storedPosts>[0]
     appId: string
     connectionId: string
     today: IsoDate
@@ -171,7 +178,7 @@ async function readPosts(
     })),
   ]
 
-  const stored = await storedPosts(ctx.db, FACEBOOK, items.map((item) => item.id))
+  const stored = await storedPosts(ctx.scope, FACEBOOK, items.map((item) => item.id))
   const readings: PostReading[] = []
   let insightFailures = 0
   for (const item of items) {

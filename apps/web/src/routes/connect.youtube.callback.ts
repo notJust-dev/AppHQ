@@ -31,7 +31,11 @@ export const Route = createFileRoute('/connect/youtube/callback')({
         }
 
         try {
-          const result = await api.youtube.connect.mutate({ code, redirectUri: youtubeRedirectUri() })
+          const result = await api.youtube.connect.mutate({
+            code,
+            redirectUri: youtubeRedirectUri(),
+            organizationId: attempt.organizationId,
+          })
           return finish(
             true,
             `Found ${result.channel}. Link it to the app it promotes on the Apps page or in the app's Settings; ` +

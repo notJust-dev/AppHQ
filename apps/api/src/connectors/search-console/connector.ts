@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { autoLink, linkedAssets, upsertAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { apps, assets, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { eachDay } from '../../lib/dates.js'
@@ -20,11 +20,12 @@ import {
 const credentialsSchema = z.object({ serviceAccount: serviceAccountSchema })
 export type SearchConsoleCredentials = z.infer<typeof credentialsSchema>
 
-export const findSearchConsoleConnection = (db: Db) =>
+/** The organization's Search Console service account. */
+export const findSearchConsoleConnection = ({ db, organizationId }: Scope) =>
   db
     .select()
     .from(connections)
-    .where(eq(connections.provider, SEARCH_CONSOLE))
+    .where(and(eq(connections.organizationId, organizationId), eq(connections.provider, SEARCH_CONSOLE)))
     .limit(1)
     .then((rows) => rows[0])
 
@@ -37,9 +38,10 @@ export interface SearchConsoleOptions {
 }
 
 /** Saves each property as a website asset; which app it belongs to is the person's call. */
-export async function saveSites(db: Db, connectionId: string, sites: SearchSite[]) {
+export async function saveSites(scope: Scope, connectionId: string, sites: SearchSite[]) {
+  const { db, organizationId } = scope
   await upsertAssets(
-    db,
+    scope,
     sites.map((site) => ({
       kind: 'search_console_site' as const,
       externalId: site.siteUrl,
@@ -48,12 +50,13 @@ export async function saveSites(db: Db, connectionId: string, sites: SearchSite[
       details: { permissionLevel: site.permissionLevel },
     })),
   )
-  await autoLink(db)
+  await autoLink(scope)
   const linked = await db
     .select({ id: assets.id })
     .from(assets)
     .where(
       and(
+        eq(assets.organizationId, organizationId),
         eq(assets.kind, 'search_console_site'),
         inArray(
           assets.externalId,
@@ -75,12 +78,13 @@ export function createSearchConsoleConnector(options: SearchConsoleOptions = {})
     source: SEARCH_CONSOLE,
     scope: 'account',
 
-    async isConfigured(db) {
-      return (await findSearchConsoleConnection(db)) !== undefined
+    async isConfigured(scope) {
+      return (await findSearchConsoleConnection(scope)) !== undefined
     },
 
-    async sync({ db, range, secrets }) {
-      const connection = await findSearchConsoleConnection(db)
+    async sync({ db, organizationId, range, secrets }) {
+      const scope = { db, organizationId }
+      const connection = await findSearchConsoleConnection(scope)
       if (!connection?.accessTokenEnc) throw new Error('No Search Console service account is stored')
       const { serviceAccount } = readSearchConsoleCredentials(secrets, connection.accessTokenEnc)
       const client = createSearchConsoleClient({ serviceAccount, ...options })
@@ -88,13 +92,18 @@ export function createSearchConsoleConnector(options: SearchConsoleOptions = {})
       try {
         // Picks up properties shared with the service account since the last run.
         const sites = await client.listSites()
-        await saveSites(db, connection.id, sites)
+        await saveSites(scope, connection.id, sites)
 
         const active = new Set(
-          (await db.select({ id: apps.id }).from(apps).where(eq(apps.isActive, true))).map((app) => app.id),
+          (
+            await db
+              .select({ id: apps.id })
+              .from(apps)
+              .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+          ).map((app) => app.id),
         )
         const owned = new Set(sites.map((site) => site.siteUrl))
-        const tracked = (await linkedAssets(db, 'search_console_site'))
+        const tracked = (await linkedAssets(scope, 'search_console_site'))
           .map(({ asset }) => asset)
           .filter((asset) => asset.connectionId === connection.id && asset.appId !== null && active.has(asset.appId))
           .filter((asset) => owned.has(asset.externalId))
@@ -117,7 +126,7 @@ export function createSearchConsoleConnector(options: SearchConsoleOptions = {})
           }
         })
 
-        const written = await upsertMetrics(db, rows)
+        const written = await upsertMetrics(scope, rows)
         await db
           .update(connections)
           .set({ status: 'ok', lastSyncedAt: new Date(), updatedAt: new Date() })

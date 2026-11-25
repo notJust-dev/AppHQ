@@ -7,6 +7,8 @@ import { apps, assets, metricDaily } from '../db/schema.js'
 import { ConnectInputError } from '../services/errors.js'
 import { assetOf } from '../test/assets.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { assignAsset, autoLink, removeApp, renameApp, setIgnored } from './store.js'
 import { PORTFOLIO_APP_ID } from './kinds.js'
 
@@ -19,14 +21,17 @@ describe.skipIf(!url)('Apps and assets, against a real database', () => {
   const bundleId = `dev.example.store.${run}`
   const ids = { ios: `ios-${run}`, android: bundleId, other: `ios-other-${run}`, third: `ios-third-${run}` }
   const createdApps: string[] = []
+  let scope: Scope
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
+    scope = await defaultScope(db)
+    const { organizationId } = scope
     await db.insert(assets).values([
-      { kind: 'ios_app', externalId: ids.ios, name: `Store App ${run}`, details: { bundleId } },
-      { kind: 'android_app', externalId: ids.android, name: `Store App ${run}` },
-      { kind: 'ios_app', externalId: ids.other, name: `Other App ${run}` },
-      { kind: 'ios_app', externalId: ids.third, name: `Third App ${run}` },
+      { organizationId, kind: 'ios_app', externalId: ids.ios, name: `Store App ${run}`, details: { bundleId } },
+      { organizationId, kind: 'android_app', externalId: ids.android, name: `Store App ${run}` },
+      { organizationId, kind: 'ios_app', externalId: ids.other, name: `Other App ${run}` },
+      { organizationId, kind: 'ios_app', externalId: ids.third, name: `Third App ${run}` },
     ])
   })
 
@@ -38,52 +43,52 @@ describe.skipIf(!url)('Apps and assets, against a real database', () => {
 
   it('renames an app and keeps its id, but not Shared accounts', async () => {
     const third = await assetOf(db, 'ios_app', ids.third)
-    const { appId } = await assignAsset(db, { assetId: third.id, appId: 'new' })
+    const { appId } = await assignAsset(scope, { assetId: third.id, appId: 'new' })
     if (!appId) throw new Error('no app')
     createdApps.push(appId)
 
-    expect(await renameApp(db, appId, `Renamed ${run}`)).toBe(`Renamed ${run}`)
+    expect(await renameApp(scope, appId, `Renamed ${run}`)).toBe(`Renamed ${run}`)
     const [app] = await db.select().from(apps).where(eq(apps.id, appId))
     expect(app?.name).toBe(`Renamed ${run}`)
-    await expect(renameApp(db, PORTFOLIO_APP_ID, 'Mine')).rejects.toBeInstanceOf(ConnectInputError)
+    await expect(renameApp(scope, PORTFOLIO_APP_ID, 'Mine')).rejects.toBeInstanceOf(ConnectInputError)
 
-    await assignAsset(db, { assetId: third.id, appId: null })
+    await assignAsset(scope, { assetId: third.id, appId: null })
   })
 
   it('removes an app with its numbers, and leaves what fed it waiting', async () => {
     const ios = await assetOf(db, 'ios_app', ids.ios)
-    const { appId } = await assignAsset(db, { assetId: ios.id, appId: 'new' })
+    const { appId } = await assignAsset(scope, { assetId: ios.id, appId: 'new' })
     if (!appId) throw new Error('no app')
     createdApps.push(appId)
     // The Android package has the iOS bundle id, so it joined the new app by itself.
     expect((await assetOf(db, 'android_app', ids.android)).appId).toBe(appId)
-    await db.insert(metricDaily).values({ appId, date: '2026-11-01', source: 'app_store', metric: 'downloads', value: 3 })
+    await db.insert(metricDaily).values({ organizationId: scope.organizationId, appId, date: '2026-11-01', source: 'app_store', metric: 'downloads', value: 3 })
 
-    expect(await removeApp(db, appId)).toBe(`Store App ${run}`)
+    expect(await removeApp(scope, appId)).toBe(`Store App ${run}`)
 
     expect(await db.select().from(apps).where(eq(apps.id, appId))).toEqual([])
     expect(await db.select().from(metricDaily).where(eq(metricDaily.appId, appId))).toEqual([])
     expect((await assetOf(db, 'ios_app', ids.ios)).appId).toBeNull()
     expect((await assetOf(db, 'android_app', ids.android)).appId).toBeNull()
     // Nothing links them again behind the person's back.
-    await autoLink(db)
+    await autoLink(scope)
     expect((await assetOf(db, 'android_app', ids.android)).appId).toBeNull()
   })
 
   it('refuses to remove Shared accounts or an app that is gone', async () => {
-    await expect(removeApp(db, PORTFOLIO_APP_ID)).rejects.toBeInstanceOf(ConnectInputError)
-    await expect(removeApp(db, `gone-${run}`)).rejects.toBeInstanceOf(ConnectInputError)
+    await expect(removeApp(scope, PORTFOLIO_APP_ID)).rejects.toBeInstanceOf(ConnectInputError)
+    await expect(removeApp(scope, `gone-${run}`)).rejects.toBeInstanceOf(ConnectInputError)
   })
 
   it('ignores several assets at once, and brings them back', async () => {
     const other = await assetOf(db, 'ios_app', ids.other)
     const third = await assetOf(db, 'ios_app', ids.third)
 
-    expect(await setIgnored(db, [other.id, third.id], true)).toBe(2)
+    expect(await setIgnored(scope, [other.id, third.id], true)).toBe(2)
     expect((await assetOf(db, 'ios_app', ids.other)).ignored).toBe(true)
     expect((await assetOf(db, 'ios_app', ids.third)).ignored).toBe(true)
 
-    expect(await setIgnored(db, [third.id], false)).toBe(1)
+    expect(await setIgnored(scope, [third.id], false)).toBe(1)
     expect((await assetOf(db, 'ios_app', ids.third)).ignored).toBe(false)
   })
 })

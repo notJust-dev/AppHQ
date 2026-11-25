@@ -4,6 +4,7 @@ import { assignAsset, autoLink, upsertAssets } from '../assets/store.js'
 import { RevenueCatError, createRevenueCatClient } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
 import type { Db } from '../db/client.js'
+import type { Scope } from '../organizations/scope.js'
 import { apps, assets, connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import { ConnectInputError } from './errors.js'
@@ -29,12 +30,18 @@ export interface ConnectedProject {
  * whatever its bundle id says, and the key must belong to exactly one project.
  */
 export async function connectRevenueCat(
-  deps: { db: Db; secrets: Secrets; fetch?: typeof fetch },
+  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch },
   apiKey: string,
   options: { appId?: string } = {},
 ): Promise<ConnectedProject[]> {
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const inOrg = eq(assets.organizationId, deps.organizationId)
   if (options.appId !== undefined) {
-    const [target] = await deps.db.select({ id: apps.id }).from(apps).where(eq(apps.id, options.appId)).limit(1)
+    const [target] = await deps.db
+      .select({ id: apps.id })
+      .from(apps)
+      .where(and(eq(apps.organizationId, deps.organizationId), eq(apps.id, options.appId)))
+      .limit(1)
     if (!target || options.appId === PORTFOLIO_APP_ID) {
       throw new ConnectInputError('That app no longer exists. Reload the page.')
     }
@@ -65,12 +72,12 @@ export async function connectRevenueCat(
     const values = { displayName: project.name, accessTokenEnc: encryptedKey, status: 'ok', updatedAt: new Date() }
     const [connection] = await deps.db
       .insert(connections)
-      .values({ provider: REVENUECAT, externalAccountId: project.id, ...values })
-      .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+      .values({ organizationId: deps.organizationId, provider: REVENUECAT, externalAccountId: project.id, ...values })
+      .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
       .returning({ id: connections.id })
     if (!connection) throw new Error('could not save the RevenueCat connection')
 
-    const [asset] = await upsertAssets(deps.db, [
+    const [asset] = await upsertAssets(scope, [
       {
         kind: 'revenuecat_project',
         externalId: project.id,
@@ -84,27 +91,31 @@ export async function connectRevenueCat(
     let movedFrom: string | null = null
     let replaced: string | null = null
     if (options.appId !== undefined) {
-      const [before] = await deps.db.select({ appId: assets.appId }).from(assets).where(eq(assets.id, asset.id)).limit(1)
-      if (before?.appId && before.appId !== options.appId) movedFrom = await appName(deps.db, before.appId)
+      const [before] = await deps.db
+        .select({ appId: assets.appId })
+        .from(assets)
+        .where(and(inOrg, eq(assets.id, asset.id)))
+        .limit(1)
+      if (before?.appId && before.appId !== options.appId) movedFrom = await appName(scope, before.appId)
       const [previous] = await deps.db
         .select({ name: assets.name })
         .from(assets)
         .where(
-          and(eq(assets.kind, 'revenuecat_project'), eq(assets.appId, options.appId), ne(assets.id, asset.id)),
+          and(inOrg, eq(assets.kind, 'revenuecat_project'), eq(assets.appId, options.appId), ne(assets.id, asset.id)),
         )
         .limit(1)
       replaced = previous?.name ?? null
-      await assignAsset(deps.db, { assetId: asset.id, appId: options.appId })
+      await assignAsset(scope, { assetId: asset.id, appId: options.appId })
     } else {
-      await autoLink(deps.db)
+      await autoLink(scope)
     }
 
-    const [current] = await deps.db.select().from(assets).where(eq(assets.id, asset.id)).limit(1)
+    const [current] = await deps.db.select().from(assets).where(and(inOrg, eq(assets.id, asset.id))).limit(1)
     const appId = current?.appId ?? null
     connected.push({
       name: project.name,
       appId,
-      appName: appId ? await appName(deps.db, appId) : null,
+      appName: appId ? await appName(scope, appId) : null,
       movedFrom,
       replaced,
     })
@@ -113,7 +124,11 @@ export async function connectRevenueCat(
   return connected
 }
 
-async function appName(db: Db, appId: string): Promise<string | null> {
-  const [app] = await db.select({ name: apps.name }).from(apps).where(eq(apps.id, appId)).limit(1)
+async function appName({ db, organizationId }: Scope, appId: string): Promise<string | null> {
+  const [app] = await db
+    .select({ name: apps.name })
+    .from(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+    .limit(1)
   return app?.name ?? null
 }

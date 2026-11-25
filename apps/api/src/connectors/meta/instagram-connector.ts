@@ -33,12 +33,13 @@ export function createInstagramConnector(
     source: INSTAGRAM,
     scope: 'app',
 
-    async isConfigured(app, db) {
+    async isConfigured(app, scope) {
       if (!metaConfig(options.env)) return false
-      return (await metaConnections(db, INSTAGRAM, app.id)).length > 0
+      return (await metaConnections(scope, INSTAGRAM, app.id)).length > 0
     },
 
-    async sync({ db, app, range, log, secrets }) {
+    async sync({ db, organizationId, app, range, log, secrets }) {
+      const scope = { db, organizationId }
       const client = createMetaClient({ config: requireMetaConfig(options.env), fetch: options.fetch })
       const today = todayUtc(now())
       const from = range.from > addDays(today, -(VIEWS_HISTORY_DAYS - 1))
@@ -50,7 +51,7 @@ export function createInstagramConnector(
       let rowsWritten = 0
       let followersComplete = true
 
-      const accounts = await metaConnections(db, INSTAGRAM, app.id)
+      const accounts = await metaConnections(scope, INSTAGRAM, app.id)
       for (const account of accounts) {
         const name = account.displayName ?? 'Instagram account'
         if (account.status === 'needs_reauth' || !account.accessTokenEnc) {
@@ -86,8 +87,8 @@ export function createInstagramConnector(
             }
           })
 
-          const readings = await readMedia({ call, client, igId, today, appId: app.id, connectionId: account.id, db, warnings, name })
-          rowsWritten += await savePosts(db, readings, today)
+          const readings = await readMedia({ call, client, igId, today, appId: app.id, connectionId: account.id, scope, warnings, name })
+          rowsWritten += await savePosts(scope, readings, today)
           await markAccount(db, account.id, {
             ok: true,
             now: now(),
@@ -103,7 +104,7 @@ export function createInstagramConnector(
       let rows = totals.rows(app.id, INSTAGRAM)
       // A partial follower total would look like a drop, so it is only written when complete.
       if (!followersComplete) rows = rows.filter((row) => row.metric !== 'followers')
-      rowsWritten += await upsertMetrics(db, rows)
+      rowsWritten += await upsertMetrics(scope, rows)
       for (const warning of warnings.slice(0, 5)) log.warn(`instagram ${app.id}: ${warning}`)
       if (failures.length > 0) {
         throw new Error(`${failures.length} of ${accounts.length} Instagram accounts failed. ${failures.join('; ')}`)
@@ -143,14 +144,14 @@ async function readMedia(ctx: {
   today: IsoDate
   appId: string
   connectionId: string
-  db: Parameters<typeof storedPosts>[0]
+  scope: Parameters<typeof storedPosts>[0]
   warnings: string[]
   name: string
 }): Promise<PostReading[]> {
   const since = Date.parse(`${addDays(ctx.today, -POST_HISTORY_DAYS)}T00:00:00Z`)
   const freshSince = Date.parse(`${addDays(ctx.today, -FRESH_POST_DAYS)}T00:00:00Z`)
   const media = await ctx.call((token) => ctx.client.instagramMedia(token, ctx.igId, since))
-  const stored = await storedPosts(ctx.db, INSTAGRAM, media.map((item) => item.id))
+  const stored = await storedPosts(ctx.scope, INSTAGRAM, media.map((item) => item.id))
 
   let insightFailures = 0
   const readings: PostReading[] = []

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { connections, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { addDays, parseIsoDate, todayUtc } from '../../lib/dates.js'
@@ -14,8 +15,8 @@ import { YOUTUBE, requireYouTubeConfig, youtubeConfig } from './config.js'
 const POST_HISTORY_DAYS = 365
 
 /** The YouTube channels linked to an app, as their connection rows (tokens, state). */
-const channelConnections = (db: Db, appId: string) =>
-  linkedAssets(db, 'youtube_channel', appId).then((rows) => rows.flatMap((row) => (row.connection ? [row.connection] : [])))
+const channelConnections = (scope: Scope, appId: string) =>
+  linkedAssets(scope, 'youtube_channel', appId).then((rows) => rows.flatMap((row) => (row.connection ? [row.connection] : [])))
 
 /**
  * A working access token: the stored one while it lasts, a refreshed one (saved) after that.
@@ -51,12 +52,13 @@ export function createYouTubeConnector(
     source: YOUTUBE,
     scope: 'app',
 
-    async isConfigured(app, db) {
+    async isConfigured(app, scope) {
       if (!youtubeConfig(options.env)) return false
-      return (await channelConnections(db, app.id)).length > 0
+      return (await channelConnections(scope, app.id)).length > 0
     },
 
-    async sync({ db, app, range, secrets }) {
+    async sync({ db, organizationId, app, range, secrets }) {
+      const scope = { db, organizationId }
       const client = createYouTubeClient({ config: requireYouTubeConfig(options.env), fetch: options.fetch })
       const today = todayUtc(now())
       const totals = new Map<string, number>()
@@ -66,7 +68,7 @@ export function createYouTubeConnector(
       let followersComplete = true
       let rowsWritten = 0
 
-      const channels = await channelConnections(db, app.id)
+      const channels = await channelConnections(scope, app.id)
       for (const connection of channels) {
         const name = connection.displayName ?? 'YouTube channel'
         if (connection.status === 'needs_reauth') {
@@ -106,7 +108,7 @@ export function createYouTubeConnector(
               comments: video.comments,
               shares: 0,
             }))
-            rowsWritten += await savePosts(db, readings, today)
+            rowsWritten += await savePosts(scope, readings, today)
           }
 
           await db
@@ -130,7 +132,7 @@ export function createYouTubeConnector(
       })
       // A partial follower total would look like a drop, so it is only written when complete.
       if (!followersComplete) rows = rows.filter((row) => row.metric !== 'followers')
-      rowsWritten += await upsertMetrics(db, rows)
+      rowsWritten += await upsertMetrics(scope, rows)
       if (failures.length > 0) {
         throw new Error(`${failures.length} of ${channels.length} YouTube channels failed. ${failures.join('; ')}`)
       }

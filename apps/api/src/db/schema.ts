@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   doublePrecision,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -12,7 +13,75 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
+
+/**
+ * Organizations, kept by Better Auth's organization plugin with its default names (see
+ * src/auth/auth.ts). Every piece of data belongs to one: `organization_id` on each data table.
+ *
+ * Nobody can create, join or switch organizations through Better Auth: none of the plugin's
+ * endpoints is reachable. The API makes them itself (src/organizations), and the dashboard
+ * password works in one of them (src/organizations/dashboard.ts). Membership grants nothing yet.
+ */
+export const organization = pgTable('organization', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  logo: text('logo'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  metadata: text('metadata'),
+})
+
+/** Who belongs to an organization. A user may belong to several. */
+export const member = pgTable(
+  'member',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** 'owner' | 'admin' | 'member' */
+    role: text('role').default('member').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('member_organization_user_idx').on(t.organizationId, t.userId),
+    index('member_userId_idx').on(t.userId),
+  ],
+)
+
+/** Invitations to an organization. The table is the plugin's; nothing uses it yet. */
+export const invitation = pgTable(
+  'invitation',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role'),
+    status: text('status').default('pending').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    inviterId: uuid('inviter_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    index('invitation_organizationId_idx').on(t.organizationId),
+    index('invitation_email_idx').on(t.email),
+  ],
+)
+
+/** The organization a row belongs to. Deleting an organization that still holds data fails. */
+const organizationId = () =>
+  uuid('organization_id')
+    .notNull()
+    .references(() => organization.id)
 
 /**
  * The portfolio. `id` is a short slug used in URLs and by the AI tools. What feeds an app (its
@@ -22,15 +91,25 @@ import {
  * such as a personal build-in-public account, so their numbers count toward the portfolio's
  * totals without landing in any single app's funnel.
  */
-export const apps = pgTable('apps', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  iconUrl: text('icon_url'),
-  /** 'app' | 'portfolio' */
-  kind: text('kind').notNull().default('app'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const apps = pgTable(
+  'apps',
+  {
+    organizationId: organizationId(),
+    /** Unique within its organization; two organizations may use the same slug. */
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    iconUrl: text('icon_url'),
+    /** 'app' | 'portfolio' */
+    kind: text('kind').notNull().default('app'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.organizationId, t.id] })],
+)
+
+/** A row's app, in the row's own organization: a row can never point at another one's app. */
+const appOf = (t: { organizationId: AnyPgColumn; appId: AnyPgColumn }) =>
+  foreignKey({ columns: [t.organizationId, t.appId], foreignColumns: [apps.organizationId, apps.id] })
 
 /**
  * Credentials: one row per signed-in account or key, never tied to an app. App Store Connect and
@@ -42,6 +121,7 @@ export const connections = pgTable(
   'connections',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: organizationId(),
     provider: text('provider').notNull(),
     externalAccountId: text('external_account_id'),
     displayName: text('display_name'),
@@ -60,7 +140,7 @@ export const connections = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('connections_provider_account_idx').on(t.provider, t.externalAccountId)],
+  (t) => [uniqueIndex('connections_org_provider_account_idx').on(t.organizationId, t.provider, t.externalAccountId)],
 )
 
 /**
@@ -74,12 +154,14 @@ export const assets = pgTable(
   'assets',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: organizationId(),
     /** 'ios_app' | 'android_app' | 'revenuecat_project' | 'facebook_page' | 'instagram_account' | 'tiktok_account' */
     kind: text('kind').notNull(),
     /** Apple ID, package name, RevenueCat project id, Page id, Instagram id, TikTok open_id. */
     externalId: text('external_id').notNull(),
     name: text('name').notNull(),
-    appId: text('app_id').references(() => apps.id, { onDelete: 'set null' }),
+    /** Removing an app unlinks its assets first (see `removeApp`). */
+    appId: text('app_id'),
     /** The account it was found through, whose credentials read it. Null for demo assets. */
     connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'set null' }),
     ignored: boolean('ignored').notNull().default(false),
@@ -91,8 +173,9 @@ export const assets = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('assets_kind_external_idx').on(t.kind, t.externalId),
-    index('assets_app_idx').on(t.appId),
+    uniqueIndex('assets_org_kind_external_idx').on(t.organizationId, t.kind, t.externalId),
+    index('assets_org_app_idx').on(t.organizationId, t.appId),
+    appOf(t),
   ],
 )
 
@@ -104,9 +187,8 @@ export const assets = pgTable(
 export const metricDaily = pgTable(
   'metric_daily',
   {
-    appId: text('app_id')
-      .notNull()
-      .references(() => apps.id, { onDelete: 'cascade' }),
+    organizationId: organizationId(),
+    appId: text('app_id').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     source: text('source').notNull(),
     metric: text('metric').notNull(),
@@ -115,8 +197,9 @@ export const metricDaily = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.appId, t.date, t.source, t.metric, t.dimension] }),
-    index('metric_daily_date_idx').on(t.date),
+    primaryKey({ columns: [t.organizationId, t.appId, t.date, t.source, t.metric, t.dimension] }),
+    index('metric_daily_org_date_idx').on(t.organizationId, t.date),
+    appOf(t).onDelete('cascade'),
   ],
 )
 
@@ -128,11 +211,10 @@ export const posts = pgTable(
   'posts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: organizationId(),
     platform: text('platform').notNull(),
     externalId: text('external_id').notNull(),
-    appId: text('app_id')
-      .notNull()
-      .references(() => apps.id, { onDelete: 'cascade' }),
+    appId: text('app_id').notNull(),
     connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'set null' }),
     url: text('url'),
     caption: text('caption'),
@@ -147,8 +229,9 @@ export const posts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('posts_platform_external_idx').on(t.platform, t.externalId),
-    index('posts_app_published_idx').on(t.appId, t.publishedAt),
+    uniqueIndex('posts_org_platform_external_idx').on(t.organizationId, t.platform, t.externalId),
+    index('posts_org_app_published_idx').on(t.organizationId, t.appId, t.publishedAt),
+    appOf(t).onDelete('cascade'),
   ],
 )
 
@@ -182,9 +265,8 @@ export const reviews = pgTable(
   'reviews',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    appId: text('app_id')
-      .notNull()
-      .references(() => apps.id, { onDelete: 'cascade' }),
+    organizationId: organizationId(),
+    appId: text('app_id').notNull(),
     /** 'app_store' | 'google_play' */
     store: text('store').notNull(),
     /** The store's review id; for a Play review without one, its package and submit time. */
@@ -209,9 +291,10 @@ export const reviews = pgTable(
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('reviews_store_external_idx').on(t.store, t.externalId),
-    index('reviews_app_created_idx').on(t.appId, t.createdAt),
-    index('reviews_created_idx').on(t.createdAt),
+    uniqueIndex('reviews_org_store_external_idx').on(t.organizationId, t.store, t.externalId),
+    index('reviews_org_app_created_idx').on(t.organizationId, t.appId, t.createdAt),
+    index('reviews_org_created_idx').on(t.organizationId, t.createdAt),
+    appOf(t).onDelete('cascade'),
   ],
 )
 
@@ -220,8 +303,9 @@ export const syncRuns = pgTable(
   'sync_runs',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: organizationId(),
     source: text('source').notNull(),
-    appId: text('app_id').references(() => apps.id, { onDelete: 'cascade' }),
+    appId: text('app_id'),
     /** 'running' | 'ok' | 'error' */
     status: text('status').notNull(),
     rangeFrom: date('range_from', { mode: 'string' }),
@@ -231,7 +315,10 @@ export const syncRuns = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
-  (t) => [index('sync_runs_source_started_idx').on(t.source, t.startedAt)],
+  (t) => [
+    index('sync_runs_org_source_started_idx').on(t.organizationId, t.source, t.startedAt),
+    appOf(t).onDelete('cascade'),
+  ],
 )
 
 /**
@@ -299,6 +386,8 @@ export const session = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    /** The organization plugin's field. Nothing sets it yet, and it grants nothing. */
+    activeOrganizationId: uuid('active_organization_id'),
   },
   (t) => [index('session_userId_idx').on(t.userId)],
 )
@@ -346,7 +435,8 @@ export const verification = pgTable(
 
 export type App = typeof apps.$inferSelect
 export type NewApp = typeof apps.$inferInsert
-export type NewMetric = typeof metricDaily.$inferInsert
+/** A metric row as a connector reads it; `upsertMetrics` adds the organization. */
+export type NewMetric = Omit<typeof metricDaily.$inferInsert, 'organizationId'>
 export type SyncRun = typeof syncRuns.$inferSelect
 export type Connection = typeof connections.$inferSelect
 export type Post = typeof posts.$inferSelect
@@ -355,3 +445,4 @@ export type Asset = typeof assets.$inferSelect
 export type Review = typeof reviews.$inferSelect
 export type NewReview = typeof reviews.$inferInsert
 export type WaitlistEntry = typeof waitlist.$inferSelect
+export type Organization = typeof organization.$inferSelect

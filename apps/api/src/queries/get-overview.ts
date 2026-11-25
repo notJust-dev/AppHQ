@@ -46,15 +46,21 @@ export const getOverview = defineQuery({
     '`reporting` says, per app and for the portfolio, which totals rest on reported numbers: ' +
     'false means no source reported that metric in the range (no data), not zero.',
   input: overviewInput,
-  async handler({ db }, input) {
+  async handler(scope, input) {
+    const { db, organizationId } = scope
     const range: DateRange = { from: input.from, to: input.to }
     const previousRange = previousPeriod(range)
 
     const [appRows, firstDays, rows, icons] = await Promise.all([
-      db.select().from(apps).where(eq(apps.isActive, true)).orderBy(asc(apps.name)),
+      db
+        .select()
+        .from(apps)
+        .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+        .orderBy(asc(apps.name)),
       db
         .select({ appId: metricDaily.appId, firstDay: min(metricDaily.date) })
         .from(metricDaily)
+        .where(eq(metricDaily.organizationId, organizationId))
         .groupBy(metricDaily.appId),
       db
         .select({
@@ -68,9 +74,15 @@ export const getOverview = defineQuery({
           socialViewsRows: headlineRows('socialViews'),
         })
         .from(metricDaily)
-        .where(and(gte(metricDaily.date, previousRange.from), lte(metricDaily.date, range.to)))
+        .where(
+          and(
+            eq(metricDaily.organizationId, organizationId),
+            gte(metricDaily.date, previousRange.from),
+            lte(metricDaily.date, range.to),
+          ),
+        )
         .groupBy(metricDaily.appId, metricDaily.date),
-      appIcons(db),
+      appIcons(scope),
     ])
 
     const byAppAndDay = new Map<string, HeadlineTotals>()

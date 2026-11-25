@@ -1,9 +1,10 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { iconOf } from '../assets/icons.js'
 import { ASSET_KINDS, type AssetKind } from '../assets/kinds.js'
 import { suggestApp } from '../assets/store.js'
 import { apps, assets, connections } from '../db/schema.js'
+import { sameConnection } from '../organizations/joins.js'
 import { defineQuery } from './define.js'
 
 export const listAssets = defineQuery({
@@ -14,7 +15,7 @@ export const listAssets = defineQuery({
     '(null when it has none yet), whether it is ignored, the account it was found through, and ' +
     'for one without an app, the app its name suggests.',
   input: z.void(),
-  async handler({ db }) {
+  async handler({ db, organizationId }) {
     const [rows, appRows] = await Promise.all([
       db
         .select({
@@ -31,9 +32,13 @@ export const listAssets = defineQuery({
           lastSyncedAt: connections.lastSyncedAt,
         })
         .from(assets)
-        .leftJoin(connections, eq(connections.id, assets.connectionId))
+        .leftJoin(connections, sameConnection)
+        .where(eq(assets.organizationId, organizationId))
         .orderBy(asc(assets.kind), asc(assets.name)),
-      db.select({ id: apps.id, name: apps.name, kind: apps.kind }).from(apps).where(eq(apps.isActive, true)),
+      db
+        .select({ id: apps.id, name: apps.name, kind: apps.kind })
+        .from(apps)
+        .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true))),
     ])
 
     const candidates = appRows.filter((app) => app.kind !== 'portfolio')

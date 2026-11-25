@@ -4,7 +4,7 @@ import { createAccounts } from './auth/accounts.js'
 import { authConfigFromEnv, authOptions, createAuth } from './auth/auth.js'
 import { connectors } from './connectors/registry.js'
 import { createDb } from './db/client.js'
-import { account, session, user, verification } from './db/schema.js'
+import { account, invitation, member, organization, session, user, verification } from './db/schema.js'
 import { runMigrations } from './db/migrate.js'
 import { loadEnv } from './env.js'
 import { createSecrets } from './lib/crypto.js'
@@ -20,7 +20,15 @@ const secrets = createSecrets(env.ENCRYPTION_KEY)
 // Accounts are optional: without their variables /api/auth does not exist, as before.
 const authConfig = authConfigFromEnv(env)
 const auth = authConfig
-  ? createAuth(authOptions(authConfig, drizzleAdapter(db, { provider: 'pg', schema: { user, session, account, verification } })))
+  ? createAuth(
+      authOptions(
+        authConfig,
+        drizzleAdapter(db, {
+          provider: 'pg',
+          schema: { user, session, account, verification, organization, member, invitation },
+        }),
+      ),
+    )
   : null
 
 const app = await buildApp({

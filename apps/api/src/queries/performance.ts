@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, lt, lte, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import { appIcons } from '../assets/icons.js'
-import type { Db } from '../db/client.js'
+import type { Scope } from '../organizations/scope.js'
 import { apps, metricDaily, posts } from '../db/schema.js'
 import { addDays, eachDay, previousPeriod, toIsoDate, type DateRange, type IsoDate } from '../lib/dates.js'
 import { PERFORMANCE } from '../metrics/catalog.js'
@@ -50,7 +50,8 @@ function sumOverApps(rows: (MetricRow & { appId: string })[]): MetricRow[] {
  * One performance page's series over a range and the period before it, summed over the chosen
  * apps, with each app's summaries for the comparison table.
  */
-async function loadSection<D extends SeriesDefinition>(db: Db, definitions: readonly D[], range: Input) {
+async function loadSection<D extends SeriesDefinition>(scope: Scope, definitions: readonly D[], range: Input) {
+  const { db, organizationId } = scope
   const previous = previousPeriod(range)
   const appFilter: SQL | undefined = range.appId ? eq(metricDaily.appId, range.appId) : undefined
 
@@ -66,6 +67,7 @@ async function loadSection<D extends SeriesDefinition>(db: Db, definitions: read
       .from(metricDaily)
       .where(
         and(
+          eq(metricDaily.organizationId, organizationId),
           appFilter,
           gte(metricDaily.date, previous.from),
           lte(metricDaily.date, range.to),
@@ -76,9 +78,9 @@ async function loadSection<D extends SeriesDefinition>(db: Db, definitions: read
     db
       .select({ id: apps.id, name: apps.name, kind: apps.kind, iconUrl: apps.iconUrl })
       .from(apps)
-      .where(range.appId ? eq(apps.id, range.appId) : undefined)
+      .where(and(eq(apps.organizationId, organizationId), range.appId ? eq(apps.id, range.appId) : undefined))
       .orderBy(apps.name),
-    appIcons(db),
+    appIcons(scope),
   ])
 
   const inRange = (row: { date: IsoDate }, { from, to }: DateRange) => row.date >= from && row.date <= to
@@ -196,8 +198,9 @@ export const getSocialPerformance = defineQuery({
     'lift against a baseline, not attribution). ' +
     SERIES_NOTE,
   input,
-  async handler({ db }, range) {
-    const { result: section } = await loadSection(db, PERFORMANCE.social, range)
+  async handler(scope, range) {
+    const { db, organizationId } = scope
+    const { result: section } = await loadSection(scope, PERFORMANCE.social, range)
     const postRows = await db
       .select({
         id: posts.id,
@@ -214,6 +217,7 @@ export const getSocialPerformance = defineQuery({
       .from(posts)
       .where(
         and(
+          eq(posts.organizationId, organizationId),
           range.appId ? eq(posts.appId, range.appId) : undefined,
           gte(posts.publishedAt, new Date(`${range.from}T00:00:00Z`)),
           lt(posts.publishedAt, new Date(`${addDays(range.to, 1)}T00:00:00Z`)),
@@ -243,7 +247,7 @@ export const getSocialPerformance = defineQuery({
     const lifts = new Map(
       await Promise.all(
         [...new Set(top.map((post) => post.appId))].map(
-          async (appId) => [appId, await downloadLifts(db, appId, range)] as const,
+          async (appId) => [appId, await downloadLifts(scope, appId, range)] as const,
         ),
       ),
     )
@@ -251,14 +255,16 @@ export const getSocialPerformance = defineQuery({
     const appName = async (appId: string) => {
       const known = appNames.get(appId)
       if (known) return known
-      const [row] = await db.select({ name: apps.name }).from(apps).where(eq(apps.id, appId)).limit(1)
+      const [row] = await db.select({ name: apps.name }).from(apps)
+        .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+        .limit(1)
       return row?.name ?? appId
     }
 
     return {
       ...section,
       /** The first day TikTok views are daily; before it they sit on each video's post day. */
-      tiktokDailyFrom: await tiktokDailyFrom(db, range.appId),
+      tiktokDailyFrom: await tiktokDailyFrom(scope, range.appId),
       posts: {
         byPlatform: [...platforms.values()].sort((a, b) => b.views - a.views),
         perDay: postsPerDay(postRows, section.days),
@@ -284,8 +290,8 @@ export const getStorePerformance = defineQuery({
     'day over the apps and stores that report both. Google Play reports no impressions. ' +
     SERIES_NOTE,
   input,
-  async handler({ db }, range) {
-    const { result, rows } = await loadSection(db, PERFORMANCE.store, range)
+  async handler(scope, range) {
+    const { result, rows } = await loadSection(scope, PERFORMANCE.store, range)
     return {
       ...result,
       /** Downloads per store page view each day, over the apps and stores that report both. */
@@ -302,7 +308,7 @@ export const getMonetisationPerformance = defineQuery({
     'and new customers, plus store downloads to work out revenue per download. ' +
     SERIES_NOTE,
   input,
-  handler: async ({ db }, range) => (await loadSection(db, PERFORMANCE.monetisation, range)).result,
+  handler: async (scope, range) => (await loadSection(scope, PERFORMANCE.monetisation, range)).result,
 })
 
 export const getSearchPerformance = defineQuery({
@@ -314,5 +320,5 @@ export const getSearchPerformance = defineQuery({
     'better). Google posts a day two or three days late. ' +
     SERIES_NOTE,
   input,
-  handler: async ({ db }, range) => (await loadSection(db, PERFORMANCE.search, range)).result,
+  handler: async (scope, range) => (await loadSection(scope, PERFORMANCE.search, range)).result,
 })

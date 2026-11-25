@@ -1,3 +1,4 @@
+import { AUTO_ORGANIZATION_NAME, autoOrganizationSlug } from '../organizations/auto.js'
 import { providersOf, type Auth, type AuthConfig, type SocialProvider } from './auth.js'
 import { authCookies } from './routes.js'
 
@@ -23,6 +24,12 @@ export interface Accounts {
    * twice keeps the first date and an approval is never undone.
    */
   requestAccess(userId: string): Promise<AccountUser | null>
+  /**
+   * Gives an approved account an organization of its own, with the account as its owner, unless
+   * it already belongs to one. Safe to call again and from two requests at once. Membership
+   * grants nothing yet: the dashboard still takes the dashboard password.
+   */
+  ensureOrganization(userId: string): Promise<{ organizationId: string; created: boolean }>
 }
 
 function toAccessStatus(value: unknown): AccessStatus | null {
@@ -68,6 +75,42 @@ export function createAccounts(auth: Auth, config: AuthConfig): Accounts {
       })
       const user = await context.internalAdapter.findUserById(userId)
       return user ? toUser(user) : null
+    },
+
+    async ensureOrganization(userId) {
+      const { adapter } = await auth.$context
+      const membershipOf = () =>
+        adapter.findMany<{ organizationId: string }>({ model: 'member', where: [{ field: 'userId', value: userId }], limit: 1 })
+      const [existing] = await membershipOf()
+      if (existing) return { organizationId: existing.organizationId, created: false }
+
+      // The slug comes from the account's id, so a second request at the same moment finds the
+      // first one's organization (or fails on the unique slug) instead of making another.
+      const slug = autoOrganizationSlug(userId)
+      const bySlug = () =>
+        adapter.findOne<{ id: string }>({ model: 'organization', where: [{ field: 'slug', value: slug }] })
+      let organization = await bySlug()
+      if (!organization) {
+        try {
+          organization = await adapter.create<Record<string, unknown>, { id: string }>({
+            model: 'organization',
+            data: { name: AUTO_ORGANIZATION_NAME, slug, createdAt: new Date() },
+          })
+        } catch (err) {
+          organization = await bySlug()
+          if (!organization) throw err
+        }
+      }
+      try {
+        await adapter.create({
+          model: 'member',
+          data: { organizationId: organization.id, userId, role: 'owner', createdAt: new Date() },
+        })
+      } catch (err) {
+        // Another request added the same membership first.
+        if ((await membershipOf()).length === 0) throw err
+      }
+      return { organizationId: organization.id, created: true }
     },
   }
 }

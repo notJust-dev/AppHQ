@@ -31,7 +31,11 @@ export const Route = createFileRoute('/connect/meta/callback')({
         }
 
         try {
-          const result = await api.meta.connect.mutate({ code, redirectUri: metaRedirectUri() })
+          const result = await api.meta.connect.mutate({
+            code,
+            redirectUri: metaRedirectUri(),
+            organizationId: attempt.organizationId,
+          })
           const found =
             `${result.pages} ${result.pages === 1 ? 'Page' : 'Pages'} and ${result.instagram} ` +
             `Instagram ${result.instagram === 1 ? 'account' : 'accounts'}`

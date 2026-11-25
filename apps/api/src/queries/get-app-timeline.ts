@@ -139,11 +139,12 @@ export const getAppTimeline = defineQuery({
   input: z
     .object({ appId: z.string().min(1).max(64).describe('The app id from list_apps.'), ...rangeFields })
     .superRefine(checkRange),
-  async handler({ db }, input) {
+  async handler(scope, input) {
+    const { db, organizationId } = scope
     const [app] = await db
       .select({ id: apps.id, name: apps.name })
       .from(apps)
-      .where(eq(apps.id, input.appId))
+      .where(and(eq(apps.organizationId, organizationId), eq(apps.id, input.appId)))
       .limit(1)
     if (!app) return null
 
@@ -157,6 +158,7 @@ export const getAppTimeline = defineQuery({
       .from(metricDaily)
       .where(
         and(
+          eq(metricDaily.organizationId, organizationId),
           eq(metricDaily.appId, app.id),
           gte(metricDaily.date, input.from),
           lte(metricDaily.date, input.to),
@@ -175,7 +177,7 @@ export const getAppTimeline = defineQuery({
       days,
       series: buildTimeline(rows, days),
       /** The first day TikTok views are daily; before it they sit on each video's post day. */
-      tiktokDailyFrom: await tiktokDailyFrom(db, app.id),
+      tiktokDailyFrom: await tiktokDailyFrom(scope, app.id),
     }
   },
 })

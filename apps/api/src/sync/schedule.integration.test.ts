@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
@@ -6,6 +6,7 @@ import { syncRuns } from '../db/schema.js'
 import { createSecrets } from '../lib/crypto.js'
 import type { Logger } from '../lib/logger.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
 import { SCHEDULED, isDue, syncIfDue } from './schedule.js'
 
 const HOUR = 3_600_000
@@ -27,8 +28,12 @@ describe.skipIf(!url)('syncIfDue, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
   const deps = { db, sql, log: quiet, secrets: createSecrets(undefined) }
   const clear = () => db.delete(syncRuns).where(eq(syncRuns.source, SCHEDULED))
+  let organizationId = ''
 
-  beforeAll(() => runMigrations({ db, sql }))
+  beforeAll(async () => {
+    await runMigrations({ db, sql })
+    organizationId = (await defaultScope(db)).organizationId
+  })
   beforeEach(clear)
   afterAll(async () => {
     await clear()
@@ -37,17 +42,20 @@ describe.skipIf(!url)('syncIfDue, against a real database', () => {
 
   it('runs once, then waits for the interval, and the time survives a restart', async () => {
     const start = new Date()
-    expect(await syncIfDue(deps, { connectors: [], intervalMs: 3 * HOUR, now: start })).toBe('ran')
+    expect(await syncIfDue(deps, { organizationId, connectors: [], intervalMs: 3 * HOUR, now: start })).toBe('ran')
     // Nothing in memory: a second call reads the last run from the database.
-    expect(await syncIfDue(deps, { connectors: [], intervalMs: 3 * HOUR, now: new Date(start.getTime() + HOUR) })).toBe('not-due')
-    expect(await syncIfDue(deps, { connectors: [], intervalMs: 3 * HOUR, now: new Date(Date.now() + 4 * HOUR) })).toBe('ran')
+    expect(await syncIfDue(deps, { organizationId, connectors: [], intervalMs: 3 * HOUR, now: new Date(start.getTime() + HOUR) })).toBe('not-due')
+    expect(await syncIfDue(deps, { organizationId, connectors: [], intervalMs: 3 * HOUR, now: new Date(Date.now() + 4 * HOUR) })).toBe('ran')
 
-    const rows = await db.select().from(syncRuns).where(eq(syncRuns.source, SCHEDULED))
+    const rows = await db
+      .select()
+      .from(syncRuns)
+      .where(and(eq(syncRuns.organizationId, organizationId), eq(syncRuns.source, SCHEDULED)))
     expect(rows.map((row) => row.status)).toEqual(['ok', 'ok'])
   })
 
   it('does not count a run that failed, so the next check tries again', async () => {
-    await db.insert(syncRuns).values({ source: SCHEDULED, status: 'error', error: 'Another sync was running' })
-    expect(await syncIfDue(deps, { connectors: [], intervalMs: 3 * HOUR })).toBe('ran')
+    await db.insert(syncRuns).values({ organizationId, source: SCHEDULED, status: 'error', error: 'Another sync was running' })
+    expect(await syncIfDue(deps, { organizationId, connectors: [], intervalMs: 3 * HOUR })).toBe('ran')
   })
 })

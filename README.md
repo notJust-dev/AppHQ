@@ -285,7 +285,7 @@ up, and nothing else changes when it is off.
 
 An account never opens the dashboard. The dashboard password is still the only way in, and
 approving someone's request doesn't change that yet: it records who may join once accounts can
-have their own data.
+use their own data.
 
 **1. Create the sign-in apps.** Use the dashboard's address (the `web` app, not the API), shown
 here as `<web address>`; locally it is `http://127.0.0.1:3000`.
@@ -318,10 +318,44 @@ order by access_requested_at desc nulls last;
 ```
 
 To approve someone: `update "user" set access_status = 'approved' where email = '<their address>';`
-They see that they are approved on the Request access page.
+They see that they are approved on the Request access page. The first time they open it after
+that, the API makes them an organization of their own (see below), with a generated name and
+slug. Someone who only asked gets none.
 
 Only addresses the provider has confirmed can sign in. Someone who signed in with Google can't
 later sign in to the same account with GitHub, even with the same address.
+
+### Organizations
+
+Every app, account connection, number, post, review and sync run belongs to an **organization**.
+The first one, `default`, was made when you upgraded and holds everything you had; the dashboard
+password works in it. Approved accounts get their own, empty organization. Being a member or an
+owner of an organization opens nothing yet: the dashboard password is still the only way in.
+Nobody can create, join or switch organizations through the sign-in pages.
+
+**Make your own account the owner of `default`**, so it is ready once accounts can open the
+dashboard. Sign in once at `/request-access` first. Then, where you have a shell:
+
+```sh
+cd apps/api && npm run cli -- add-owner --email <your address>
+```
+
+It also removes the empty organization made for your account on approval, if there is one. On a
+host without a shell (such as Velocity), run this SQL instead, before approving yourself:
+
+```sql
+insert into member (organization_id, user_id, role)
+select o.id, u.id, 'owner' from organization o, "user" u
+where o.slug = 'default' and u.email = '<your address>'
+on conflict (organization_id, user_id) do update set role = 'owner';
+
+-- Only if you were approved before running the statement above: removes the empty organization
+-- made for your account. It fails, and changes nothing, if that organization holds any data.
+delete from organization o using "user" u
+where u.email = '<your address>'
+  and o.slug = 'org-' || left(encode(sha256(u.id::text::bytea), 'hex'), 12)
+  and not exists (select 1 from member m where m.organization_id = o.id and m.user_id <> u.id);
+```
 
 ## Connecting your data
 
@@ -448,8 +482,11 @@ and the funnel and flow charts never claim that a specific view caused a specifi
 | `apps/api` | `npm test` | Unit tests. With `TEST_DATABASE_URL` set (database name ending in `_test`), also the Postgres tests |
 | `apps/api` | `npm run typecheck` | Type check |
 | `apps/api` | `npm run db:generate` | Create a migration after changing `src/db/schema.ts` |
-| `apps/api` | `npm run cli -- sync` | Run every connector over the last 7 days |
-| `apps/api` | `npm run cli -- seed` | Replace the demo apps with freshly generated data |
+| `apps/api` | `npm run cli -- sync` | Run every connector over the last 7 days, for every organization |
+| `apps/api` | `npm run cli -- seed` | Replace the demo apps with freshly generated data, in `default` |
+| `apps/api` | `npm run cli -- add-owner --email <address>` | Make an account an owner of `default`; grants no dashboard access |
+
+Every CLI command but `migrate` also takes `--organization <slug>`.
 | `apps/web` | `npm run typecheck` | Type check |
 | `apps/web` | `npm run build` then `npm run start` | Production build and server |
 

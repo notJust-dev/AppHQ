@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { GoogleAuthError, serviceAccountSchema } from '../connectors/google-play/auth.js'
 import {
   GOOGLE_PLAY,
@@ -37,7 +37,7 @@ export interface GooglePlayConnectResult {
  * read the account's report files, stores the key encrypted, and lists the packages found.
  */
 export async function connectGooglePlay(
-  deps: { db: Db; secrets: Secrets } & PlayClientOptions,
+  deps: { db: Db; organizationId: string; secrets: Secrets } & PlayClientOptions,
   input: { serviceAccountJson: string; storageUri: string },
 ): Promise<GooglePlayConnectResult> {
   let parsedJson: unknown
@@ -98,17 +98,20 @@ export async function connectGooglePlay(
     updatedAt: new Date(),
   }
   // One Play account: a new bucket replaces the old connection rather than adding a second.
-  const existing = await findPlayConnection(deps.db)
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const existing = await findPlayConnection(scope)
   if (existing && existing.externalAccountId !== bucket) {
-    await deps.db.delete(connections).where(eq(connections.id, existing.id))
+    await deps.db
+      .delete(connections)
+      .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.id, existing.id)))
   }
   const [connection] = await deps.db
     .insert(connections)
-    .values({ provider: GOOGLE_PLAY, externalAccountId: bucket, ...values })
-    .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+    .values({ organizationId: deps.organizationId, provider: GOOGLE_PLAY, externalAccountId: bucket, ...values })
+    .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
     .returning()
   if (!connection) throw new Error('could not save the Google Play connection')
 
-  const matched = await savePackages(deps.db, connection.id, packageNames, await client.titles())
+  const matched = await savePackages(scope, connection.id, packageNames, await client.titles())
   return { serviceAccount: email, packages: packageNames.length, matched }
 }

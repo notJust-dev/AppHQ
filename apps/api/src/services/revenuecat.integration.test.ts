@@ -8,6 +8,8 @@ import { apps, assets, connections, metricDaily } from '../db/schema.js'
 import { assetOf, connectionOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { connectRevenueCat } from './connect-revenuecat.js'
 import { assignAsset, createApp } from '../assets/store.js'
 import { ConnectInputError } from './errors.js'
@@ -17,6 +19,7 @@ const url = testDatabaseUrl()
 
 describe.skipIf(!url)('RevenueCat, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
   const secrets = createSecrets('c'.repeat(64))
   const projectId = `proj_${randomUUID().slice(0, 8)}`
   const log = { info() {}, warn() {}, error() {} }
@@ -81,17 +84,19 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
+    scope = await defaultScope(db)
   })
 
   afterAll(async () => {
-    if (appId) await db.delete(apps).where(eq(apps.id, appId))
+    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(eq(assets.externalId, projectId))
+    if (appId) await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await db.delete(connections).where(eq(connections.externalAccountId, projectId))
     await sql.end({ timeout: 5 })
   })
 
   it('finds the project without adding an app, and stores the key encrypted', async () => {
-    const [connected] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_live_key')
+    const [connected] = await connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_live_key')
 
     // Nothing in the dashboard names this bundle id, so the project waits on the Apps page.
     expect(connected).toEqual({ name: 'Integration Test App', appId: null, appName: null, movedFrom: null, replaced: null })
@@ -108,10 +113,10 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
 
   it('adds the app when the person picks it, and keeps it when the key is replaced', async () => {
     const project = await assetOf(db, 'revenuecat_project', projectId)
-    appId = (await assignAsset(db, { assetId: project.id, appId: 'new' })).appId ?? ''
+    appId = (await assignAsset(scope, { assetId: project.id, appId: 'new' })).appId ?? ''
     expect(appId).not.toBe('')
 
-    const [again] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key')
+    const [again] = await connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_new_key')
 
     expect(again).toEqual({ name: 'Integration Test App', appId, appName: 'Integration Test App', movedFrom: null, replaced: null })
     const rows = await db.select().from(connections).where(eq(connections.externalAccountId, projectId))
@@ -120,9 +125,9 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
   })
 
   it("goes to the app it is added from, whatever its bundle id says, and moves back", async () => {
-    const otherId = await createApp(db, `Other ${projectId}`)
+    const otherId = await createApp(scope, `Other ${projectId}`)
     try {
-      const [moved] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key', { appId: otherId })
+      const [moved] = await connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_new_key', { appId: otherId })
       expect(moved).toEqual({
         name: 'Integration Test App',
         appId: otherId,
@@ -132,10 +137,10 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
       })
       expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(otherId)
 
-      const [back] = await connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_new_key', { appId })
+      const [back] = await connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_new_key', { appId })
       expect(back).toMatchObject({ appId, movedFrom: `Other ${projectId}` })
     } finally {
-      await db.delete(apps).where(eq(apps.id, otherId))
+      await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, otherId)))
     }
   })
 
@@ -146,11 +151,11 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
       return new Response(JSON.stringify({ items }))
     }) as typeof fetch
 
-    await expect(connectRevenueCat({ db, secrets, fetch: several }, 'sk_other', { appId })).rejects.toThrow(
+    await expect(connectRevenueCat({ ...scope, secrets, fetch: several }, 'sk_other', { appId })).rejects.toThrow(
       /can see 2 projects/,
     )
     await expect(
-      connectRevenueCat({ db, secrets, fetch: revenueCat() }, 'sk_other', { appId: `gone-${projectId}` }),
+      connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_other', { appId: `gone-${projectId}` }),
     ).rejects.toBeInstanceOf(ConnectInputError)
     expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(appId)
   })
@@ -160,11 +165,11 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     const [app] = await db.select().from(apps).where(eq(apps.id, appId))
     if (!app) throw new Error('app missing')
 
-    expect(await connector.isConfigured(app, db)).toBe(true)
+    expect(await connector.isConfigured(app, scope)).toBe(true)
     const range = { from: '2026-11-01', to: '2026-11-19' }
-    const first = await connector.sync({ db, app, range, log, secrets })
+    const first = await connector.sync({ ...scope, app, range, log, secrets })
     // Running it again must not duplicate anything.
-    await connector.sync({ db, app, range, log, secrets })
+    await connector.sync({ ...scope, app, range, log, secrets })
 
     const revenue = await db
       .select({ date: metricDaily.date, value: metricDaily.value })
@@ -211,7 +216,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
     if (!app) throw new Error('app missing')
 
     await expect(
-      connector.sync({ db, app, range: { from: '2026-11-01', to: '2026-11-19' }, log, secrets }),
+      connector.sync({ ...scope, app, range: { from: '2026-11-01', to: '2026-11-19' }, log, secrets }),
     ).rejects.toThrow(/8 of 8 charts failed/)
 
     const connection = await connectionOf(db, 'revenuecat_project', projectId)
@@ -220,7 +225,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
 
   it('refuses to connect when no encryption key is configured', async () => {
     await expect(
-      connectRevenueCat({ db, secrets: createSecrets(undefined), fetch: revenueCat() }, 'sk_x'),
+      connectRevenueCat({ ...scope, secrets: createSecrets(undefined), fetch: revenueCat() }, 'sk_x'),
     ).rejects.toThrow(/ENCRYPTION_KEY/)
   })
 })

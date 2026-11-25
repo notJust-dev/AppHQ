@@ -5,7 +5,7 @@ import { addDays, toIsoDate, type IsoDate } from '../lib/dates.js'
 import { HEADLINE } from '../metrics/catalog.js'
 import { lastCompleteDay } from '../metrics/complete.js'
 import { BASELINE_DAYS, LIFT_DAYS, downloadLift, type DownloadLift } from '../metrics/post-lift.js'
-import type { Db } from '../db/client.js'
+import type { Scope } from '../organizations/scope.js'
 import { defineQuery } from './define.js'
 import { checkRange, rangeFields } from './range.js'
 
@@ -28,7 +28,8 @@ export const listPosts = defineQuery({
       limit: z.number().int().min(1).max(200).default(50).describe('At most this many posts.'),
     })
     .superRefine(checkRange),
-  async handler({ db }, input) {
+  async handler(scope, input) {
+    const { db, organizationId } = scope
     const rows = await db
       .select({
         id: posts.id,
@@ -46,6 +47,7 @@ export const listPosts = defineQuery({
       .from(posts)
       .where(
         and(
+          eq(posts.organizationId, organizationId),
           eq(posts.appId, input.appId),
           gte(posts.publishedAt, new Date(`${input.from}T00:00:00Z`)),
           lt(posts.publishedAt, new Date(`${addDays(input.to, 1)}T00:00:00Z`)),
@@ -55,7 +57,7 @@ export const listPosts = defineQuery({
       .limit(input.limit)
     if (rows.length === 0) return []
 
-    const liftOf = await downloadLifts(db, input.appId, input)
+    const liftOf = await downloadLifts(scope, input.appId, input)
 
     return rows.map((row) => ({
       ...row,
@@ -73,11 +75,12 @@ export const listPosts = defineQuery({
  * reached: Google Play posts days after the App Store.
  */
 export async function downloadLifts(
-  db: Db,
+  { db, organizationId }: Scope,
   appId: string,
   range: { from: IsoDate; to: IsoDate },
 ): Promise<(publishedAt: Date) => DownloadLift> {
   const downloadFilter = and(
+    eq(metricDaily.organizationId, organizationId),
     eq(metricDaily.appId, appId),
     eq(metricDaily.metric, DOWNLOADS.metric),
     eq(metricDaily.dimension, ''),

@@ -1,5 +1,5 @@
-import { and, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm'
-import type { Db } from '../db/client.js'
+import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm'
+import type { Scope } from '../organizations/scope.js'
 import { reviews, type NewReview } from '../db/schema.js'
 
 const CHUNK = 500
@@ -8,14 +8,18 @@ const CHUNK = 500
 export const UNREAD_DAYS = 14
 
 /** A review as a connector read it from a store. */
-export type ReviewReading = Omit<NewReview, 'id' | 'readAt' | 'fetchedAt'>
+export type ReviewReading = Omit<NewReview, 'id' | 'organizationId' | 'readAt' | 'fetchedAt'>
 
 /**
  * Saves reviews, updating any already saved. A new review arrives unread when it is recent; an
  * old one (a year of history read on connect) arrives read. A review whose rating, title or
  * text changed becomes unread again; a new developer reply does not.
  */
-export async function saveReviews(db: Db, readings: ReviewReading[], now: Date = new Date()): Promise<number> {
+export async function saveReviews(
+  { db, organizationId }: Scope,
+  readings: ReviewReading[],
+  now: Date = new Date(),
+): Promise<number> {
   const cutoff = new Date(now.getTime() - UNREAD_DAYS * 86_400_000)
   for (let i = 0; i < readings.length; i += CHUNK) {
     await db
@@ -23,12 +27,13 @@ export async function saveReviews(db: Db, readings: ReviewReading[], now: Date =
       .values(
         readings.slice(i, i + CHUNK).map((reading) => ({
           ...reading,
+          organizationId,
           readAt: reading.createdAt < cutoff ? now : null,
           fetchedAt: now,
         })),
       )
       .onConflictDoUpdate({
-        target: [reviews.store, reviews.externalId],
+        target: [reviews.organizationId, reviews.store, reviews.externalId],
         set: {
           appId: sql`excluded.app_id`,
           rating: sql`excluded.rating`,
@@ -58,12 +63,18 @@ export async function saveReviews(db: Db, readings: ReviewReading[], now: Date =
  * Marks reviews read or unread: the ones given by id, or every review matching `where` (a bulk
  * "mark all read" over the inbox's filters). Returns how many changed.
  */
-export async function markReviews(db: Db, where: SQL | undefined, read: boolean, ids?: string[]): Promise<number> {
+export async function markReviews(
+  { db, organizationId }: Scope,
+  where: SQL | undefined,
+  read: boolean,
+  ids?: string[],
+): Promise<number> {
   const changed = await db
     .update(reviews)
     .set({ readAt: read ? new Date() : null })
     .where(
       and(
+        eq(reviews.organizationId, organizationId),
         ids ? inArray(reviews.id, ids) : where,
         // Only the ones whose state changes, so the count means something.
         read ? isNull(reviews.readAt) : isNotNull(reviews.readAt),

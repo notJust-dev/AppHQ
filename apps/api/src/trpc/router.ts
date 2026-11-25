@@ -33,7 +33,7 @@ import { searchTop } from '../services/search-top.js'
 import { SEARCH_CONSOLE, SEARCH_CONSOLE_HISTORY_DAYS, SearchConsoleError } from '../connectors/search-console/client.js'
 import { getReviewSummary, listReviews, reviewConditions, reviewFilters } from '../queries/reviews.js'
 import { markReviews } from '../reviews/save.js'
-import { count, isNull } from 'drizzle-orm'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import { reviews as reviewsTable } from '../db/schema.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
@@ -50,7 +50,7 @@ import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 import { answerWaitlist, answerWaitlistInput, joinWaitlist, joinWaitlistInput } from '../waitlist/join.js'
 import type { AccountUser } from '../auth/accounts.js'
-import { procedure, router, signedInAccount } from './init.js'
+import { openProcedure, procedure, router, signedInAccount, type ApiContext } from './init.js'
 
 export type { ApiContext } from './init.js'
 
@@ -173,6 +173,31 @@ function connectError(err: unknown): TRPCError {
   })
 }
 
+/**
+ * A sign-in that connects a source starts in one organization and must finish in it. The
+ * dashboard keeps the organization from `authorizeUrl` in its sign-in cookie and hands it back.
+ */
+const startedIn = z.uuid()
+function finishesWhereItStarted(ctx: { organizationId: string }, organizationId: string) {
+  if (organizationId !== ctx.organizationId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'This sign-in was started in another organization. Start it again here.',
+    })
+  }
+}
+
+/**
+ * Approved accounts get an organization of their own the first time the API sees them approved
+ * (approval is a database update, so there is no code at that moment). Accounts that only asked
+ * get none. It grants nothing yet: the dashboard still takes the dashboard password.
+ */
+async function organizationIfApproved(ctx: ApiContext, account: AccountUser) {
+  if (account.accessStatus !== 'approved' || !ctx.accounts) return
+  const { created } = await ctx.accounts.ensureOrganization(account.id)
+  if (created) ctx.log.info('accounts: made an organization for an approved account')
+}
+
 /** What an account may see of itself. */
 function profile(account: AccountUser) {
   return {
@@ -213,7 +238,7 @@ export const appRouter = router({
     rename: procedure
       .input(z.object({ appId: z.string().min(1).max(64), name: z.string().trim().min(1).max(80) }))
       .mutation(async ({ ctx, input }) => ({
-        name: await renameApp(ctx.db, input.appId, input.name).catch((err: unknown) => {
+        name: await renameApp(ctx, input.appId, input.name).catch((err: unknown) => {
           throw connectError(err)
         }),
       })),
@@ -223,7 +248,7 @@ export const appRouter = router({
      * app, on the Apps page.
      */
     remove: procedure.input(z.object({ appId: z.string().min(1).max(64) })).mutation(async ({ ctx, input }) => ({
-      name: await removeApp(ctx.db, input.appId).catch((err: unknown) => {
+      name: await removeApp(ctx, input.appId).catch((err: unknown) => {
         throw connectError(err)
       }),
     })),
@@ -232,7 +257,7 @@ export const appRouter = router({
     create: procedure
       .input(z.object({ name: z.string().trim().min(1).max(80) }))
       .mutation(async ({ ctx, input }) => ({
-        appId: await createApp(ctx.db, input.name).catch((err: unknown) => {
+        appId: await createApp(ctx, input.name).catch((err: unknown) => {
           throw connectError(err)
         }),
       })),
@@ -257,7 +282,7 @@ export const appRouter = router({
         // A project waiting for an app is fetched once it is linked.
         const appIds = connected.flatMap((project) => (project.appId ? [project.appId] : []))
         if (appIds.length > 0) {
-          startSync(ctx, { connectors, sources: [REVENUECAT], appIds, range: trailingRange(BACKFILL_DAYS) })
+          startSync(ctx, { organizationId: ctx.organizationId, connectors, sources: [REVENUECAT], appIds, range: trailingRange(BACKFILL_DAYS) })
         }
         return { projects: connected }
       }),
@@ -284,6 +309,7 @@ export const appRouter = router({
           throw connectError(err)
         })
         startSync(ctx, {
+          organizationId: ctx.organizationId,
           connectors,
           sources: [APP_STORE],
           range: trailingRange(APP_STORE_HISTORY_DAYS),
@@ -300,10 +326,10 @@ export const appRouter = router({
 
     authorizeUrl: procedure
       .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
-      .query(({ input }) => {
+      .query(({ ctx, input }) => {
         const config = tiktokConfig()
         if (!config) throw connectError(new TikTokNotConfiguredError())
-        return { url: createTikTokClient({ config }).authorizeUrl(input) }
+        return { url: createTikTokClient({ config }).authorizeUrl(input), organizationId: ctx.organizationId }
       }),
 
     /** Finishes the sign-in and starts reading the account's videos. */
@@ -313,14 +339,17 @@ export const appRouter = router({
           code: z.string().min(1).max(2000),
           redirectUri: z.url(),
           appId: z.string().min(1).max(64),
+          organizationId: startedIn,
         }),
       )
       .mutation(async ({ ctx, input }) => {
+        finishesWhereItStarted(ctx, input.organizationId)
         const result = await connectTikTok(ctx, input).catch((err: unknown) => {
           ctx.log.error(`connect TikTok failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
         startSync(ctx, {
+          organizationId: ctx.organizationId,
           connectors,
           sources: [TIKTOK],
           appIds: [result.appId],
@@ -346,7 +375,7 @@ export const appRouter = router({
           ctx.log.error(`connect Google Play failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
-        startSync(ctx, { connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
+        startSync(ctx, { organizationId: ctx.organizationId, connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
         return result
       }),
   }),
@@ -359,21 +388,22 @@ export const appRouter = router({
 
     authorizeUrl: procedure
       .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
-      .query(({ input }) => {
+      .query(({ ctx, input }) => {
         const config = metaConfig()
         if (!config) throw connectError(new MetaNotConfiguredError())
-        return { url: createMetaClient({ config }).authorizeUrl(input) }
+        return { url: createMetaClient({ config }).authorizeUrl(input), organizationId: ctx.organizationId }
       }),
 
     /** Finishes the sign-in and saves every Page and Instagram account it can see. */
     connect: procedure
-      .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url() }))
-      .mutation(({ ctx, input }) =>
-        connectMeta(ctx, input).catch((err: unknown) => {
+      .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url(), organizationId: startedIn }))
+      .mutation(({ ctx, input }) => {
+        finishesWhereItStarted(ctx, input.organizationId)
+        return connectMeta(ctx, input).catch((err: unknown) => {
           ctx.log.error(`connect Meta failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
-        }),
-      ),
+        })
+      }),
   }),
   /**
    * What the accounts give access to, and which app each belongs to. Linking an asset fetches
@@ -386,12 +416,13 @@ export const appRouter = router({
     assign: procedure
       .input(z.object({ assetId: z.uuid(), appId: z.string().min(1).max(64).nullable() }))
       .mutation(async ({ ctx, input }) => {
-        const { asset, appId } = await assignAsset(ctx.db, input).catch((err: unknown) => {
+        const { asset, appId } = await assignAsset(ctx, input).catch((err: unknown) => {
           throw connectError(err)
         })
         if (appId !== null && isAssetKind(asset.kind)) {
           const kind = ASSET_KINDS[asset.kind]
           startSync(ctx, {
+            organizationId: ctx.organizationId,
             connectors,
             sources: [kind.provider],
             // The App Store and Google Play sync every app of the account at once.
@@ -406,7 +437,7 @@ export const appRouter = router({
     ignore: procedure
       .input(z.object({ assetIds: z.array(z.uuid()).min(1).max(500), ignored: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        const count = await setIgnored(ctx.db, input.assetIds, input.ignored).catch((err: unknown) => {
+        const count = await setIgnored(ctx, input.assetIds, input.ignored).catch((err: unknown) => {
           throw connectError(err)
         })
         return { count }
@@ -441,21 +472,22 @@ export const appRouter = router({
 
     authorizeUrl: procedure
       .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
-      .query(({ input }) => {
+      .query(({ ctx, input }) => {
         const config = youtubeConfig()
         if (!config) throw connectError(new YouTubeNotConfiguredError())
-        return { url: createYouTubeClient({ config }).authorizeUrl(input) }
+        return { url: createYouTubeClient({ config }).authorizeUrl(input), organizationId: ctx.organizationId }
       }),
 
     /** Finishes the sign-in and saves the channel, waiting for an app. */
     connect: procedure
-      .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url() }))
-      .mutation(({ ctx, input }) =>
-        connectYouTube(ctx, input).catch((err: unknown) => {
+      .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url(), organizationId: startedIn }))
+      .mutation(({ ctx, input }) => {
+        finishesWhereItStarted(ctx, input.organizationId)
+        return connectYouTube(ctx, input).catch((err: unknown) => {
           ctx.log.error(`connect YouTube failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
-        }),
-      ),
+        })
+      }),
   }),
   /**
    * Google Search Console, through a service account added to the person's properties: the
@@ -473,7 +505,7 @@ export const appRouter = router({
           ctx.log.error(`connect Search Console failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
-        startSync(ctx, { connectors, sources: [SEARCH_CONSOLE], range: trailingRange(SEARCH_CONSOLE_HISTORY_DAYS) })
+        startSync(ctx, { organizationId: ctx.organizationId, connectors, sources: [SEARCH_CONSOLE], range: trailingRange(SEARCH_CONSOLE_HISTORY_DAYS) })
         return result
       }),
 
@@ -505,7 +537,10 @@ export const appRouter = router({
 
     /** How many reviews wait in the inbox, for the sidebar. */
     unreadCount: procedure.query(async ({ ctx }) => {
-      const [row] = await ctx.db.select({ count: count() }).from(reviewsTable).where(isNull(reviewsTable.readAt))
+      const [row] = await ctx.db
+        .select({ count: count() })
+        .from(reviewsTable)
+        .where(and(eq(reviewsTable.organizationId, ctx.organizationId), isNull(reviewsTable.readAt)))
       return { count: row?.count ?? 0 }
     }),
 
@@ -522,7 +557,12 @@ export const appRouter = router({
         if (!input.ids && !input.filters) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Say which reviews: ids or filters.' })
         }
-        const changed = await markReviews(ctx.db, input.filters ? reviewConditions(input.filters) : undefined, input.read, input.ids)
+        const changed = await markReviews(
+          ctx,
+          input.filters ? reviewConditions(ctx.organizationId, input.filters) : undefined,
+          input.read,
+          input.ids,
+        )
         return { changed }
       }),
   }),
@@ -533,21 +573,21 @@ export const appRouter = router({
     run: procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(7) }))
       .mutation(({ ctx, input }) => {
-        startSync(ctx, { connectors, range: trailingRange(input.days) })
+        startSync(ctx, { organizationId: ctx.organizationId, connectors, range: trailingRange(input.days) })
         return { started: true }
       }),
   }),
   /** The landing page's waitlist form. Public: whoever is on the landing page can use it. */
   waitlist: router({
     /** Adds an address from the public landing page; a repeat sign-up is not an error. */
-    join: procedure.meta({ access: 'public' }).input(joinWaitlistInput).mutation(async ({ ctx, input }) => {
+    join: openProcedure.meta({ access: 'public' }).input(joinWaitlistInput).mutation(async ({ ctx, input }) => {
       const { added, answerToken } = await joinWaitlist(ctx.db, input)
       if (added) ctx.log.info(`waitlist: new sign-up from ${input.source}`)
       return { answerToken }
     }),
 
     /** Saves the optional follow-up questions for the sign-up that received `answerToken`. */
-    answer: procedure.meta({ access: 'public' }).input(answerWaitlistInput).mutation(async ({ ctx, input }) => {
+    answer: openProcedure.meta({ access: 'public' }).input(answerWaitlistInput).mutation(async ({ ctx, input }) => {
       if (!(await answerWaitlist(ctx.db, input))) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'That sign-up has no questions waiting.' })
       }
@@ -560,26 +600,31 @@ export const appRouter = router({
    */
   account: router({
     /** How people can sign in here; empty when accounts are off. Public: the landing page asks. */
-    config: procedure.meta({ access: 'public' }).query(({ ctx }) => ({ providers: ctx.accounts?.providers ?? [] })),
+    config: openProcedure.meta({ access: 'public' }).query(({ ctx }) => ({ providers: ctx.accounts?.providers ?? [] })),
 
-    get: procedure.meta({ access: 'account' }).query(async ({ ctx }) => profile(await signedInAccount(ctx))),
+    get: openProcedure.meta({ access: 'account' }).query(async ({ ctx }) => {
+      const account = await signedInAccount(ctx)
+      await organizationIfApproved(ctx, account)
+      return profile(account)
+    }),
 
     /** Asks for access. Asking again changes nothing. */
-    requestAccess: procedure.meta({ access: 'account' }).mutation(async ({ ctx }) => {
+    requestAccess: openProcedure.meta({ access: 'account' }).mutation(async ({ ctx }) => {
       const account = await signedInAccount(ctx)
       const updated = await ctx.accounts?.requestAccess(account.id)
       if (!updated) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Sign in first.' })
       if (account.accessStatus === null) ctx.log.info('accounts: new access request')
+      await organizationIfApproved(ctx, updated)
       return profile(updated)
     }),
   }),
   // Velocity has no shell, so the generated demo data is loaded and removed through the API.
-  // Both only ever touch apps whose id starts with `demo-`.
+  // Both only ever touch apps whose id starts with `demo-`, in the context's organization.
   demo: router({
     seed: procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(200) }))
-      .mutation(({ ctx, input }) => seedDemo(ctx.db, { days: input.days })),
-    clear: procedure.mutation(({ ctx }) => clearDemo(ctx.db)),
+      .mutation(({ ctx, input }) => seedDemo(ctx, { days: input.days })),
+    clear: procedure.mutation(({ ctx }) => clearDemo(ctx)),
   }),
 })
 

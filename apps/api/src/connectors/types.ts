@@ -1,12 +1,15 @@
 import type { Db } from '../db/client.js'
+import type { Scope } from '../organizations/scope.js'
 import type { App } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import type { DateRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
 import type { Source } from '../metrics/catalog.js'
 
-interface SyncContext {
+interface SyncContext extends Scope {
   db: Db
+  /** The organization being synced; a connector reads and writes only its rows. */
+  organizationId: string
   /** Inclusive UTC days to fetch. Connectors must be safe to re-run over the same range. */
   range: DateRange
   log: Logger
@@ -31,7 +34,7 @@ export interface AppConnector {
   source: Source
   scope: 'app'
   /** False when the app lacks the ids or credentials this source needs; the runner skips it. */
-  isConfigured(app: App, db: Db): boolean | Promise<boolean>
+  isConfigured(app: App, scope: Scope): boolean | Promise<boolean>
   sync(ctx: AppSyncContext): Promise<{ rowsWritten: number }>
 }
 
@@ -42,7 +45,7 @@ export interface AppConnector {
 export interface AccountConnector {
   source: Source
   scope: 'account'
-  isConfigured(db: Db): boolean | Promise<boolean>
+  isConfigured(scope: Scope): boolean | Promise<boolean>
   sync(ctx: AccountSyncContext): Promise<{ rowsWritten: number }>
 }
 

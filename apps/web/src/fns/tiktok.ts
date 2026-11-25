@@ -23,11 +23,11 @@ export const startTikTokConnectFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const state = randomBytes(24).toString('base64url')
     try {
-      const { url } = await context.api.tiktok.authorizeUrl.query({
+      const { url, organizationId } = await context.api.tiktok.authorizeUrl.query({
         redirectUri: tiktokRedirectUri(),
         state,
       })
-      await beginOAuth('tiktok', state, data.appId)
+      await beginOAuth('tiktok', state, organizationId, data.appId)
       return { ok: true as const, url }
     } catch (err) {
       const message =

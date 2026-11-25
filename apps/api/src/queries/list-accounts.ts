@@ -1,4 +1,4 @@
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { readAnalyticsState } from '../connectors/app-store/analytics.js'
 import { readReviewsState } from '../connectors/app-store/reviews.js'
@@ -25,7 +25,7 @@ export const listAccounts = defineQuery({
     'start analytics reports, say), and how many assets the source found, how many belong to an ' +
     'app, and how many wait for a decision.',
   input: z.void(),
-  async handler({ db }) {
+  async handler({ db, organizationId }) {
     // Never the token columns: credentials do not leave the API.
     const [rows, assetRows] = await Promise.all([
       db
@@ -41,8 +41,10 @@ export const listAccounts = defineQuery({
           details: connections.details,
         })
         .from(connections)
+        .where(eq(connections.organizationId, organizationId))
         .orderBy(asc(connections.provider), asc(connections.displayName)),
-      db.select({ connectionId: assets.connectionId, appId: assets.appId, ignored: assets.ignored }).from(assets),
+      db.select({ connectionId: assets.connectionId, appId: assets.appId, ignored: assets.ignored }).from(assets)
+        .where(eq(assets.organizationId, organizationId)),
     ])
 
     return ACCOUNT_FAMILIES.map((family) => {

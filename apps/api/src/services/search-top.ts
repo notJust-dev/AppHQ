@@ -22,10 +22,11 @@ export interface TopEntry {
  * sites' queries are merged, with position weighted by impressions.
  */
 export async function searchTop(
-  deps: { db: Db; secrets: Secrets } & SearchConsoleOptions,
+  deps: { db: Db; organizationId: string; secrets: Secrets } & SearchConsoleOptions,
   input: { appId?: string; from: string; to: string; dimension: 'query' | 'page'; limit: number },
 ): Promise<{ connected: boolean; rows: TopEntry[] }> {
-  const connection = await findSearchConsoleConnection(deps.db)
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const connection = await findSearchConsoleConnection(scope)
   if (!connection?.accessTokenEnc) return { connected: false, rows: [] }
   const { serviceAccount } = readSearchConsoleCredentials(deps.secrets, connection.accessTokenEnc)
   const client = createSearchConsoleClient({ serviceAccount, fetch: deps.fetch, baseUrl: deps.baseUrl })
@@ -33,9 +34,10 @@ export async function searchTop(
   const sites = await deps.db
     .select({ siteUrl: assets.externalId })
     .from(assets)
-    .innerJoin(apps, eq(apps.id, assets.appId))
+    .innerJoin(apps, and(eq(apps.organizationId, assets.organizationId), eq(apps.id, assets.appId)))
     .where(
       and(
+        eq(assets.organizationId, deps.organizationId),
         eq(assets.kind, 'search_console_site'),
         eq(assets.connectionId, connection.id),
         input.appId ? eq(assets.appId, input.appId) : undefined,

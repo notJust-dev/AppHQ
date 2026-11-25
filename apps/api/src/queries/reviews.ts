@@ -15,8 +15,10 @@ export const reviewFilters = {
 
 export type ReviewFilters = { appId?: string; store?: (typeof REVIEW_STORES)[number]; rating?: number; unread?: boolean }
 
-export function reviewConditions(filters: ReviewFilters): SQL | undefined {
+/** One organization's reviews matching the filters. */
+export function reviewConditions(organizationId: string, filters: ReviewFilters): SQL | undefined {
   return and(
+    eq(reviews.organizationId, organizationId),
     filters.appId ? eq(reviews.appId, filters.appId) : undefined,
     filters.store ? eq(reviews.store, filters.store) : undefined,
     filters.rating ? eq(reviews.rating, filters.rating) : undefined,
@@ -36,7 +38,7 @@ export const listReviews = defineQuery({
     before: z.object({ createdAt: z.iso.datetime(), id: z.uuid() }).optional().describe('The `next` cursor of the previous page.'),
     limit: z.number().int().min(1).max(100).default(30),
   }),
-  async handler({ db }, input) {
+  async handler({ db, organizationId }, input) {
     const cursor = input.before
       ? or(
           lt(reviews.createdAt, new Date(input.before.createdAt)),
@@ -65,8 +67,8 @@ export const listReviews = defineQuery({
         readAt: reviews.readAt,
       })
       .from(reviews)
-      .innerJoin(apps, eq(apps.id, reviews.appId))
-      .where(and(reviewConditions(input), cursor))
+      .innerJoin(apps, and(eq(apps.organizationId, reviews.organizationId), eq(apps.id, reviews.appId)))
+      .where(and(reviewConditions(organizationId, input), cursor))
       .orderBy(desc(reviews.createdAt), desc(reviews.id))
       .limit(input.limit + 1)
 
@@ -96,8 +98,8 @@ export const getReviewSummary = defineQuery({
     `rating, how many have each rating, how many are unread, and the last ${RECENT_DAYS} days ` +
     `against the ${RECENT_DAYS} before (count and average).`,
   input: z.object({ appId: reviewFilters.appId, store: reviewFilters.store }),
-  async handler({ db }, input) {
-    const where = reviewConditions(input)
+  async handler({ db, organizationId }, input) {
+    const where = reviewConditions(organizationId, input)
     const now = Date.now()
     const recentFrom = new Date(now - RECENT_DAYS * 86_400_000)
     const previousFrom = new Date(now - 2 * RECENT_DAYS * 86_400_000)

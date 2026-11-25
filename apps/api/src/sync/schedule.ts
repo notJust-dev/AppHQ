@@ -1,7 +1,8 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq } from 'drizzle-orm'
 import type { Connector } from '../connectors/types.js'
-import { syncRuns } from '../db/schema.js'
+import { organization, syncRuns } from '../db/schema.js'
 import { trailingRange } from '../lib/dates.js'
+import type { Scope } from '../organizations/scope.js'
 import { recordRun, runSync, type SyncDeps } from './runner.js'
 
 /** The `sync_runs` source of a scheduled sync; the Accounts page calls it "Scheduled sync". */
@@ -19,32 +20,38 @@ export function isDue(lastStartedAt: Date | null, now: Date, intervalMs: number)
   return lastStartedAt === null || now.getTime() - lastStartedAt.getTime() >= intervalMs
 }
 
-/** When the last scheduled sync that finished started, or null if none has. */
-async function lastScheduledSync(deps: SyncDeps): Promise<Date | null> {
-  const [last] = await deps.db
+/** When the organization's last scheduled sync that finished started, or null if none has. */
+async function lastScheduledSync({ db, organizationId }: Scope): Promise<Date | null> {
+  const [last] = await db
     .select({ startedAt: syncRuns.startedAt })
     .from(syncRuns)
-    .where(and(eq(syncRuns.source, SCHEDULED), eq(syncRuns.status, 'ok')))
+    .where(and(eq(syncRuns.organizationId, organizationId), eq(syncRuns.source, SCHEDULED), eq(syncRuns.status, 'ok')))
     .orderBy(desc(syncRuns.startedAt))
     .limit(1)
   return last?.startedAt ?? null
 }
 
 /**
- * Runs one scheduled sync of every source if one is due. The time of the last one is read from
- * `sync_runs`, not kept in memory, so a deploy (which restarts the API) neither skips a sync nor
- * starts an extra one. A sync that could not run because another held the lock is recorded as an
- * error and does not count, so the next check tries again.
+ * Runs one scheduled sync of every source of one organization if one is due. The time of the
+ * last one is read from `sync_runs`, not kept in memory, so a deploy (which restarts the API)
+ * neither skips a sync nor starts an extra one. A sync that could not run because another held
+ * the organization's lock is recorded as an error and does not count, so the next check tries
+ * again.
  */
 export async function syncIfDue(
   deps: SyncDeps,
-  options: { connectors: Connector[]; intervalMs: number; now?: Date },
+  options: { organizationId: string; connectors: Connector[]; intervalMs: number; now?: Date },
 ): Promise<'ran' | 'not-due'> {
   const now = options.now ?? new Date()
-  if (!isDue(await lastScheduledSync(deps), now, options.intervalMs)) return 'not-due'
+  const scope: Scope = { db: deps.db, organizationId: options.organizationId }
+  if (!isDue(await lastScheduledSync(scope), now, options.intervalMs)) return 'not-due'
 
-  await recordRun(deps.db, { source: SCHEDULED }, async () => {
-    const summary = await runSync(deps, { connectors: options.connectors, range: trailingRange(SCHEDULED_DAYS, now) })
+  await recordRun(scope, { source: SCHEDULED }, async () => {
+    const summary = await runSync(deps, {
+      organizationId: options.organizationId,
+      connectors: options.connectors,
+      range: trailingRange(SCHEDULED_DAYS, now),
+    })
     if (summary.skipped) throw new Error('Another sync was running; trying again shortly.')
     deps.log.info(`scheduled sync finished: ${summary.ok} ok, ${summary.failed} failed`)
     // Each source's own row holds what it wrote; this row only marks that the schedule ran.
@@ -54,9 +61,33 @@ export async function syncIfDue(
 }
 
 /**
+ * Walks every organization and syncs the ones that are due, one after the other. One
+ * organization's failure (a source that throws, a lock another sync holds) is logged and never
+ * stops the next organization.
+ */
+export async function syncDueOrganizations(
+  deps: SyncDeps,
+  options: { connectors: Connector[]; intervalMs: number; now?: Date },
+): Promise<{ ran: number; failed: number }> {
+  const all = await deps.db.select({ id: organization.id }).from(organization).orderBy(asc(organization.createdAt))
+  let ran = 0
+  let failed = 0
+  for (const { id } of all) {
+    try {
+      if ((await syncIfDue(deps, { ...options, organizationId: id })) === 'ran') ran++
+    } catch (err) {
+      failed++
+      deps.log.error(`scheduled sync of an organization failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  return { ran, failed }
+}
+
+/**
  * Keeps the data fresh from inside the API, which is always running and already has every
  * variable a sync needs (a Velocity cron command does not get them). Checks every few minutes
- * and syncs when the last scheduled sync is `intervalHours` old. Returns a function that stops it.
+ * and syncs each organization whose last scheduled sync is `intervalHours` old. Returns a
+ * function that stops it.
  */
 export function startSyncSchedule(
   deps: SyncDeps,
@@ -70,7 +101,7 @@ export function startSyncSchedule(
     if (busy) return
     busy = true
     try {
-      await syncIfDue(deps, { connectors: options.connectors, intervalMs })
+      await syncDueOrganizations(deps, { connectors: options.connectors, intervalMs })
     } catch (err) {
       deps.log.error(`scheduled sync failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
