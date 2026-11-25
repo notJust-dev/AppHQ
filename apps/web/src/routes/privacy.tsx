@@ -50,6 +50,29 @@ function PrivacyPage() {
         including IP addresses, for a short time for security and troubleshooting.
       </p>
 
+      <h2>Usage analytics</h2>
+      <p>
+        We use PostHog, hosted in the United States, to understand how the site is used: which pages
+        are visited, where visitors came from (such as a YouTube video), whether they joined the waitlist, and which
+        parts of the dashboard are used. Each event includes the page address, your browser and device
+        type, and an approximate location based on your IP address. Your IP address itself isn't kept.
+      </p>
+      <ul>
+        <li>
+          It's cookieless: nothing is stored in your browser, and we can't recognise you from one visit
+          to the next.
+        </li>
+        <li>
+          It records that something was clicked, not what it said: the text and attributes of everything
+          on the page are masked, so the numbers in your dashboard are never sent.
+        </li>
+        <li>Your email address is never sent to PostHog, and there are no session recordings.</li>
+      </ul>
+      <p>
+        We rely on our legitimate interest in improving AppHQ. If you'd rather not be counted, an ad or
+        tracker blocker that blocks our <code>/ingest</code> path will stop it.
+      </p>
+
       <h2>Cookies</h2>
       <p>
         We don't use analytics or advertising cookies. Signing in to the dashboard sets one session
@@ -67,7 +90,10 @@ function PrivacyPage() {
       </p>
       <ul>
         <li>This data is used only to show your numbers back to you in the dashboard.</li>
-        <li>It isn't sold, shared with anyone else, used for advertising or used to train AI models.</li>
+        <li>
+          It isn't sold, shared with anyone else, used for advertising or used to train AI models. Our
+          usage analytics never include it.
+        </li>
         <li>
           AppHQ doesn't send it to an AI service today. If we add a way to ask an AI assistant about
           your numbers, it will be off until you turn it on, and we'll update this page first.
@@ -94,6 +120,7 @@ function PrivacyPage() {
       <ul>
         <li>Cloudways, which hosts the servers and database.</li>
         <li>Cloudflare, which serves the site and protects it from attacks.</li>
+        <li>PostHog, for the usage analytics described above, on its US servers.</li>
         <li>An email delivery provider, once we start emailing the waitlist.</li>
       </ul>
       <p>

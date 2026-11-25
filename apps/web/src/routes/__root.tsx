@@ -8,10 +8,12 @@ import {
   createRootRouteWithContext,
   type ErrorComponentProps,
 } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { ErrorPage } from '@/components/ErrorPage'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { getAnalyticsConfigFn } from '@/fns/analytics'
+import { startAnalytics } from '@/lib/analytics'
 import { PRIVACY_SCRIPT } from '@/lib/privacy'
 import { THEME_SCRIPT } from '@/lib/theme'
 import appCss from '../styles.css?url'
@@ -30,6 +32,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
     ],
   }),
+  // Whether analytics are on is the server's setting; read once, on the first page load.
+  loader: () => getAnalyticsConfigFn(),
+  staleTime: Infinity,
+  shouldReload: false,
   component: RootComponent,
   // An error in the root route itself replaces the whole document, so it brings its own shell.
   errorComponent: RootError,
@@ -51,6 +57,10 @@ function NotFound() {
 }
 
 function RootComponent() {
+  const analytics = Route.useLoaderData()
+  useEffect(() => {
+    if (analytics) startAnalytics(analytics)
+  }, [analytics])
   return (
     <RootDocument>
       <Outlet />
