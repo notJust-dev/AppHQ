@@ -180,6 +180,8 @@ Add a second application on the same server, from the same repository:
 | `SESSION_SECRET` | A new `openssl rand -hex 32` value |
 | `DASHBOARD_PASSWORD` | The password you will sign in with, 12+ characters |
 | `PUBLIC_URL` | Optional. The dashboard's own address, if the sign-in redirect addresses on the Accounts page come out wrong (for example behind a custom domain) |
+| `POSTHOG_KEY` | Optional. A PostHog project API key turns on cookieless usage analytics, sent through the app's own `/ingest` path. Leave it unset and nothing is sent anywhere |
+| `POSTHOG_HOST` | Optional. Defaults to PostHog's US cloud, `https://us.i.posthog.com`. For the EU cloud, `https://eu.i.posthog.com` |
 
 Deploy the app, then open `https://<web address>/health`. It reports whether the dashboard is
 fully configured and whether it can reach the API, so you can check the setup without

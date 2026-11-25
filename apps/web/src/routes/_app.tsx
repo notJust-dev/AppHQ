@@ -1,8 +1,10 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { AppSidebar } from '@/components/AppSidebar'
 import { LANDING_META, LandingPage } from '@/components/Landing'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { getSessionFn } from '@/fns/auth'
+import { setSignedIn } from '@/lib/analytics'
 import { appsQuery } from '@/lib/queries'
 
 /**
@@ -31,6 +33,7 @@ export const Route = createFileRoute('/_app')({
  */
 function AppShell() {
   const { signedIn, sidebarOpen } = Route.useRouteContext()
+  useEffect(() => setSignedIn(signedIn), [signedIn])
   if (!signedIn) return <LandingPage />
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>

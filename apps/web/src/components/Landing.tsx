@@ -9,6 +9,7 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { joinWaitlistFn } from '@/fns/waitlist'
+import { track } from '@/lib/analytics'
 import { WaitlistQuestions } from '@/components/WaitlistQuestions'
 
 /** What a signed-out visitor sees at `/`, in place of the dashboard. */
@@ -148,6 +149,7 @@ function WaitlistForm() {
             open={asking}
             onOpenChange={setAsking}
             onSaved={() => {
+              track('waitlist_questions_completed')
               setAnswered(true)
               setAsking(false)
             }}
@@ -166,6 +168,7 @@ function WaitlistForm() {
         try {
           const joinedNow = await join({ data: { email, website } })
           if (joinedNow.result === 'ok') {
+            track('waitlist_joined')
             setJoined(true)
             setAnswerToken(joinedNow.answerToken)
             setAsking(joinedNow.answerToken !== null)

@@ -23,6 +23,7 @@ import { Route as AppSeoRouteImport } from './routes/_app/seo'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSocialRouteImport } from './routes/_app/social'
 import { Route as AppStoreRouteImport } from './routes/_app/store'
+import { Route as IngestSplatRouteImport } from './routes/ingest.$'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts.index'
 import { Route as AppAccountsAppStoreRouteImport } from './routes/_app/accounts.app-store'
 import { Route as AppAccountsGooglePlayRouteImport } from './routes/_app/accounts.google-play'
@@ -108,6 +109,11 @@ const AppStoreRoute = AppStoreRouteImport.update({
   id: '/store',
   path: '/store',
   getParentRoute: () => AppRoute,
+} as any)
+const IngestSplatRoute = IngestSplatRouteImport.update({
+  id: '/ingest/$',
+  path: '/ingest/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
   id: '/',
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
+  '/ingest/$': typeof IngestSplatRoute
   '/accounts/app-store': typeof AppAccountsAppStoreRoute
   '/accounts/google-play': typeof AppAccountsGooglePlayRoute
   '/accounts/meta': typeof AppAccountsMetaRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
+  '/ingest/$': typeof IngestSplatRoute
   '/': typeof AppIndexRoute
   '/accounts/app-store': typeof AppAccountsAppStoreRoute
   '/accounts/google-play': typeof AppAccountsGooglePlayRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/social': typeof AppSocialRoute
   '/_app/store': typeof AppStoreRoute
+  '/ingest/$': typeof IngestSplatRoute
   '/_app/': typeof AppIndexRoute
   '/_app/accounts/app-store': typeof AppAccountsAppStoreRoute
   '/_app/accounts/google-play': typeof AppAccountsGooglePlayRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social'
     | '/store'
+    | '/ingest/$'
     | '/accounts/app-store'
     | '/accounts/google-play'
     | '/accounts/meta'
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social'
     | '/store'
+    | '/ingest/$'
     | '/'
     | '/accounts/app-store'
     | '/accounts/google-play'
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/social'
     | '/_app/store'
+    | '/ingest/$'
     | '/_app/'
     | '/_app/accounts/app-store'
     | '/_app/accounts/google-play'
@@ -386,6 +398,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   WaitlistRoute: typeof WaitlistRoute
+  IngestSplatRoute: typeof IngestSplatRoute
   ConnectMetaCallbackRoute: typeof ConnectMetaCallbackRoute
   ConnectTiktokCallbackRoute: typeof ConnectTiktokCallbackRoute
   ConnectYoutubeCallbackRoute: typeof ConnectYoutubeCallbackRoute
@@ -490,6 +503,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/store'
       preLoaderRoute: typeof AppStoreRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/ingest/$': {
+      id: '/ingest/$'
+      path: '/ingest/$'
+      fullPath: '/ingest/$'
+      preLoaderRoute: typeof IngestSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/accounts/': {
       id: '/_app/accounts/'
@@ -683,6 +703,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   WaitlistRoute: WaitlistRoute,
+  IngestSplatRoute: IngestSplatRoute,
   ConnectMetaCallbackRoute: ConnectMetaCallbackRoute,
   ConnectTiktokCallbackRoute: ConnectTiktokCallbackRoute,
   ConnectYoutubeCallbackRoute: ConnectYoutubeCallbackRoute,
