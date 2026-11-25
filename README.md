@@ -403,7 +403,17 @@ Each connector's base URL can be pointed at a stand-in for testing, for example
 
 ## License
 
-[MIT](LICENSE)
+AppHQ is licensed under the [GNU Affero General Public License v3.0](LICENSE). You can use,
+change and self-host it freely. If you run a modified version as a service for other people,
+you must publish your changes under the same license.
+
+The AppHQ name and logo are not covered by the code license. Please don't use them for your own
+hosted version or fork.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). To report a vulnerability, follow
+[SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## Disclosure
 
