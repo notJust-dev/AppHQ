@@ -11,3 +11,22 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Key files downloaded from Apple, Google and others.
+*.p8
+*.p12
+*.pem
+*.key
+*.dump
+
+# Agent and editor state. Only the shared launch config is committed; add a `!` line here
+# before committing anything else from .claude/.
+.claude/*
+!.claude/launch.json
+CLAUDE.local.md
+# A project-scoped MCP config carries the access token of whoever created it.
+.mcp.json
+
+# Scratch space for plans, notes and logs. See AGENTS.md.
+.local/
+PLAN.md
