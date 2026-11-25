@@ -3,6 +3,7 @@ import { CheckCircle2, Inbox, MessageSquareText, Waypoints } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { BrandMark, BrandName } from '@/components/Brand'
 import { ConnectionsHub } from '@/components/ConnectionsHub'
+import { PublicFooter } from '@/components/Legal'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -65,9 +66,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="mx-auto w-full max-w-5xl px-6 py-8 text-sm text-faint">
-        © {new Date().getFullYear()} AppHQ
-      </footer>
+      <PublicFooter />
     </div>
   )
 }
