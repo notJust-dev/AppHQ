@@ -15,6 +15,10 @@ The [README](README.md) covers setup: Postgres through `docker compose`, `apps/a
 `apps/web`, each with its own `.env` copied from `.env.example`. Never commit a `.env` file or
 real credentials.
 
+[AGENTS.md](AGENTS.md) lists what must never reach this repository: secrets, deployment details,
+real data and working notes. Coding agents read it by themselves. If you write by hand, read it
+once.
+
 ## Pull requests
 
 1. Fork the repository and branch from `main`.
