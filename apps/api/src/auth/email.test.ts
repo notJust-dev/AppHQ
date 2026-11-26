@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ORIGIN, TOKEN, buildTestApp } from '../test/auth.js'
 import { CLIENT_ADDRESS_HEADER } from './auth.js'
-import { CODE_ATTEMPTS, EMAIL_PATHS } from './email.js'
+import { CODE_ATTEMPTS, EMAIL_PATHS, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './email.js'
 
 const bearer = { authorization: `Bearer ${TOKEN}` }
 const PASSWORD = 'a-test-password-of-enough-length'
 const OTHER_PASSWORD = 'another-test-password-long-enough'
+/** One character short of the shortest password allowed, and one over the longest. */
+const TOO_SHORT = 'x'.repeat(MIN_PASSWORD_LENGTH - 1)
+const TOO_LONG = 'x'.repeat(MAX_PASSWORD_LENGTH + 1)
 
 type Built = Awaited<ReturnType<typeof buildTestApp>>
 const errorCode = (res: { json(): unknown }) => (res.json() as { code?: string }).code
@@ -139,13 +142,16 @@ describe('signing up with an email address', () => {
     await built.post('/email-sign-up/send-code', { email })
     const code = built.lastCode(email)
     for (let i = 0; i < CODE_ATTEMPTS + 2; i++) {
-      const short = await built.post('/email-sign-up/confirm', { email, code, password: 'too-short' })
+      const short = await built.post('/email-sign-up/confirm', { email, code, password: TOO_SHORT })
       expect(short.statusCode).toBe(400)
       expect(errorCode(short)).toBe('PASSWORD_TOO_SHORT')
     }
-    expect(errorCode(await built.post('/email-sign-up/confirm', { email, code, password: 'x'.repeat(129) }))).toBe('PASSWORD_TOO_LONG')
+    expect(errorCode(await built.post('/email-sign-up/confirm', { email, code, password: TOO_LONG }))).toBe('PASSWORD_TOO_LONG')
     expect(user(email)).toBeUndefined()
-    expect((await built.post('/email-sign-up/confirm', { email, code, password: PASSWORD })).statusCode).toBe(200)
+    // The shortest password allowed is taken, and signs in afterwards.
+    const shortest = 'x'.repeat(MIN_PASSWORD_LENGTH)
+    expect((await built.post('/email-sign-up/confirm', { email, code, password: shortest })).statusCode).toBe(200)
+    expect((await built.post('/sign-in/email', { email, password: shortest })).statusCode).toBe(200)
   })
 
   it('a sign-up body cannot set the access status or a role', async () => {
@@ -412,7 +418,7 @@ describe('resetting a password', () => {
 
     await built.post('/request-password-reset', { email })
     const token = decodeURIComponent(linkTo(email)![1]!)
-    expect((await built.post('/reset-password', { token, newPassword: 'too-short' })).statusCode).toBe(400)
+    expect((await built.post('/reset-password', { token, newPassword: TOO_SHORT })).statusCode).toBe(400)
     expect((await built.post('/sign-in/email', { email, password: PASSWORD })).statusCode).toBe(200)
     expect((await built.post('/reset-password', { token, newPassword: OTHER_PASSWORD })).statusCode).toBe(200)
   })

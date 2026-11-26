@@ -5,7 +5,7 @@
  */
 
 /** Passwords: at least this long. Must match `MIN_PASSWORD_LENGTH` in apps/api/src/auth/email.ts. */
-export const MIN_PASSWORD_LENGTH = 12
+export const MIN_PASSWORD_LENGTH = 8
 /** How long a sign-up code works, in minutes. Must match `CODE_MINUTES` there. */
 export const CODE_MINUTES = 10
 /** How long a reset link works, in minutes. Must match `RESET_MINUTES` there. */

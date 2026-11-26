@@ -353,7 +353,7 @@ them.
   survives a few wrong guesses.
 - **Resetting a password.** The person gets a link that works once, for 60 minutes. Choosing a
   new password signs the account out everywhere and emails its owner that the password changed.
-- **Passwords** are at least 12 characters and are stored hashed.
+- **Passwords** are at least 8 characters and are stored hashed.
 - **One way in per address.** Signing up with an address that already has an account emails its
   owner to say so, instead of a code. An account made with Google or GitHub gets no password,
   and an account with a password can't sign in with Google or GitHub.

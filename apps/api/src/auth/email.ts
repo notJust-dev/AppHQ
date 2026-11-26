@@ -33,7 +33,7 @@ import type { Outbox } from '../mail/outbox.js'
  */
 
 /** Passwords: at least this long. Must match `MIN_PASSWORD_LENGTH` in apps/web/src/lib/email-auth.ts. */
-export const MIN_PASSWORD_LENGTH = 12
+export const MIN_PASSWORD_LENGTH = 8
 export const MAX_PASSWORD_LENGTH = 128
 
 /** How long a sign-up code works, and how many wrong guesses it survives. */
