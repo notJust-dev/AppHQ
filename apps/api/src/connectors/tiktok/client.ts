@@ -222,6 +222,9 @@ export function createTikTokClient(options: TikTokClientOptions) {
       url.searchParams.set('response_type', 'code')
       url.searchParams.set('redirect_uri', params.redirectUri)
       url.searchParams.set('state', params.state)
+      // Always show TikTok's screen, with its "Switch account" link. Without it, TikTok skips the
+      // screen for an account that has authorized AppHQ before and connects that one again.
+      url.searchParams.set('disable_auto_auth', '1')
       return url.toString()
     },
 

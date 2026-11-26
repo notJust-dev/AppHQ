@@ -53,6 +53,7 @@ describe('TikTok client', () => {
       response_type: 'code',
       redirect_uri: 'https://dash.example/connect/tiktok/callback',
       state: 's1',
+      disable_auto_auth: '1',
     })
   })
 

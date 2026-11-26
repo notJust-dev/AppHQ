@@ -567,9 +567,10 @@ in the API's log. A total that dips and comes back is counted once.
    business portfolio, with the use cases **Manage everything on your Page** and **Manage
    messaging & content on Instagram**.
 2. Add the redirect URI shown on AppHQ's Facebook and Instagram page.
-3. Create a **Facebook Login for Business** configuration (user access token) with
+3. Create a **Facebook Login for Business** configuration for Pages and Instagram accounts with
    `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `read_insights`,
-   `instagram_basic`, `instagram_manage_insights` and `business_management`.
+   `instagram_basic` and `instagram_manage_insights`. A system-user token, which Unified login
+   gives, and a user token both work.
 4. Set `META_APP_ID`, `META_APP_SECRET` and `META_LOGIN_CONFIG_ID` on the API and redeploy.
 
 One sign-in finds every Page you manage and the Instagram accounts linked to them. Facebook
