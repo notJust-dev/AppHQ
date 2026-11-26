@@ -282,7 +282,7 @@ export const appRouter = router({
         // A project waiting for an app is fetched once it is linked.
         const appIds = connected.flatMap((project) => (project.appId ? [project.appId] : []))
         if (appIds.length > 0) {
-          startSync(ctx, { organizationId: ctx.organizationId, connectors, sources: [REVENUECAT], appIds, range: trailingRange(BACKFILL_DAYS) })
+          startSync(ctx.background, { organizationId: ctx.organizationId, connectors, sources: [REVENUECAT], appIds, range: trailingRange(BACKFILL_DAYS) })
         }
         return { projects: connected }
       }),
@@ -308,7 +308,7 @@ export const appRouter = router({
           ctx.log.error(`connect App Store failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
-        startSync(ctx, {
+        startSync(ctx.background, {
           organizationId: ctx.organizationId,
           connectors,
           sources: [APP_STORE],
@@ -348,7 +348,7 @@ export const appRouter = router({
           ctx.log.error(`connect TikTok failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
-        startSync(ctx, {
+        startSync(ctx.background, {
           organizationId: ctx.organizationId,
           connectors,
           sources: [TIKTOK],
@@ -375,7 +375,7 @@ export const appRouter = router({
           ctx.log.error(`connect Google Play failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
-        startSync(ctx, { organizationId: ctx.organizationId, connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
+        startSync(ctx.background, { organizationId: ctx.organizationId, connectors, sources: [GOOGLE_PLAY], range: trailingRange(GOOGLE_PLAY_HISTORY_DAYS) })
         return result
       }),
   }),
@@ -421,7 +421,7 @@ export const appRouter = router({
         })
         if (appId !== null && isAssetKind(asset.kind)) {
           const kind = ASSET_KINDS[asset.kind]
-          startSync(ctx, {
+          startSync(ctx.background, {
             organizationId: ctx.organizationId,
             connectors,
             sources: [kind.provider],
@@ -505,7 +505,7 @@ export const appRouter = router({
           ctx.log.error(`connect Search Console failed: ${err instanceof Error ? err.message : err}`)
           throw connectError(err)
         })
-        startSync(ctx, { organizationId: ctx.organizationId, connectors, sources: [SEARCH_CONSOLE], range: trailingRange(SEARCH_CONSOLE_HISTORY_DAYS) })
+        startSync(ctx.background, { organizationId: ctx.organizationId, connectors, sources: [SEARCH_CONSOLE], range: trailingRange(SEARCH_CONSOLE_HISTORY_DAYS) })
         return result
       }),
 
@@ -537,10 +537,12 @@ export const appRouter = router({
 
     /** How many reviews wait in the inbox, for the sidebar. */
     unreadCount: procedure.query(async ({ ctx }) => {
-      const [row] = await ctx.db
-        .select({ count: count() })
-        .from(reviewsTable)
-        .where(and(eq(reviewsTable.organizationId, ctx.organizationId), isNull(reviewsTable.readAt)))
+      const [row] = await ctx.run((db) =>
+        db
+          .select({ count: count() })
+          .from(reviewsTable)
+          .where(and(eq(reviewsTable.organizationId, ctx.organizationId), isNull(reviewsTable.readAt))),
+      )
       return { count: row?.count ?? 0 }
     }),
 
@@ -573,7 +575,7 @@ export const appRouter = router({
     run: procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(7) }))
       .mutation(({ ctx, input }) => {
-        startSync(ctx, { organizationId: ctx.organizationId, connectors, range: trailingRange(input.days) })
+        startSync(ctx.background, { organizationId: ctx.organizationId, connectors, range: trailingRange(input.days) })
         return { started: true }
       }),
   }),

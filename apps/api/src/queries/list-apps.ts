@@ -15,8 +15,8 @@ export const listApps = defineQuery({
     'kind "portfolio" holds accounts shared by several apps.',
   input: z.void(),
   async handler(scope) {
-    const { db, organizationId } = scope
-    const [rows, sourceRows, assetRows, icons] = await Promise.all([
+    const { organizationId } = scope
+    const [rows, sourceRows, assetRows, icons] = await scope.run((db) => Promise.all([
       db
         .select()
         .from(apps)
@@ -44,7 +44,7 @@ export const listApps = defineQuery({
         .where(eq(assets.organizationId, organizationId))
         .orderBy(asc(assets.kind), asc(assets.name)),
       appIcons(scope),
-    ])
+    ]))
 
     const sourcesByApp = new Map<string, string[]>()
     for (const { appId, source } of sourceRows) {

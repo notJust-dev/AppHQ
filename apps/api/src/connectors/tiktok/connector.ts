@@ -1,7 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
-import type { Scope } from '../../organizations/scope.js'
+import type { Scope, Tx } from '../../organizations/scope.js'
 import { connections, postSnapshots, posts, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { todayUtc, toIsoDate, type IsoDate } from '../../lib/dates.js'
@@ -23,16 +22,17 @@ const tiktokConnections = (scope: Scope, appId: string) =>
 
 /**
  * Keeps one account's access token usable. TikTok's access tokens last two hours and every
- * refresh replaces the refresh token, so the new pair is saved before it is used.
+ * refresh replaces the refresh token, so the new pair is saved, in a unit of work of its own,
+ * before it is used.
  */
 function tokenKeeper(deps: {
-  db: Db
+  scope: Scope
   secrets: Secrets
   client: TikTokClient
   now: () => Date
   connection: Connection
 }) {
-  const { db, secrets, client, now } = deps
+  const { scope, secrets, client, now } = deps
   let connection = deps.connection
 
   async function refreshed(): Promise<string> {
@@ -48,7 +48,12 @@ function tokenKeeper(deps: {
       scopes: tokens.scopes.length > 0 ? tokens.scopes.join(',') : connection.scopes,
       updatedAt: now(),
     }
-    await db.update(connections).set(update).where(eq(connections.id, connection.id))
+    await scope.run((db) =>
+      db
+        .update(connections)
+        .set(update)
+        .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, connection.id))),
+    )
     connection = { ...connection, ...update }
     return tokens.accessToken
   }
@@ -98,7 +103,12 @@ const postRow = (video: TikTokVideo, appId: string, connectionId: string): PostR
  * last successful sync, so an account that is failing leaves a gap rather than zeros.
  */
 async function writeDailyViews(scope: Scope, appId: string) {
-  const { db, organizationId } = scope
+  // Reads and writes only the database: one unit of work.
+  return scope.run((db) => writeDailyViewsIn(db, scope, appId))
+}
+
+async function writeDailyViewsIn(db: Tx, scope: Scope, appId: string) {
+  const { organizationId } = scope
   const accounts = await tiktokConnections(scope, appId)
   const readings = await db
     .select({
@@ -174,8 +184,8 @@ export function createTikTokConnector(
       return (await tiktokConnections(scope, app.id)).length > 0
     },
 
-    async sync({ db, organizationId, app, log, secrets }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { app, log, secrets } = scope
       const client = createTikTokClient({
         config: requireTikTokConfig(options.env),
         fetch: options.fetch,
@@ -196,7 +206,7 @@ export function createTikTokConnector(
           continue
         }
         try {
-          const keeper = tokenKeeper({ db, secrets, client, now, connection: account })
+          const keeper = tokenKeeper({ scope, secrets, client, now, connection: account })
           const scopes = (account.scopes ?? '').split(',').filter(Boolean)
           const user = await keeper.use((token) => client.getUser(token, scopes))
           const videos = await keeper.use((token) => client.listVideos(token))
@@ -210,22 +220,26 @@ export function createTikTokConnector(
           if (typeof user.follower_count === 'number') {
             followers = (followers ?? 0) + user.follower_count
           }
-          await db
-            .update(connections)
-            .set({
-              displayName: user.username ? `@${user.username}` : (user.display_name ?? account.displayName),
-              status: 'ok',
-              lastSyncedAt: now(),
-              updatedAt: now(),
-            })
-            .where(eq(connections.id, account.id))
+          await scope.run((db) =>
+            db
+              .update(connections)
+              .set({
+                displayName: user.username ? `@${user.username}` : (user.display_name ?? account.displayName),
+                status: 'ok',
+                lastSyncedAt: now(),
+                updatedAt: now(),
+              })
+              .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, account.id))),
+          )
           log.info(`tiktok ${app.id}: ${name}, ${videos.length} videos`)
         } catch (err) {
           const authProblem = err instanceof TikTokError && err.isAuthProblem
-          await db
-            .update(connections)
-            .set({ status: authProblem ? 'needs_reauth' : 'error', updatedAt: now() })
-            .where(eq(connections.id, account.id))
+          await scope.run((db) =>
+            db
+              .update(connections)
+              .set({ status: authProblem ? 'needs_reauth' : 'error', updatedAt: now() })
+              .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, account.id))),
+          )
           failures.push(`${name}: ${err instanceof Error ? err.message : String(err)}`)
         }
       }

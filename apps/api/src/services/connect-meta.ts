@@ -1,9 +1,9 @@
 import { autoLink, upsertAssets, type AssetInput } from '../assets/store.js'
 import { MetaError, createMetaClient, type MetaPage } from '../connectors/meta/client.js'
 import { ESSENTIAL_PERMISSIONS, FACEBOOK, INSTAGRAM, requireMetaConfig } from '../connectors/meta/config.js'
-import type { Db } from '../db/client.js'
 import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 
 export interface MetaConnectResult {
@@ -43,7 +43,7 @@ const unlessRefused = <T>(err: unknown): T[] => {
  * connector tries them in that order.
  */
 export async function connectMeta(
-  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
+  deps: Scope & { secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
   input: { code: string; redirectUri: string },
 ): Promise<MetaConnectResult> {
   const config = requireMetaConfig(deps.env)
@@ -109,7 +109,8 @@ export async function connectMeta(
 
   const encryptedSignIn = deps.secrets.encrypt(signInToken)
   const found: AssetInput[] = []
-  await deps.db.transaction(async (tx) => {
+  // Facebook has answered everything; saving is one unit of work.
+  await deps.run(async (tx) => {
     const save = async (row: {
       provider: string
       externalAccountId: string
@@ -162,9 +163,8 @@ export async function connectMeta(
 
   // New Pages and accounts wait for an app to be chosen; one linked to a Page that already has
   // its app follows the Page. Reconnecting keeps every choice made before.
-  const scope = { db: deps.db, organizationId: deps.organizationId }
-  await upsertAssets(scope, found)
-  await autoLink(scope)
+  await upsertAssets(deps, found)
+  await autoLink(deps)
 
   return {
     pages: pages.length,

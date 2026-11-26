@@ -3,6 +3,8 @@ import type { AccountUser, Accounts } from '../auth/accounts.js'
 import type { Db, Sql } from '../db/client.js'
 import type { Secrets } from '../lib/crypto.js'
 import type { Logger } from '../lib/logger.js'
+import { scopeFor } from '../organizations/scope.js'
+import type { SyncDeps } from '../sync/runner.js'
 
 /**
  * Who may call a procedure. Set with `.meta({ access })`; a procedure without it is `dashboard`.
@@ -30,10 +32,11 @@ export const ACCESS_HEADER = 'x-apphq-access'
 export const DASHBOARD_ACCESS = 'dashboard'
 
 /**
- * Everything a request brings. A dashboard procedure also gets `organizationId` (see
+ * Everything a request brings. A dashboard procedure gets a scope instead of `db` (see
  * `procedure`); the others have none, so they cannot reach any organization's data.
  */
 export interface ApiContext {
+  /** For the procedures that are not about an organization's data: the waitlist and accounts. */
   db: Db
   sql: Sql
   secrets: Secrets
@@ -75,6 +78,11 @@ const guard = t.middleware(async ({ ctx, meta, next }) => {
  * The organization a dashboard procedure reads and writes in, put in the context after the guard
  * has accepted the request. Today that is always the dashboard password's organization: no
  * account session, membership or active organization is consulted.
+ *
+ * The context then is that organization's scope (`organizationId` and `run`), and `db` is gone:
+ * every read and write goes through `run`, where row-level security holds it to the
+ * organization. `background` is for work that carries on after the request (`startSync`), which
+ * opens its own units of work.
  */
 const inOrganization = t.middleware(async ({ ctx, meta, next }) => {
   if ((meta?.access ?? 'dashboard') !== 'dashboard' || !ctx.dashboardAccess) {
@@ -82,14 +90,16 @@ const inOrganization = t.middleware(async ({ ctx, meta, next }) => {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Sign in to the dashboard first.' })
   }
   const organizationId = await ctx.dashboardOrganization()
-  return next({ ctx: { organizationId } })
+  const { run } = scopeFor(ctx.db, organizationId)
+  const background: SyncDeps = { db: ctx.db, sql: ctx.sql, log: ctx.log, secrets: ctx.secrets }
+  return next({ ctx: { organizationId, run, background, db: undefined } })
 })
 
 export const router = t.router
 
 /**
  * Dashboard procedures. Every procedure passes the guard; these then get the organization they
- * work in as `ctx.organizationId`, and every query and write takes it from there.
+ * work in as their context's scope, and every query and write goes through it.
  */
 export const procedure = t.procedure.use(guard).use(inOrganization)
 

@@ -9,8 +9,9 @@ export const getSyncStatus = defineQuery({
     'The most recent sync run for each data source: when it ran, whether it succeeded, how ' +
     'many rows it wrote, and the error if it failed.',
   input: z.void(),
-  async handler({ db, organizationId }) {
-    const latest = await db
+  async handler(scope) {
+    const latest = await scope.run((db) =>
+      db
       .selectDistinctOn([syncRuns.source], {
         source: syncRuns.source,
         status: syncRuns.status,
@@ -20,8 +21,9 @@ export const getSyncStatus = defineQuery({
         error: syncRuns.error,
       })
       .from(syncRuns)
-      .where(eq(syncRuns.organizationId, organizationId))
-      .orderBy(syncRuns.source, desc(syncRuns.startedAt))
+      .where(eq(syncRuns.organizationId, scope.organizationId))
+      .orderBy(syncRuns.source, desc(syncRuns.startedAt)),
+    )
 
     return latest.map((run) => ({
       ...run,

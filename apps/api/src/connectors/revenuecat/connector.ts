@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
 import type { Scope } from '../../organizations/scope.js'
 import { connections, type App, type NewMetric } from '../../db/schema.js'
@@ -64,8 +64,8 @@ export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}
       return (await findProject(scope, app)) !== null
     },
 
-    async sync({ db, organizationId, app, range, log, secrets }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { app, range, log, secrets } = scope
       const found = await findProject(scope, app)
       const connection = found?.connection
       const projectId = found?.asset.externalId
@@ -108,14 +108,16 @@ export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}
       }
 
       const rowsWritten = await upsertMetrics(scope, rows)
-      await db
-        .update(connections)
-        .set({
-          status: keyRejected ? 'needs_reauth' : failures.length > 0 ? 'error' : 'ok',
-          lastSyncedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(connections.id, connection.id))
+      await scope.run((db) =>
+        db
+          .update(connections)
+          .set({
+            status: keyRejected ? 'needs_reauth' : failures.length > 0 ? 'error' : 'ok',
+            lastSyncedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, connection.id))),
+      )
 
       if (failures.length > 0) {
         throw new Error(`${failures.length} of ${CHARTS.length} charts failed. ${failures.join('; ')}`)

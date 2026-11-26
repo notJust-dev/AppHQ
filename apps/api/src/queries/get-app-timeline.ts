@@ -140,44 +140,46 @@ export const getAppTimeline = defineQuery({
     .object({ appId: z.uuid().describe('The app id from list_apps.'), ...rangeFields })
     .superRefine(checkRange),
   async handler(scope, input) {
-    const { db, organizationId } = scope
-    const [app] = await db
-      .select({ id: apps.id, name: apps.name })
-      .from(apps)
-      .where(and(eq(apps.organizationId, organizationId), eq(apps.id, input.appId)))
-      .limit(1)
-    if (!app) return null
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      const [app] = await db
+        .select({ id: apps.id, name: apps.name })
+        .from(apps)
+        .where(and(eq(apps.organizationId, organizationId), eq(apps.id, input.appId)))
+        .limit(1)
+      if (!app) return null
 
-    const rows = await db
-      .select({
-        date: metricDaily.date,
-        source: metricDaily.source,
-        metric: metricDaily.metric,
-        value: metricDaily.value,
-      })
-      .from(metricDaily)
-      .where(
-        and(
-          eq(metricDaily.organizationId, organizationId),
-          eq(metricDaily.appId, app.id),
-          gte(metricDaily.date, input.from),
-          lte(metricDaily.date, input.to),
-          eq(metricDaily.dimension, ''),
-          inArray(
-            metricDaily.metric,
-            TIMELINE.map((definition) => definition.metric),
+      const rows = await db
+        .select({
+          date: metricDaily.date,
+          source: metricDaily.source,
+          metric: metricDaily.metric,
+          value: metricDaily.value,
+        })
+        .from(metricDaily)
+        .where(
+          and(
+            eq(metricDaily.organizationId, organizationId),
+            eq(metricDaily.appId, app.id),
+            gte(metricDaily.date, input.from),
+            lte(metricDaily.date, input.to),
+            eq(metricDaily.dimension, ''),
+            inArray(
+              metricDaily.metric,
+              TIMELINE.map((definition) => definition.metric),
+            ),
           ),
-        ),
-      )
+        )
 
-    const days = eachDay({ from: input.from, to: input.to })
-    return {
-      app,
-      range: { from: input.from, to: input.to },
-      days,
-      series: buildTimeline(rows, days),
-      /** The first day TikTok views are daily; before it they sit on each video's post day. */
-      tiktokDailyFrom: await tiktokDailyFrom(scope, app.id),
-    }
+      const days = eachDay({ from: input.from, to: input.to })
+      return {
+        app,
+        range: { from: input.from, to: input.to },
+        days,
+        series: buildTimeline(rows, days),
+        /** The first day TikTok views are daily; before it they sit on each video's post day. */
+        tiktokDailyFrom: await tiktokDailyFrom(scope, app.id),
+      }
+    })
   },
 })

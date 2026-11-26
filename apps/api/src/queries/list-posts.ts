@@ -29,42 +29,44 @@ export const listPosts = defineQuery({
     })
     .superRefine(checkRange),
   async handler(scope, input) {
-    const { db, organizationId } = scope
-    const rows = await db
-      .select({
-        id: posts.id,
-        platform: posts.platform,
-        url: posts.url,
-        caption: posts.caption,
-        publishedAt: posts.publishedAt,
-        durationSeconds: posts.durationSeconds,
-        views: posts.views,
-        likes: posts.likes,
-        comments: posts.comments,
-        shares: posts.shares,
-        updatedAt: posts.updatedAt,
-      })
-      .from(posts)
-      .where(
-        and(
-          eq(posts.organizationId, organizationId),
-          eq(posts.appId, input.appId),
-          gte(posts.publishedAt, new Date(`${input.from}T00:00:00Z`)),
-          lt(posts.publishedAt, new Date(`${addDays(input.to, 1)}T00:00:00Z`)),
-        ),
-      )
-      .orderBy(desc(posts.publishedAt))
-      .limit(input.limit)
-    if (rows.length === 0) return []
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      const rows = await db
+        .select({
+          id: posts.id,
+          platform: posts.platform,
+          url: posts.url,
+          caption: posts.caption,
+          publishedAt: posts.publishedAt,
+          durationSeconds: posts.durationSeconds,
+          views: posts.views,
+          likes: posts.likes,
+          comments: posts.comments,
+          shares: posts.shares,
+          updatedAt: posts.updatedAt,
+        })
+        .from(posts)
+        .where(
+          and(
+            eq(posts.organizationId, organizationId),
+            eq(posts.appId, input.appId),
+            gte(posts.publishedAt, new Date(`${input.from}T00:00:00Z`)),
+            lt(posts.publishedAt, new Date(`${addDays(input.to, 1)}T00:00:00Z`)),
+          ),
+        )
+        .orderBy(desc(posts.publishedAt))
+        .limit(input.limit)
+      if (rows.length === 0) return []
 
-    const liftOf = await downloadLifts(scope, input.appId, input)
+      const liftOf = await downloadLifts(scope, input.appId, input)
 
-    return rows.map((row) => ({
-      ...row,
-      publishedAt: row.publishedAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-      downloadLift: liftOf(row.publishedAt),
-    }))
+      return rows.map((row) => ({
+        ...row,
+        publishedAt: row.publishedAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        downloadLift: liftOf(row.publishedAt),
+      }))
+    })
   },
 })
 
@@ -75,40 +77,43 @@ export const listPosts = defineQuery({
  * reached: Google Play posts days after the App Store.
  */
 export async function downloadLifts(
-  { db, organizationId }: Scope,
+  scope: Scope,
   appId: string,
   range: { from: IsoDate; to: IsoDate },
 ): Promise<(publishedAt: Date) => DownloadLift> {
-  const downloadFilter = and(
-    eq(metricDaily.organizationId, organizationId),
-    eq(metricDaily.appId, appId),
-    eq(metricDaily.metric, DOWNLOADS.metric),
-    eq(metricDaily.dimension, ''),
-    inArray(metricDaily.source, [...DOWNLOADS.sources]),
-  )
-  const [downloadRows, latestBySource] = await Promise.all([
-    db
-      .select({ date: metricDaily.date, value: metricDaily.value })
-      .from(metricDaily)
-      .where(
-        and(
-          downloadFilter,
-          gte(metricDaily.date, addDays(range.from, -BASELINE_DAYS)),
-          lte(metricDaily.date, addDays(range.to, LIFT_DAYS - 1)),
+  return scope.run(async (db) => {
+    const { organizationId } = scope
+    const downloadFilter = and(
+      eq(metricDaily.organizationId, organizationId),
+      eq(metricDaily.appId, appId),
+      eq(metricDaily.metric, DOWNLOADS.metric),
+      eq(metricDaily.dimension, ''),
+      inArray(metricDaily.source, [...DOWNLOADS.sources]),
+    )
+    const [downloadRows, latestBySource] = await Promise.all([
+      db
+        .select({ date: metricDaily.date, value: metricDaily.value })
+        .from(metricDaily)
+        .where(
+          and(
+            downloadFilter,
+            gte(metricDaily.date, addDays(range.from, -BASELINE_DAYS)),
+            lte(metricDaily.date, addDays(range.to, LIFT_DAYS - 1)),
+          ),
         ),
-      ),
-    db
-      .select({ source: metricDaily.source, day: max(metricDaily.date) })
-      .from(metricDaily)
-      .where(downloadFilter)
-      .groupBy(metricDaily.source),
-  ])
+      db
+        .select({ source: metricDaily.source, day: max(metricDaily.date) })
+        .from(metricDaily)
+        .where(downloadFilter)
+        .groupBy(metricDaily.source),
+    ])
 
-  const byDay = new Map<IsoDate, number>()
-  for (const { date, value } of downloadRows) byDay.set(date, (byDay.get(date) ?? 0) + value)
-  const lastDays = new Map(
-    latestBySource.flatMap(({ source, day }) => (day ? [[source, day] as const] : [])),
-  )
-  const lastReportedDay = lastCompleteDay(lastDays).through
-  return (publishedAt) => downloadLift(byDay, toIsoDate(publishedAt), lastReportedDay)
+    const byDay = new Map<IsoDate, number>()
+    for (const { date, value } of downloadRows) byDay.set(date, (byDay.get(date) ?? 0) + value)
+    const lastDays = new Map(
+      latestBySource.flatMap(({ source, day }) => (day ? [[source, day] as const] : [])),
+    )
+    const lastReportedDay = lastCompleteDay(lastDays).through
+    return (publishedAt) => downloadLift(byDay, toIsoDate(publishedAt), lastReportedDay)
+  })
 }

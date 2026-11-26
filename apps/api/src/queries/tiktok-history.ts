@@ -10,12 +10,16 @@ import { addDays, toIsoDate, type IsoDate } from '../lib/dates.js'
  * day each video was posted (TikTok keeps no daily history; see `dailyViews`), so a chart can say
  * so. Null when no TikTok account belongs to an app.
  */
-export async function tiktokDailyFrom({ db, organizationId }: Scope, appId?: string): Promise<IsoDate | null> {
-  const rows = await db
-    .select({ connectedAt: connections.createdAt })
-    .from(assets)
-    .innerJoin(connections, sameConnection)
-    .where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'tiktok_account'), appId ? eq(assets.appId, appId) : isNotNull(assets.appId)))
+export async function tiktokDailyFrom(scope: Scope, appId?: string): Promise<IsoDate | null> {
+  const rows = await scope.run((db) =>
+    db
+      .select({ connectedAt: connections.createdAt })
+      .from(assets)
+      .innerJoin(connections, sameConnection)
+      .where(
+        and(eq(assets.organizationId, scope.organizationId), eq(assets.kind, 'tiktok_account'), appId ? eq(assets.appId, appId) : isNotNull(assets.appId)),
+      ),
+  )
   if (rows.length === 0) return null
   const latest = Math.max(...rows.map((row) => row.connectedAt.getTime()))
   return addDays(toIsoDate(new Date(latest)), 1)

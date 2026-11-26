@@ -38,53 +38,56 @@ export const listReviews = defineQuery({
     before: z.object({ createdAt: z.iso.datetime(), id: z.uuid() }).optional().describe('The `next` cursor of the previous page.'),
     limit: z.number().int().min(1).max(100).default(30),
   }),
-  async handler({ db, organizationId }, input) {
-    const cursor = input.before
-      ? or(
-          lt(reviews.createdAt, new Date(input.before.createdAt)),
-          and(eq(reviews.createdAt, new Date(input.before.createdAt)), lt(reviews.id, input.before.id)),
-        )
-      : undefined
-    const rows = await db
-      .select({
-        id: reviews.id,
-        appId: reviews.appId,
-        appName: apps.name,
-        store: reviews.store,
-        rating: reviews.rating,
-        title: reviews.title,
-        body: reviews.body,
-        author: reviews.author,
-        territory: reviews.territory,
-        language: reviews.language,
-        appVersion: reviews.appVersion,
-        device: reviews.device,
-        url: reviews.url,
-        reply: reviews.reply,
-        repliedAt: reviews.repliedAt,
-        createdAt: reviews.createdAt,
-        editedAt: reviews.editedAt,
-        readAt: reviews.readAt,
-      })
-      .from(reviews)
-      .innerJoin(apps, and(eq(apps.organizationId, reviews.organizationId), eq(apps.id, reviews.appId)))
-      .where(and(reviewConditions(organizationId, input), cursor))
-      .orderBy(desc(reviews.createdAt), desc(reviews.id))
-      .limit(input.limit + 1)
+  async handler(scope, input) {
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      const cursor = input.before
+        ? or(
+            lt(reviews.createdAt, new Date(input.before.createdAt)),
+            and(eq(reviews.createdAt, new Date(input.before.createdAt)), lt(reviews.id, input.before.id)),
+          )
+        : undefined
+      const rows = await db
+        .select({
+          id: reviews.id,
+          appId: reviews.appId,
+          appName: apps.name,
+          store: reviews.store,
+          rating: reviews.rating,
+          title: reviews.title,
+          body: reviews.body,
+          author: reviews.author,
+          territory: reviews.territory,
+          language: reviews.language,
+          appVersion: reviews.appVersion,
+          device: reviews.device,
+          url: reviews.url,
+          reply: reviews.reply,
+          repliedAt: reviews.repliedAt,
+          createdAt: reviews.createdAt,
+          editedAt: reviews.editedAt,
+          readAt: reviews.readAt,
+        })
+        .from(reviews)
+        .innerJoin(apps, and(eq(apps.organizationId, reviews.organizationId), eq(apps.id, reviews.appId)))
+        .where(and(reviewConditions(organizationId, input), cursor))
+        .orderBy(desc(reviews.createdAt), desc(reviews.id))
+        .limit(input.limit + 1)
 
-    const page = rows.slice(0, input.limit)
-    const last = page.at(-1)
-    return {
-      reviews: page.map((row) => ({
-        ...row,
-        createdAt: row.createdAt.toISOString(),
-        editedAt: row.editedAt?.toISOString() ?? null,
-        repliedAt: row.repliedAt?.toISOString() ?? null,
-        read: row.readAt !== null,
-        readAt: undefined,
-      })),
-      next: rows.length > input.limit && last ? { createdAt: last.createdAt.toISOString(), id: last.id } : null,
-    }
+      const page = rows.slice(0, input.limit)
+      const last = page.at(-1)
+      return {
+        reviews: page.map((row) => ({
+          ...row,
+          createdAt: row.createdAt.toISOString(),
+          editedAt: row.editedAt?.toISOString() ?? null,
+          repliedAt: row.repliedAt?.toISOString() ?? null,
+          read: row.readAt !== null,
+          readAt: undefined,
+        })),
+        next: rows.length > input.limit && last ? { createdAt: last.createdAt.toISOString(), id: last.id } : null,
+      }
+    })
   },
 })
 
@@ -98,41 +101,44 @@ export const getReviewSummary = defineQuery({
     `rating, how many have each rating, how many are unread, and the last ${RECENT_DAYS} days ` +
     `against the ${RECENT_DAYS} before (count and average).`,
   input: z.object({ appId: reviewFilters.appId, store: reviewFilters.store }),
-  async handler({ db, organizationId }, input) {
-    const where = reviewConditions(organizationId, input)
-    const now = Date.now()
-    const recentFrom = new Date(now - RECENT_DAYS * 86_400_000)
-    const previousFrom = new Date(now - 2 * RECENT_DAYS * 86_400_000)
+  async handler(scope, input) {
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      const where = reviewConditions(organizationId, input)
+      const now = Date.now()
+      const recentFrom = new Date(now - RECENT_DAYS * 86_400_000)
+      const previousFrom = new Date(now - 2 * RECENT_DAYS * 86_400_000)
 
-    const [byRating, [unread], [recent], [previous]] = await Promise.all([
-      db.select({ rating: reviews.rating, count: count() }).from(reviews).where(where).groupBy(reviews.rating),
-      db.select({ count: count() }).from(reviews).where(and(where, isNull(reviews.readAt))),
-      db
-        .select({ count: count(), average: sql<string | null>`avg(${reviews.rating})` })
-        .from(reviews)
-        .where(and(where, gte(reviews.createdAt, recentFrom))),
-      db
-        .select({ count: count(), average: sql<string | null>`avg(${reviews.rating})` })
-        .from(reviews)
-        .where(and(where, gte(reviews.createdAt, previousFrom), lt(reviews.createdAt, recentFrom))),
-    ])
+      const [byRating, [unread], [recent], [previous]] = await Promise.all([
+        db.select({ rating: reviews.rating, count: count() }).from(reviews).where(where).groupBy(reviews.rating),
+        db.select({ count: count() }).from(reviews).where(and(where, isNull(reviews.readAt))),
+        db
+          .select({ count: count(), average: sql<string | null>`avg(${reviews.rating})` })
+          .from(reviews)
+          .where(and(where, gte(reviews.createdAt, recentFrom))),
+        db
+          .select({ count: count(), average: sql<string | null>`avg(${reviews.rating})` })
+          .from(reviews)
+          .where(and(where, gte(reviews.createdAt, previousFrom), lt(reviews.createdAt, recentFrom))),
+      ])
 
-    const distribution = [5, 4, 3, 2, 1].map((stars) => ({
-      rating: stars,
-      count: byRating.find((row) => row.rating === stars)?.count ?? 0,
-    }))
-    const total = distribution.reduce((sum, row) => sum + row.count, 0)
-    const average = total === 0 ? null : distribution.reduce((sum, row) => sum + row.rating * row.count, 0) / total
-    const round = (value: string | null | undefined) => (value == null ? null : Math.round(Number(value) * 100) / 100)
+      const distribution = [5, 4, 3, 2, 1].map((stars) => ({
+        rating: stars,
+        count: byRating.find((row) => row.rating === stars)?.count ?? 0,
+      }))
+      const total = distribution.reduce((sum, row) => sum + row.count, 0)
+      const average = total === 0 ? null : distribution.reduce((sum, row) => sum + row.rating * row.count, 0) / total
+      const round = (value: string | null | undefined) => (value == null ? null : Math.round(Number(value) * 100) / 100)
 
-    return {
-      total,
-      average: average === null ? null : Math.round(average * 100) / 100,
-      distribution,
-      unread: unread?.count ?? 0,
-      recentDays: RECENT_DAYS,
-      recent: { count: recent?.count ?? 0, average: round(recent?.average) },
-      previous: { count: previous?.count ?? 0, average: round(previous?.average) },
-    }
+      return {
+        total,
+        average: average === null ? null : Math.round(average * 100) / 100,
+        distribution,
+        unread: unread?.count ?? 0,
+        recentDays: RECENT_DAYS,
+        recent: { count: recent?.count ?? 0, average: round(recent?.average) },
+        previous: { count: previous?.count ?? 0, average: round(previous?.average) },
+      }
+    })
   },
 })

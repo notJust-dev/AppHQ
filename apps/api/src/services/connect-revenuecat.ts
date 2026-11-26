@@ -2,7 +2,6 @@ import { and, eq, ne } from 'drizzle-orm'
 import { assignAsset, autoLink, upsertAssets } from '../assets/store.js'
 import { RevenueCatError, createRevenueCatClient } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
-import type { Db } from '../db/client.js'
 import type { Scope } from '../organizations/scope.js'
 import { apps, assets, connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
@@ -29,18 +28,21 @@ export interface ConnectedProject {
  * whatever its bundle id says, and the key must belong to exactly one project.
  */
 export async function connectRevenueCat(
-  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch },
+  deps: Scope & { secrets: Secrets; fetch?: typeof fetch },
   apiKey: string,
   options: { appId?: string } = {},
 ): Promise<ConnectedProject[]> {
-  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const scope: Scope = deps
   const inOrg = eq(assets.organizationId, deps.organizationId)
   if (options.appId !== undefined) {
-    const [target] = await deps.db
-      .select({ id: apps.id, kind: apps.kind })
-      .from(apps)
-      .where(and(eq(apps.organizationId, deps.organizationId), eq(apps.id, options.appId)))
-      .limit(1)
+    const appId = options.appId
+    const [target] = await scope.run((db) =>
+      db
+        .select({ id: apps.id, kind: apps.kind })
+        .from(apps)
+        .where(and(eq(apps.organizationId, deps.organizationId), eq(apps.id, appId)))
+        .limit(1),
+    )
     if (!target || target.kind === 'portfolio') {
       throw new ConnectInputError('That app no longer exists. Reload the page.')
     }
@@ -68,66 +70,73 @@ export async function connectRevenueCat(
     const bundleId = storeApps.find((app) => app.type === 'app_store')?.app_store?.bundle_id ?? null
     const androidPackage = storeApps.find((app) => app.type === 'play_store')?.play_store?.package_name ?? null
 
-    const values = { displayName: project.name, accessTokenEnc: encryptedKey, status: 'ok', updatedAt: new Date() }
-    const [connection] = await deps.db
-      .insert(connections)
-      .values({ organizationId: deps.organizationId, provider: REVENUECAT, externalAccountId: project.id, ...values })
-      .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
-      .returning({ id: connections.id })
-    if (!connection) throw new Error('could not save the RevenueCat connection')
+    // RevenueCat has answered for this project; saving it is one unit of work.
+    connected.push(
+      await scope.run(async (db) => {
+        const values = { displayName: project.name, accessTokenEnc: encryptedKey, status: 'ok', updatedAt: new Date() }
+        const [connection] = await db
+          .insert(connections)
+          .values({ organizationId: deps.organizationId, provider: REVENUECAT, externalAccountId: project.id, ...values })
+          .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
+          .returning({ id: connections.id })
+        if (!connection) throw new Error('could not save the RevenueCat connection')
 
-    const [asset] = await upsertAssets(scope, [
-      {
-        kind: 'revenuecat_project',
-        externalId: project.id,
-        name: project.name,
-        connectionId: connection.id,
-        details: { bundleId, androidPackage },
-      },
-    ])
-    if (!asset) throw new Error('could not save the RevenueCat project')
+        const [asset] = await upsertAssets(scope, [
+          {
+            kind: 'revenuecat_project',
+            externalId: project.id,
+            name: project.name,
+            connectionId: connection.id,
+            details: { bundleId, androidPackage },
+          },
+        ])
+        if (!asset) throw new Error('could not save the RevenueCat project')
 
-    let movedFrom: string | null = null
-    let replaced: string | null = null
-    if (options.appId !== undefined) {
-      const [before] = await deps.db
-        .select({ appId: assets.appId })
-        .from(assets)
-        .where(and(inOrg, eq(assets.id, asset.id)))
-        .limit(1)
-      if (before?.appId && before.appId !== options.appId) movedFrom = await appName(scope, before.appId)
-      const [previous] = await deps.db
-        .select({ name: assets.name })
-        .from(assets)
-        .where(
-          and(inOrg, eq(assets.kind, 'revenuecat_project'), eq(assets.appId, options.appId), ne(assets.id, asset.id)),
-        )
-        .limit(1)
-      replaced = previous?.name ?? null
-      await assignAsset(scope, { assetId: asset.id, appId: options.appId })
-    } else {
-      await autoLink(scope)
-    }
+        let movedFrom: string | null = null
+        let replaced: string | null = null
+        if (options.appId !== undefined) {
+          const [before] = await db
+            .select({ appId: assets.appId })
+            .from(assets)
+            .where(and(inOrg, eq(assets.id, asset.id)))
+            .limit(1)
+          if (before?.appId && before.appId !== options.appId) movedFrom = await appName(scope, before.appId)
+          const [previous] = await db
+            .select({ name: assets.name })
+            .from(assets)
+            .where(
+              and(inOrg, eq(assets.kind, 'revenuecat_project'), eq(assets.appId, options.appId), ne(assets.id, asset.id)),
+            )
+            .limit(1)
+          replaced = previous?.name ?? null
+          await assignAsset(scope, { assetId: asset.id, appId: options.appId })
+        } else {
+          await autoLink(scope)
+        }
 
-    const [current] = await deps.db.select().from(assets).where(and(inOrg, eq(assets.id, asset.id))).limit(1)
-    const appId = current?.appId ?? null
-    connected.push({
-      name: project.name,
-      appId,
-      appName: appId ? await appName(scope, appId) : null,
-      movedFrom,
-      replaced,
-    })
+        const [current] = await db.select().from(assets).where(and(inOrg, eq(assets.id, asset.id))).limit(1)
+        const appId = current?.appId ?? null
+        return {
+          name: project.name,
+          appId,
+          appName: appId ? await appName(scope, appId) : null,
+          movedFrom,
+          replaced,
+        }
+      }),
+    )
   }
 
   return connected
 }
 
-async function appName({ db, organizationId }: Scope, appId: string): Promise<string | null> {
-  const [app] = await db
-    .select({ name: apps.name })
-    .from(apps)
-    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
-    .limit(1)
+async function appName(scope: Scope, appId: string): Promise<string | null> {
+  const [app] = await scope.run((db) =>
+    db
+      .select({ name: apps.name })
+      .from(apps)
+      .where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
+      .limit(1),
+  )
   return app?.name ?? null
 }

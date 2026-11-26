@@ -361,6 +361,31 @@ where u.email = '<your address>'
   and not exists (select 1 from member m where m.organization_id = o.id and m.user_id <> u.id);
 ```
 
+### Row-level security
+
+Under the code's own filters, Postgres keeps each organization's rows apart too. Every table
+with an `organization_id` has a row-level security policy, and the API reads and writes them only
+in short transactions that name one organization: a query sees and changes that organization's
+rows and nothing else, and one that names none sees nothing. A write can't point at another
+organization's app, account or post either.
+
+When the API starts it checks this holds, and refuses to start, saying why, when it doesn't. The
+database login needs one of these:
+
+- **It may create roles** (a superuser, or `CREATEROLE`, as with the local Docker database). The
+  API then makes a role `apphq_tenant` that can't log in or bypass row-level security, and runs
+  every request and sync as it.
+- **It owns the tables and is neither a superuser nor has `BYPASSRLS`**, as is usual on managed
+  hosts. Requests then run as the login itself, which the policies hold too.
+
+To use the separate role on a host where the login can't create it, have someone who can run
+this once, then restart the API:
+
+```sql
+create role apphq_tenant nologin;
+grant apphq_tenant to <the api's database user>;
+```
+
 ## Connecting your data
 
 Sign in and open **Accounts**. It lists every source with its state. Each source's page has the
@@ -484,7 +509,7 @@ and the funnel and flow charts never claim that a specific view caused a specifi
 
 | Where | Command | What it does |
 |---|---|---|
-| `apps/api` | `npm test` | Unit tests. With `TEST_DATABASE_URL` set (database name ending in `_test`), also the Postgres tests |
+| `apps/api` | `npm test` | Unit tests. With `TEST_DATABASE_URL` set (database name ending in `_test`, a login that may create roles), also the Postgres tests |
 | `apps/api` | `npm run typecheck` | Type check |
 | `apps/api` | `npm run db:generate` | Create a migration after changing `src/db/schema.ts` |
 | `apps/api` | `npm run cli -- sync` | Run every connector over the last 7 days, for every organization |

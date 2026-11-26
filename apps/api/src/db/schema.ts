@@ -7,6 +7,7 @@ import {
   index,
   integer,
   jsonb,
+  pgPolicy,
   pgTable,
   primaryKey,
   text,
@@ -83,6 +84,29 @@ const organizationId = () =>
     .references(() => organization.id)
 
 /**
+ * Row-level security on every table with `organization_id`, a second layer under the code's own
+ * filters. A unit of work sets `app.organization_id` for its transaction (src/organizations/scope.ts);
+ * a row is visible and writable only in that organization, and with none set nothing is. FORCE in
+ * the migration makes it hold for the table owner too.
+ *
+ * Foreign keys are checked without row-level security, so a write must also point only at rows the
+ * organization can see: `links` are the checks for its references to other organization tables.
+ *
+ * A migration that changes data in these tables has to switch FORCE off and back on around it, in
+ * the same migration (they run in one transaction), or run as a role that bypasses row-level security.
+ */
+const inOrganization = sql`organization_id = (select nullif(current_setting('app.organization_id', true), '')::uuid)`
+const organizationPolicy = (table: string, links: string[] = []) =>
+  pgPolicy(`${table}_organization`, {
+    for: 'all',
+    to: 'public',
+    using: inOrganization,
+    withCheck: sql.join([inOrganization, ...links.map((link) => sql.raw(link))], sql` and `),
+  })
+const linkTo = (column: string, table: string, nullable: boolean) =>
+  nullable ? `(${column} is null or ${column} in (select id from ${table}))` : `${column} in (select id from ${table})`
+
+/**
  * The portfolio. `id` is a uuid, also used in the dashboard's addresses: it says nothing about
  * the app. What feeds an app (its store listings, RevenueCat project, social accounts) is in
  * `assets`.
@@ -108,6 +132,7 @@ export const apps = pgTable(
   (t) => [
     index('apps_org_idx').on(t.organizationId),
     uniqueIndex('apps_org_portfolio_idx').on(t.organizationId).where(sql`${t.kind} = 'portfolio'`),
+    organizationPolicy('apps'),
   ],
 )
 
@@ -140,7 +165,10 @@ export const connections = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('connections_org_provider_account_idx').on(t.organizationId, t.provider, t.externalAccountId)],
+  (t) => [
+    uniqueIndex('connections_org_provider_account_idx').on(t.organizationId, t.provider, t.externalAccountId),
+    organizationPolicy('connections'),
+  ],
 )
 
 /**
@@ -174,6 +202,7 @@ export const assets = pgTable(
   (t) => [
     uniqueIndex('assets_org_kind_external_idx').on(t.organizationId, t.kind, t.externalId),
     index('assets_org_app_idx').on(t.organizationId, t.appId),
+    organizationPolicy('assets', [linkTo('app_id', 'apps', true), linkTo('connection_id', 'connections', true)]),
   ],
 )
 
@@ -199,6 +228,7 @@ export const metricDaily = pgTable(
   (t) => [
     primaryKey({ columns: [t.organizationId, t.appId, t.date, t.source, t.metric, t.dimension] }),
     index('metric_daily_org_date_idx').on(t.organizationId, t.date),
+    organizationPolicy('metric_daily', [linkTo('app_id', 'apps', false)]),
   ],
 )
 
@@ -232,6 +262,7 @@ export const posts = pgTable(
   (t) => [
     uniqueIndex('posts_org_platform_external_idx').on(t.organizationId, t.platform, t.externalId),
     index('posts_org_app_published_idx').on(t.organizationId, t.appId, t.publishedAt),
+    organizationPolicy('posts', [linkTo('app_id', 'apps', false), linkTo('connection_id', 'connections', true)]),
   ],
 )
 
@@ -254,7 +285,7 @@ export const postSnapshots = pgTable(
     shares: bigint('shares', { mode: 'number' }).notNull(),
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.postId, t.date] })],
+  (t) => [primaryKey({ columns: [t.postId, t.date] }), organizationPolicy('post_snapshots', [linkTo('post_id', 'posts', false)])],
 )
 
 /**
@@ -298,6 +329,7 @@ export const reviews = pgTable(
     uniqueIndex('reviews_org_store_external_idx').on(t.organizationId, t.store, t.externalId),
     index('reviews_org_app_created_idx').on(t.organizationId, t.appId, t.createdAt),
     index('reviews_org_created_idx').on(t.organizationId, t.createdAt),
+    organizationPolicy('reviews', [linkTo('app_id', 'apps', false)]),
   ],
 )
 
@@ -318,7 +350,10 @@ export const syncRuns = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
-  (t) => [index('sync_runs_org_source_started_idx').on(t.organizationId, t.source, t.startedAt)],
+  (t) => [
+    index('sync_runs_org_source_started_idx').on(t.organizationId, t.source, t.startedAt),
+    organizationPolicy('sync_runs', [linkTo('app_id', 'apps', true)]),
+  ],
 )
 
 /**
