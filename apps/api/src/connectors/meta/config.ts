@@ -16,7 +16,6 @@ export const META_PERMISSIONS = [
   'read_insights',
   'instagram_basic',
   'instagram_manage_insights',
-  'business_management',
 ] as const
 
 /** Without these the connectors cannot read anything: Pages, Page insights, Instagram. */

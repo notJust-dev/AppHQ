@@ -125,7 +125,8 @@ function PrivacyPage() {
           <a href="https://security.google.com/settings/security/permissions">
             Google security settings page
           </a>
-          . To have the stored credentials and data deleted too, email us.
+          . To have the stored credentials and data deleted too, see{' '}
+          <a href="#deleting-your-data">Deleting your data</a>.
         </li>
       </ul>
       <p>
@@ -145,6 +146,17 @@ function PrivacyPage() {
       <p>
         If you host AppHQ yourself, all of this stays on your own server, and you're responsible for it
         there.
+      </p>
+
+      <h2 id="deleting-your-data">Deleting your data</h2>
+      <p>
+        To have a connected account's data and credentials deleted, or your whole AppHQ account, email{' '}
+        <ContactEmail /> from the address you use with AppHQ and say what to delete. We delete it
+        within 7 days and email you when it's done.
+      </p>
+      <p>
+        Revoking AppHQ's access in Facebook, Instagram, TikTok or Google stops AppHQ reading anything
+        new, but doesn't remove what it has already stored. For that, email us as well.
       </p>
 
       <h2>Who processes data for us</h2>

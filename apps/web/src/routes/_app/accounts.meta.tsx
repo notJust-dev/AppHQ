@@ -69,10 +69,10 @@ function MetaPage() {
           on Instagram&quot; (API setup with Unified login).
         </p>
         <p>
-          Create a login configuration (user access token) with <code>pages_show_list</code>,{' '}
-          <code>pages_read_engagement</code>, <code>pages_read_user_content</code>,{' '}
-          <code>read_insights</code>, <code>instagram_basic</code>,{' '}
-          <code>instagram_manage_insights</code> and <code>business_management</code>.
+          Create a login configuration for Pages and Instagram accounts with{' '}
+          <code>pages_show_list</code>, <code>pages_read_engagement</code>,{' '}
+          <code>pages_read_user_content</code>, <code>read_insights</code>,{' '}
+          <code>instagram_basic</code> and <code>instagram_manage_insights</code>.
         </p>
         <p>
           Set <code>META_APP_ID</code>, <code>META_APP_SECRET</code> and{' '}
