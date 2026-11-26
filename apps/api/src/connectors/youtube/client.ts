@@ -147,7 +147,9 @@ export function createYouTubeClient(options: { config: YouTubeConfig; fetch?: ty
         scope: YOUTUBE_SCOPES.join(' '),
         // A refresh token, every time, so syncs keep working after the hour-long access token.
         access_type: 'offline',
-        prompt: 'consent',
+        // Always the account chooser too: the channel's account is often not the one the
+        // browser is signed in with, such as a brand account.
+        prompt: 'consent select_account',
         include_granted_scopes: 'true',
         state: input.state,
       }).toString()

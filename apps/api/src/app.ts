@@ -1,8 +1,12 @@
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from '@trpc/server/adapters/fastify'
 import Fastify from 'fastify'
+import type { Accounts } from './auth/accounts.js'
+import type { Auth } from './auth/auth.js'
 import { requireBearerToken } from './auth/bearer.js'
+import { authRoutes } from './auth/routes.js'
 import type { Db, Sql } from './db/client.js'
 import type { Secrets } from './lib/crypto.js'
+import { ACCESS_HEADER, DASHBOARD_ACCESS, type ApiContext } from './trpc/init.js'
 import { appRouter, type AppRouter } from './trpc/router.js'
 
 export interface AppDeps {
@@ -12,6 +16,8 @@ export interface AppDeps {
   /** Resolves when the database answers; used by /health. */
   pingDb: () => Promise<unknown>
   internalApiToken: string
+  /** Accounts, when they are set up; without them /api/auth does not exist. */
+  accounts?: { auth: Auth; origin: string; accounts: Accounts } | null
   logLevel?: 'info' | 'silent'
 }
 
@@ -32,15 +38,33 @@ export async function buildApp(deps: AppDeps) {
     }
   })
 
-  // Everything under /trpc is for the dashboard server only.
+  // Everything else is for the dashboard server only.
   await app.register(async (internal) => {
     internal.addHook('onRequest', requireBearerToken(deps.internalApiToken))
+
+    if (deps.accounts) await internal.register(authRoutes(deps.accounts.auth, deps.accounts.origin))
+
+    const accounts = deps.accounts?.accounts ?? null
     await internal.register(fastifyTRPCPlugin, {
       prefix: '/trpc',
       trpcOptions: {
         router: appRouter,
-        createContext: () => ({ db: deps.db, sql: deps.sql, secrets: deps.secrets, log: app.log }),
+        createContext: ({ req }): ApiContext => {
+          const cookie = req.headers.cookie
+          let account: ReturnType<ApiContext['account']> | undefined
+          return {
+            db: deps.db,
+            sql: deps.sql,
+            secrets: deps.secrets,
+            log: app.log,
+            dashboardAccess: req.headers[ACCESS_HEADER] === DASHBOARD_ACCESS,
+            accounts,
+            account: () => (account ??= accounts ? accounts.userFor(cookie) : Promise.resolve(null)),
+          }
+        },
         onError({ path, error }) {
+          // Refusals are expected; they say nothing about the API's health.
+          if (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN') return
           app.log.error({ path, code: error.code }, error.message)
         },
       } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],

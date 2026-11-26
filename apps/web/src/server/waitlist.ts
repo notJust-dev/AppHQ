@@ -1,5 +1,5 @@
 import '@tanstack/react-start/server-only'
-import { api } from './api'
+import { publicApi } from './api'
 import { clientAddress } from './password'
 
 const MAX_PER_WINDOW = 5
@@ -23,6 +23,6 @@ export async function joinWaitlist(email: string, now: number = Date.now()): Pro
   if (current && current.count >= MAX_PER_WINDOW) return { result: 'busy' }
   attempts.set(address, { count: (current?.count ?? 0) + 1, resetAt: current?.resetAt ?? now + WINDOW_MS })
 
-  const { answerToken } = await api().waitlist.join.mutate({ email, source: 'landing' })
+  const { answerToken } = await publicApi().waitlist.join.mutate({ email, source: 'landing' })
   return { result: 'ok', answerToken }
 }

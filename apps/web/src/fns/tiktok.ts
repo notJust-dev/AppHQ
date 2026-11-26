@@ -2,15 +2,14 @@ import { randomBytes } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
 import { TRPCClientError } from '@trpc/client'
 import { z } from 'zod'
-import { api } from '@/server/api'
 import { beginOAuth, getOAuthSession, tiktokRedirectUri } from '@/server/oauth'
-import { requireSession } from './auth'
+import { requireDashboardAccess } from './auth'
 
 /** Whether the API has TikTok credentials, and the redirect URI to register with TikTok. */
 export const tiktokSetupFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
-  .handler(async () => {
-    const { configured } = await api().tiktok.setup.query()
+  .middleware([requireDashboardAccess])
+  .handler(async ({ context }) => {
+    const { configured } = await context.api.tiktok.setup.query()
     return { configured, redirectUri: tiktokRedirectUri() }
   })
 
@@ -19,12 +18,12 @@ export const tiktokSetupFn = createServerFn({ method: 'GET' })
  * TikTok's sign-in URL, which the page then navigates to.
  */
 export const startTikTokConnectFn = createServerFn({ method: 'POST' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ appId: z.string().min(1).max(64) }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const state = randomBytes(24).toString('base64url')
     try {
-      const { url } = await api().tiktok.authorizeUrl.query({
+      const { url } = await context.api.tiktok.authorizeUrl.query({
         redirectUri: tiktokRedirectUri(),
         state,
       })
@@ -41,7 +40,7 @@ export const startTikTokConnectFn = createServerFn({ method: 'POST' })
 
 /** The outcome of the last sign-in, once: reading it clears it. */
 export const takeConnectResultFn = createServerFn({ method: 'POST' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .handler(async () => {
     const oauth = await getOAuthSession()
     const result = oauth.result ?? null

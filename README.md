@@ -15,20 +15,23 @@ from both stores into one inbox.
 It reads from **App Store Connect, Google Play, RevenueCat, TikTok, Instagram, Facebook Pages,
 YouTube and Google Search Console** using your own API keys and developer apps. There is no
 third-party service in between. Credentials are encrypted before they are stored, and the
-dashboard is protected by a single password.
+dashboard is protected by a single password. Optionally, people can sign in with Google or GitHub
+to ask for access; an account never opens the dashboard (see
+[Accounts and access requests](#accounts-and-access-requests-optional)).
 
 ## How it works
 
 ```
 Browser ──▶ web (TanStack Start)  ──internal token──▶  api (Fastify + tRPC)  ──▶ PostgreSQL
             login, dashboard UI,                       connectors, scheduled
-            server functions                           syncs, migrations
+            server functions,                          syncs, migrations,
+            /api/auth forwarding                       accounts (Better Auth)
 ```
 
 | Folder | What it is |
 |---|---|
 | `apps/api` | Fastify + tRPC + Drizzle. The only part that touches Postgres. Runs the data syncs on a schedule and applies migrations when it boots. Also includes a small CLI. |
-| `apps/web` | TanStack Start dashboard (React, Vite, shadcn/ui). Its server functions call the API with a shared secret, so the browser never talks to the API directly. |
+| `apps/web` | TanStack Start dashboard (React, Vite, shadcn/ui). Its server functions call the API with a shared secret, so the browser never talks to the API directly. It also forwards account sign-ins to the API, so their cookie stays on the dashboard's own domain. |
 
 The two apps are independent npm packages. Each one installs, builds and deploys on its own.
 Both need **Node 22.13 or newer**.
@@ -198,17 +201,25 @@ It loads four made-up apps whose ids start with `demo-`:
 ```bash
 curl -X POST https://<api address>/trpc/demo.seed \
   -H "Authorization: Bearer <INTERNAL_API_TOKEN>" \
+  -H "x-apphq-access: dashboard" \
   -H "Content-Type: application/json" -d '{}'
 ```
 
-Remove them before you connect real data. The same request to `demo.clear` deletes them and
+Or use **Load demo data** on the Accounts page once you are signed in. Remove them before you
+connect real data. The same request to `demo.clear` (or **Remove demo data**) deletes them and
 nothing else.
+
+The `x-apphq-access` header is how the dashboard server tells the API that someone signed in with
+the dashboard password. The API refuses every dashboard request without it, and only accepts it
+alongside the internal token.
 
 ### 9. (Optional) Custom domains
 
 Add a domain to each application in Velocity, for example `app.example.com` for `web` and
 `api.example.com` for `api`. Then update `API_URL` on `web`, set `PUBLIC_URL` on `web` to the
-new dashboard address, and update the redirect URIs registered with TikTok, Meta and Google.
+new dashboard address, and update the redirect URIs registered with TikTok, Meta and Google. If
+accounts are on, also set `PUBLIC_URL` on `api` to the same new dashboard address and update the
+sign-in redirect URIs with Google and GitHub.
 
 ### Good to know
 
@@ -265,6 +276,56 @@ Good to know:
   `ENCRYPTION_KEY`, `SESSION_SECRET` and `DASHBOARD_PASSWORD` into Velocity yourself.
 - **The MCP can also delete servers and apps**, and deletion can't be undone. Your token has full
   access to the account, so keep it private and review what the agent proposes before you approve it.
+
+## Accounts and access requests (optional)
+
+If you want other people to ask for access, turn on accounts: the sign-in page (`/login`) then
+offers **Continue with Google** and **Continue with GitHub** above the dashboard password, and
+people who sign in that way land on a page where they can press **Request access**. This is off
+unless you set it up, and nothing else changes when it is off.
+
+An account never opens the dashboard. The dashboard password is still the only way in, and
+approving someone's request doesn't change that yet: it records who may join once accounts can
+have their own data.
+
+**1. Create the sign-in apps.** Use the dashboard's address (the `web` app, not the API), shown
+here as `<web address>`; locally it is `http://127.0.0.1:3000`.
+
+- **Google:** use the same Google Cloud project as YouTube, with a second **OAuth client** of type
+  **Web application** for sign-in. Add the authorized redirect URI
+  `<web address>/api/auth/callback/google`. The two clients share one consent screen, but each
+  asks only for its own permissions: signing in asks for name and email, and YouTube's
+  permissions are asked for only when someone presses **Connect YouTube**, with whichever Google
+  account owns the channel. While the consent screen is in **Testing**, only its test users can
+  sign in, so publish it before you open sign-up (Google reviews the YouTube permissions first).
+- **GitHub:** in **Settings → Developer settings → OAuth Apps**, create an app with the
+  authorization callback URL `<web address>/api/auth/callback/github`.
+
+You can set up just one of them.
+
+**2. Set the variables on the `api` app** and redeploy. Nothing new is needed on `web`.
+
+| Variable | Value |
+|---|---|
+| `BETTER_AUTH_SECRET` | A new `openssl rand -hex 32` value. Changing it signs everyone out |
+| `PUBLIC_URL` | `<web address>`, with no path: the dashboard's address, not the API's. The same value as `PUBLIC_URL` on `web` |
+| `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET` | From the Google OAuth client |
+| `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` | From the GitHub OAuth App |
+
+The API's log says `accounts are on` when it boots, and `/login` shows the sign-in buttons.
+
+**3. See who asked**, in the database (for example with `psql`):
+
+```sql
+select email, name, access_status, access_requested_at from "user"
+order by access_requested_at desc nulls last;
+```
+
+To approve someone: `update "user" set access_status = 'approved' where email = '<their address>';`
+They see that they are approved on the Request access page.
+
+Only addresses the provider has confirmed can sign in. Someone who signed in with Google can't
+later sign in to the same account with GitHub, even with the same address.
 
 ## Connecting your data
 
@@ -354,7 +415,8 @@ sign in again before the date shown on the page.
 1. In Google Cloud, enable the **YouTube Data API v3** and the **YouTube Analytics API**.
 2. Create an **OAuth client** of type **Web application**. Its consent screen needs the
    `youtube.readonly` and `yt-analytics.readonly` scopes. Add yourself as a test user while
-   the app is in testing.
+   the app is in testing. If you also turn on [accounts](#accounts-and-access-requests-optional),
+   their Google sign-in goes in this same project, as a second client.
 3. Add the redirect URI shown on AppHQ's YouTube page.
 4. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` on the API and redeploy.
 

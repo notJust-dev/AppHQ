@@ -42,6 +42,18 @@ function PrivacyPage() {
         then delete the entries of people who didn't.
       </p>
 
+      <h2>Asking for access</h2>
+      <p>
+        When you sign in with Google or GitHub to ask for access, we store your name and email
+        address as the provider gives them to us, whether the provider has confirmed the address,
+        which provider you used and your account id there, and whether and when you asked. The
+        provider's sign-in tokens are stored encrypted and aren't used. We don't ask the provider for
+        anything else.
+      </p>
+      <p>
+        We use this to let you in when your account is ready and to email you about it. We rely on
+        your consent, which you give by signing in. Email us to have your account deleted.
+      </p>
       <h2>Technical data</h2>
       <p>
         To stop abuse, the site uses your IP address to limit how often you can sign in or join the
@@ -75,9 +87,10 @@ function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        We don't use analytics or advertising cookies. Signing in to the dashboard sets one session
-        cookie, which is needed to keep you signed in. Your light or dark theme choice is kept in your
-        own browser and never sent to us.
+        We don't use analytics or advertising cookies. Signing in to the dashboard, or with Google or
+        GitHub, sets a session cookie, which is needed to keep you signed in; a Google or GitHub
+        sign-in also sets a short-lived cookie that lets it finish safely. Your light or dark theme
+        choice is kept in your own browser and never sent to us.
       </p>
 
       <h2>Accounts connected to the dashboard</h2>

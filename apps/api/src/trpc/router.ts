@@ -1,4 +1,4 @@
-import { TRPCError, initTRPC } from '@trpc/server'
+import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { AppStoreError } from '../connectors/app-store/client.js'
 import { APP_STORE, APP_STORE_HISTORY_DAYS } from '../connectors/app-store/connector.js'
@@ -9,11 +9,8 @@ import { MetaError, createMetaClient } from '../connectors/meta/client.js'
 import { FACEBOOK, MetaNotConfiguredError, metaConfig } from '../connectors/meta/config.js'
 import { TikTokError, createTikTokClient } from '../connectors/tiktok/client.js'
 import { TIKTOK, TikTokNotConfiguredError, tiktokConfig } from '../connectors/tiktok/config.js'
-import type { Sql } from '../db/client.js'
-import { MissingEncryptionKeyError, type Secrets } from '../lib/crypto.js'
+import { MissingEncryptionKeyError } from '../lib/crypto.js'
 import { trailingRange } from '../lib/dates.js'
-import type { Logger } from '../lib/logger.js'
-import type { QueryContext } from '../queries/define.js'
 import { getAppFlow } from '../queries/get-app-flow.js'
 import { getAppTimeline } from '../queries/get-app-timeline.js'
 import { getOverview } from '../queries/get-overview.js'
@@ -52,18 +49,13 @@ import { assignAsset, createApp, removeApp, renameApp, setIgnored } from '../ass
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 import { answerWaitlist, answerWaitlistInput, joinWaitlist, joinWaitlistInput } from '../waitlist/join.js'
+import type { AccountUser } from '../auth/accounts.js'
+import { procedure, router, signedInAccount } from './init.js'
 
-/** Everything a procedure can use. Read-only queries only need the `db` part. */
-export interface ApiContext extends QueryContext {
-  sql: Sql
-  secrets: Secrets
-  log: Logger
-}
+export type { ApiContext } from './init.js'
 
 /** How much history to fetch when an app is first connected. */
 const BACKFILL_DAYS = 400
-
-const t = initTRPC.context<ApiContext>().create()
 
 /** Turns a failure to connect a source into a message that is safe and useful to show. */
 function connectError(err: unknown): TRPCError {
@@ -181,31 +173,44 @@ function connectError(err: unknown): TRPCError {
   })
 }
 
+/** What an account may see of itself. */
+function profile(account: AccountUser) {
+  return {
+    email: account.email,
+    name: account.name,
+    accessStatus: account.accessStatus,
+    accessRequestedAt: account.accessRequestedAt?.toISOString() ?? null,
+  }
+}
+
 /**
  * The dashboard's view of the API. Read procedures are thin wrappers around query definitions,
  * so tRPC, MCP and the Telegram agent can never drift apart.
+ *
+ * Every procedure is for the dashboard (the dashboard password) unless its `meta` says otherwise;
+ * see `trpc/init.ts`, and the list in `access.test.ts`, which has to name each one.
  */
-export const appRouter = t.router({
-  apps: t.router({
-    list: t.procedure.query(({ ctx }) => listApps.handler(ctx)),
+export const appRouter = router({
+  apps: router({
+    list: procedure.query(({ ctx }) => listApps.handler(ctx)),
 
-    timeline: t.procedure.input(getAppTimeline.input).query(async ({ ctx, input }) => {
+    timeline: procedure.input(getAppTimeline.input).query(async ({ ctx, input }) => {
       const timeline = await getAppTimeline.handler(ctx, input)
       if (!timeline) throw new TRPCError({ code: 'NOT_FOUND', message: 'There is no such app.' })
       return timeline
     }),
 
     /** Totals for the funnel and flow charts: views, downloads, trials and what became of them. */
-    flow: t.procedure.input(getAppFlow.input).query(async ({ ctx, input }) => {
+    flow: procedure.input(getAppFlow.input).query(async ({ ctx, input }) => {
       const flow = await getAppFlow.handler(ctx, input)
       if (!flow) throw new TRPCError({ code: 'NOT_FOUND', message: 'There is no such app.' })
       return flow
     }),
 
-    posts: t.procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
+    posts: procedure.input(listPosts.input).query(({ ctx, input }) => listPosts.handler(ctx, input)),
 
     /** Renames an app; its id and address stay the same. */
-    rename: t.procedure
+    rename: procedure
       .input(z.object({ appId: z.string().min(1).max(64), name: z.string().trim().min(1).max(80) }))
       .mutation(async ({ ctx, input }) => ({
         name: await renameApp(ctx.db, input.appId, input.name).catch((err: unknown) => {
@@ -217,14 +222,14 @@ export const appRouter = t.router({
      * Stops tracking an app: deletes it with its numbers and posts. What fed it stays, without an
      * app, on the Apps page.
      */
-    remove: t.procedure.input(z.object({ appId: z.string().min(1).max(64) })).mutation(async ({ ctx, input }) => ({
+    remove: procedure.input(z.object({ appId: z.string().min(1).max(64) })).mutation(async ({ ctx, input }) => ({
       name: await removeApp(ctx.db, input.appId).catch((err: unknown) => {
         throw connectError(err)
       }),
     })),
 
     /** Makes an app by name, to link assets to; returns its id. */
-    create: t.procedure
+    create: procedure
       .input(z.object({ name: z.string().trim().min(1).max(80) }))
       .mutation(async ({ ctx, input }) => ({
         appId: await createApp(ctx.db, input.name).catch((err: unknown) => {
@@ -236,7 +241,7 @@ export const appRouter = t.router({
      * Connects the project behind a RevenueCat secret key, to `appId` when it is added from an
      * app's settings, and starts fetching its history once it belongs to an app.
      */
-    connectRevenueCat: t.procedure
+    connectRevenueCat: procedure
       .input(z.object({ apiKey: z.string().trim().min(8).max(500), appId: z.string().min(1).max(64).optional() }))
       .mutation(async ({ ctx, input }) => {
         const connected = await connectRevenueCat(ctx, input.apiKey, { appId: input.appId }).catch((err: unknown) => {
@@ -257,14 +262,14 @@ export const appRouter = t.router({
         return { projects: connected }
       }),
   }),
-  accounts: t.router({
-    list: t.procedure.query(({ ctx }) => listAccounts.handler(ctx)),
+  accounts: router({
+    list: procedure.query(({ ctx }) => listAccounts.handler(ctx)),
 
     /**
      * Connects the App Store Connect account, adds its apps and starts fetching a year of
      * downloads. Also asks Apple to start analytics reports, when the key is allowed to.
      */
-    connectAppStore: t.procedure
+    connectAppStore: procedure
       .input(
         z.object({
           issuerId: z.string().trim().min(8).max(100),
@@ -290,10 +295,10 @@ export const appRouter = t.router({
    * TikTok sign-in. The dashboard owns the browser side (the session, the state cookie and the
    * redirect); the API owns the client secret and the tokens.
    */
-  tiktok: t.router({
-    setup: t.procedure.query(() => ({ configured: tiktokConfig() !== null })),
+  tiktok: router({
+    setup: procedure.query(() => ({ configured: tiktokConfig() !== null })),
 
-    authorizeUrl: t.procedure
+    authorizeUrl: procedure
       .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
       .query(({ input }) => {
         const config = tiktokConfig()
@@ -302,7 +307,7 @@ export const appRouter = t.router({
       }),
 
     /** Finishes the sign-in and starts reading the account's videos. */
-    connect: t.procedure
+    connect: procedure
       .input(
         z.object({
           code: z.string().min(1).max(2000),
@@ -328,8 +333,8 @@ export const appRouter = t.router({
    * The Google Play developer account: a service account key that can read the monthly report
    * files in the account's Cloud Storage bucket, and which app each package belongs to.
    */
-  googlePlay: t.router({
-    connect: t.procedure
+  googlePlay: router({
+    connect: procedure
       .input(
         z.object({
           serviceAccountJson: z.string().trim().min(100).max(10_000),
@@ -349,10 +354,10 @@ export const appRouter = t.router({
    * Facebook Pages and their linked Instagram accounts, through one Facebook sign-in. Like
    * TikTok, the dashboard owns the browser side and the API owns the app secret and tokens.
    */
-  meta: t.router({
-    setup: t.procedure.query(() => ({ configured: metaConfig() !== null })),
+  meta: router({
+    setup: procedure.query(() => ({ configured: metaConfig() !== null })),
 
-    authorizeUrl: t.procedure
+    authorizeUrl: procedure
       .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
       .query(({ input }) => {
         const config = metaConfig()
@@ -361,7 +366,7 @@ export const appRouter = t.router({
       }),
 
     /** Finishes the sign-in and saves every Page and Instagram account it can see. */
-    connect: t.procedure
+    connect: procedure
       .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url() }))
       .mutation(({ ctx, input }) =>
         connectMeta(ctx, input).catch((err: unknown) => {
@@ -374,11 +379,11 @@ export const appRouter = t.router({
    * What the accounts give access to, and which app each belongs to. Linking an asset fetches
    * its history; an app holds one iOS app, one Android app and one RevenueCat project.
    */
-  assets: t.router({
-    list: t.procedure.query(({ ctx }) => listAssets.handler(ctx)),
+  assets: router({
+    list: procedure.query(({ ctx }) => listAssets.handler(ctx)),
 
     /** Gives an asset to an app, to a new app (`'new'`), to the portfolio, or to none (`null`). */
-    assign: t.procedure
+    assign: procedure
       .input(z.object({ assetId: z.uuid(), appId: z.string().min(1).max(64).nullable() }))
       .mutation(async ({ ctx, input }) => {
         const { asset, appId } = await assignAsset(ctx.db, input).catch((err: unknown) => {
@@ -398,7 +403,7 @@ export const appRouter = t.router({
       }),
 
     /** Stops assets asking for a decision (and unlinks them), or brings them back. */
-    ignore: t.procedure
+    ignore: procedure
       .input(z.object({ assetIds: z.array(z.uuid()).min(1).max(500), ignored: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         const count = await setIgnored(ctx.db, input.assetIds, input.ignored).catch((err: unknown) => {
@@ -407,23 +412,23 @@ export const appRouter = t.router({
         return { count }
       }),
   }),
-  overview: t.router({
-    get: t.procedure
+  overview: router({
+    get: procedure
       .input(getOverview.input)
       .query(({ ctx, input }) => getOverview.handler(ctx, input)),
   }),
   /** The Social, Store and Monetisation pages: one app or all of them, over a range. */
-  performance: t.router({
-    social: t.procedure
+  performance: router({
+    social: procedure
       .input(getSocialPerformance.input)
       .query(({ ctx, input }) => getSocialPerformance.handler(ctx, input)),
-    store: t.procedure
+    store: procedure
       .input(getStorePerformance.input)
       .query(({ ctx, input }) => getStorePerformance.handler(ctx, input)),
-    monetisation: t.procedure
+    monetisation: procedure
       .input(getMonetisationPerformance.input)
       .query(({ ctx, input }) => getMonetisationPerformance.handler(ctx, input)),
-    search: t.procedure
+    search: procedure
       .input(getSearchPerformance.input)
       .query(({ ctx, input }) => getSearchPerformance.handler(ctx, input)),
   }),
@@ -431,10 +436,10 @@ export const appRouter = t.router({
    * YouTube channels, through a Google sign-in. Like Meta, the dashboard owns the browser side
    * and the API owns the client secret and the tokens; channels wait for an app on the Apps page.
    */
-  youtube: t.router({
-    setup: t.procedure.query(() => ({ configured: youtubeConfig() !== null })),
+  youtube: router({
+    setup: procedure.query(() => ({ configured: youtubeConfig() !== null })),
 
-    authorizeUrl: t.procedure
+    authorizeUrl: procedure
       .input(z.object({ redirectUri: z.url(), state: z.string().min(16).max(200) }))
       .query(({ input }) => {
         const config = youtubeConfig()
@@ -443,7 +448,7 @@ export const appRouter = t.router({
       }),
 
     /** Finishes the sign-in and saves the channel, waiting for an app. */
-    connect: t.procedure
+    connect: procedure
       .input(z.object({ code: z.string().min(1).max(2000), redirectUri: z.url() }))
       .mutation(({ ctx, input }) =>
         connectYouTube(ctx, input).catch((err: unknown) => {
@@ -456,8 +461,8 @@ export const appRouter = t.router({
    * Google Search Console, through a service account added to the person's properties: the
    * Google Play one, or another key.
    */
-  searchConsole: t.router({
-    connect: t.procedure
+  searchConsole: router({
+    connect: procedure
       .input(
         z
           .object({ serviceAccountJson: z.string().trim().min(100).max(10_000).optional(), usePlayKey: z.boolean().optional() })
@@ -473,7 +478,7 @@ export const appRouter = t.router({
       }),
 
     /** The top queries or pages over a range, read live from Search Console. */
-    top: t.procedure
+    top: procedure
       .input(
         z.object({
           appId: z.string().min(1).max(64).optional(),
@@ -493,19 +498,19 @@ export const appRouter = t.router({
       ),
   }),
   /** The reviews inbox: written App Store and Google Play reviews, read state kept here. */
-  reviews: t.router({
-    list: t.procedure.input(listReviews.input).query(({ ctx, input }) => listReviews.handler(ctx, input)),
+  reviews: router({
+    list: procedure.input(listReviews.input).query(({ ctx, input }) => listReviews.handler(ctx, input)),
 
-    summary: t.procedure.input(getReviewSummary.input).query(({ ctx, input }) => getReviewSummary.handler(ctx, input)),
+    summary: procedure.input(getReviewSummary.input).query(({ ctx, input }) => getReviewSummary.handler(ctx, input)),
 
     /** How many reviews wait in the inbox, for the sidebar. */
-    unreadCount: t.procedure.query(async ({ ctx }) => {
+    unreadCount: procedure.query(async ({ ctx }) => {
       const [row] = await ctx.db.select({ count: count() }).from(reviewsTable).where(isNull(reviewsTable.readAt))
       return { count: row?.count ?? 0 }
     }),
 
     /** Marks the given reviews, or every review matching the filters, read or unread. */
-    mark: t.procedure
+    mark: procedure
       .input(
         z.object({
           ids: z.array(z.uuid()).min(1).max(500).optional(),
@@ -521,40 +526,60 @@ export const appRouter = t.router({
         return { changed }
       }),
   }),
-  sync: t.router({
-    status: t.procedure.query(({ ctx }) => getSyncStatus.handler(ctx)),
+  sync: router({
+    status: procedure.query(({ ctx }) => getSyncStatus.handler(ctx)),
 
     /** Starts a sync of every connected source and returns at once; see `status` for progress. */
-    run: t.procedure
+    run: procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(7) }))
       .mutation(({ ctx, input }) => {
         startSync(ctx, { connectors, range: trailingRange(input.days) })
         return { started: true }
       }),
   }),
-  // Velocity has no shell, so the generated demo data is loaded and removed through the API.
-  // Both only ever touch apps whose id starts with `demo-`.
-  waitlist: t.router({
+  /** The landing page's waitlist form. Public: whoever is on the landing page can use it. */
+  waitlist: router({
     /** Adds an address from the public landing page; a repeat sign-up is not an error. */
-    join: t.procedure.input(joinWaitlistInput).mutation(async ({ ctx, input }) => {
+    join: procedure.meta({ access: 'public' }).input(joinWaitlistInput).mutation(async ({ ctx, input }) => {
       const { added, answerToken } = await joinWaitlist(ctx.db, input)
       if (added) ctx.log.info(`waitlist: new sign-up from ${input.source}`)
       return { answerToken }
     }),
 
     /** Saves the optional follow-up questions for the sign-up that received `answerToken`. */
-    answer: t.procedure.input(answerWaitlistInput).mutation(async ({ ctx, input }) => {
+    answer: procedure.meta({ access: 'public' }).input(answerWaitlistInput).mutation(async ({ ctx, input }) => {
       if (!(await answerWaitlist(ctx.db, input))) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'That sign-up has no questions waiting.' })
       }
       return { ok: true as const }
     }),
   }),
-  demo: t.router({
-    seed: t.procedure
+  /**
+   * The visitor's own account, for the Request access page. An account sees only itself, and
+   * asking for access grants nothing yet: the dashboard still takes the dashboard password.
+   */
+  account: router({
+    /** How people can sign in here; empty when accounts are off. Public: the landing page asks. */
+    config: procedure.meta({ access: 'public' }).query(({ ctx }) => ({ providers: ctx.accounts?.providers ?? [] })),
+
+    get: procedure.meta({ access: 'account' }).query(async ({ ctx }) => profile(await signedInAccount(ctx))),
+
+    /** Asks for access. Asking again changes nothing. */
+    requestAccess: procedure.meta({ access: 'account' }).mutation(async ({ ctx }) => {
+      const account = await signedInAccount(ctx)
+      const updated = await ctx.accounts?.requestAccess(account.id)
+      if (!updated) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Sign in first.' })
+      if (account.accessStatus === null) ctx.log.info('accounts: new access request')
+      return profile(updated)
+    }),
+  }),
+  // Velocity has no shell, so the generated demo data is loaded and removed through the API.
+  // Both only ever touch apps whose id starts with `demo-`.
+  demo: router({
+    seed: procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(200) }))
       .mutation(({ ctx, input }) => seedDemo(ctx.db, { days: input.days })),
-    clear: t.procedure.mutation(({ ctx }) => clearDemo(ctx.db)),
+    clear: procedure.mutation(({ ctx }) => clearDemo(ctx.db)),
   }),
 })
 

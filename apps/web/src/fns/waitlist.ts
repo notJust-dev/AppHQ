@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { inferRouterInputs } from '@trpc/server'
 // Type-only: erased at build time.
 import type { AppRouter } from '../../../api/src/trpc/router'
-import { api } from '@/server/api'
+import { publicApi } from '@/server/api'
 import { joinWaitlist } from '@/server/waitlist'
 
 /**
@@ -38,7 +38,7 @@ export const answerWaitlistFn = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }) => {
-    await api().waitlist.answer.mutate({
+    await publicApi().waitlist.answer.mutate({
       answerToken: data.answerToken,
       answers: data.answers as WaitlistAnswers,
       completed: data.completed,

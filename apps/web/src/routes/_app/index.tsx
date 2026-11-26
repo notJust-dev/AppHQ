@@ -17,9 +17,9 @@ export const Route = createFileRoute('/_app/')({
   // Keep the default range out of the address, so the bare `/` stays bare for the landing page.
   search: { middlewares: [stripSearchParams({ range: '28d' })] },
   loaderDeps: ({ search }) => ({ range: search.range }),
-  // Signed out, `_app` shows the landing page instead, so there is nothing to load.
+  // Without dashboard access, `_app` shows the landing page instead, so there is nothing to load.
   loader: async ({ context, deps }) => {
-    if (context.signedIn) await context.queryClient.ensureQueryData(overviewQuery(rangeToDates(deps.range)))
+    if (context.dashboardAccess) await context.queryClient.ensureQueryData(overviewQuery(rangeToDates(deps.range)))
   },
   component: PortfolioPage,
 })

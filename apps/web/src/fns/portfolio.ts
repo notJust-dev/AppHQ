@@ -1,30 +1,29 @@
 import { createServerFn } from '@tanstack/react-start'
 import { TRPCClientError } from '@trpc/client'
 import { z } from 'zod'
-import { api } from '@/server/api'
-import { requireSession } from './auth'
+import { requireDashboardAccess } from './auth'
 
 export const getOverviewFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ from: z.iso.date(), to: z.iso.date() }))
-  .handler(({ data }) => api().overview.get.query(data))
+  .handler(({ data, context }) => context.api.overview.get.query(data))
 
 /** The most posts one app's page lists, the newest of the range; as many as the API gives. */
 export const POSTS_LIMIT = 200
 
 /** One app's social posts published in the range, newest first. */
 export const listPostsFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ appId: z.string().min(1).max(64), from: z.iso.date(), to: z.iso.date() }))
-  .handler(({ data }) => api().apps.posts.query({ ...data, limit: POSTS_LIMIT }))
+  .handler(({ data, context }) => context.api.apps.posts.query({ ...data, limit: POSTS_LIMIT }))
 
 /** One app's totals for the funnel and flow charts, or null when there is no such app. */
 export const getAppFlowFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ appId: z.string().min(1).max(64), from: z.iso.date(), to: z.iso.date() }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return await api().apps.flow.query(data)
+      return await context.api.apps.flow.query(data)
     } catch (err) {
       if (err instanceof TRPCClientError && err.data?.code === 'NOT_FOUND') return null
       throw err
@@ -33,11 +32,11 @@ export const getAppFlowFn = createServerFn({ method: 'GET' })
 
 /** One app's daily funnel, or null when there is no such app. */
 export const getAppTimelineFn = createServerFn({ method: 'GET' })
-  .middleware([requireSession])
+  .middleware([requireDashboardAccess])
   .validator(z.object({ appId: z.string().min(1).max(64), from: z.iso.date(), to: z.iso.date() }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return await api().apps.timeline.query(data)
+      return await context.api.apps.timeline.query(data)
     } catch (err) {
       if (err instanceof TRPCClientError && err.data?.code === 'NOT_FOUND') return null
       throw err
