@@ -52,12 +52,7 @@ export function EmailSignIn({ autoFocus }: { autoFocus: boolean }) {
         />
       </Field>
       <Field data-invalid={problem !== null}>
-        <div className="flex items-baseline justify-between gap-3">
-          <FieldLabel htmlFor="account-password">Password</FieldLabel>
-          <Link to="/forgot-password" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-            Forgot password?
-          </Link>
-        </div>
+        <FieldLabel htmlFor="account-password">Password</FieldLabel>
         <Input
           id="account-password"
           name="password"
@@ -73,6 +68,12 @@ export function EmailSignIn({ autoFocus }: { autoFocus: boolean }) {
           aria-describedby={problem ? 'email-sign-in-problem' : undefined}
         />
         {problem && <FieldError id="email-sign-in-problem">{PROBLEMS[problem]}</FieldError>}
+        {/* After the field, on the page and for the Tab key: email, password, then this. */}
+        <div className="flex justify-end">
+          <Link to="/forgot-password" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+            Forgot password?
+          </Link>
+        </div>
       </Field>
       <Button type="submit" size="lg" disabled={pending} className="mt-1 w-full">
         {pending && <Spinner />}

@@ -2,12 +2,11 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { AgreeLine, AuthPage, TextLink } from '@/components/AuthPage'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { getAccountFn } from '@/fns/account'
 import {
-  CODE_MINUTES,
   MIN_PASSWORD_LENGTH,
   NEW_CODE_AFTER_SECONDS,
   PROBLEMS,
@@ -112,18 +111,17 @@ function SignUpPage() {
               type="password"
               autoComplete="new-password"
               required
-              minLength={MIN_PASSWORD_LENGTH}
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value)
                 setProblem(null)
               }}
               aria-invalid={problem === 'short' || problem === 'long'}
-              aria-describedby="new-password-hint"
+              aria-describedby={problem ? 'sign-up-problem' : undefined}
             />
-            <FieldDescription id="new-password-hint">At least {MIN_PASSWORD_LENGTH} characters.</FieldDescription>
           </Field>
-          {problem && <FieldError>{PROBLEMS[problem]}</FieldError>}
+          {/* The length rule is not shown up front; a password that is too short says so here. */}
+          {problem && <FieldError id="sign-up-problem">{PROBLEMS[problem]}</FieldError>}
           <Button type="submit" size="lg" disabled={pending} className="mt-1 w-full">
             {pending && <Spinner />}
             {pending ? 'Sending a code…' : 'Continue'}
@@ -136,9 +134,8 @@ function SignUpPage() {
   return (
     <AuthPage title="Check your email" below={below}>
       <p className="text-muted-foreground">
-        We sent an email to <span className="font-medium text-foreground">{email.trim()}</span>. Enter the 6-digit code
-        from it to finish. It works for {CODE_MINUTES} minutes. If that address already has an account, the email
-        says so instead.
+        We sent an email to <span className="font-medium text-foreground">{email.trim()}</span>. Enter the{' '}
+        <span className="whitespace-nowrap">6-digit</span> code from it to finish.
       </p>
       <form
         className="flex flex-col gap-4"
