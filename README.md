@@ -290,9 +290,13 @@ have their own data.
 **1. Create the sign-in apps.** Use the dashboard's address (the `web` app, not the API), shown
 here as `<web address>`; locally it is `http://127.0.0.1:3000`.
 
-- **Google:** in Google Cloud, create an **OAuth client** of type **Web application** and add the
-  authorized redirect URI `<web address>/api/auth/callback/google`. It can be the same project as
-  YouTube's, but use its own client.
+- **Google:** use the same Google Cloud project as YouTube, with a second **OAuth client** of type
+  **Web application** for sign-in. Add the authorized redirect URI
+  `<web address>/api/auth/callback/google`. The two clients share one consent screen, but each
+  asks only for its own permissions: signing in asks for name and email, and YouTube's
+  permissions are asked for only when someone presses **Connect YouTube**, with whichever Google
+  account owns the channel. While the consent screen is in **Testing**, only its test users can
+  sign in, so publish it before you open sign-up (Google reviews the YouTube permissions first).
 - **GitHub:** in **Settings → Developer settings → OAuth Apps**, create an app with the
   authorization callback URL `<web address>/api/auth/callback/github`.
 
@@ -411,7 +415,8 @@ sign in again before the date shown on the page.
 1. In Google Cloud, enable the **YouTube Data API v3** and the **YouTube Analytics API**.
 2. Create an **OAuth client** of type **Web application**. Its consent screen needs the
    `youtube.readonly` and `yt-analytics.readonly` scopes. Add yourself as a test user while
-   the app is in testing.
+   the app is in testing. If you also turn on [accounts](#accounts-and-access-requests-optional),
+   their Google sign-in goes in this same project, as a second client.
 3. Add the redirect URI shown on AppHQ's YouTube page.
 4. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` on the API and redeploy.
 
