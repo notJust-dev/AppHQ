@@ -35,7 +35,7 @@ function RequestAccessPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 pb-16">
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 pb-16">
         <Link to="/" className="flex items-center gap-2.5 self-start">
           <BrandMark className="size-8" />
           <BrandName className="text-lg" />

@@ -41,7 +41,7 @@ function LoginPage() {
   const accounts = providers.length > 0 || email
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 pb-24">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 pb-24">
       <p className="flex items-center gap-2.5">
         <BrandMark className="size-8" />
         <BrandName className="text-lg" />
@@ -69,7 +69,7 @@ function LoginPage() {
       </Card>
       {/* Signing in to an account is the consent the privacy policy relies on. */}
       {accounts && (
-        <p className="mt-6 text-center text-sm text-muted-foreground">
+        <p className="mt-6 text-center text-sm text-balance text-muted-foreground">
           By continuing, you agree to the{' '}
           <Link to="/terms" className="font-medium underline underline-offset-4 hover:text-foreground">
             Terms

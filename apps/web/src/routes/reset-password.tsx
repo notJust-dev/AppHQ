@@ -2,7 +2,7 @@ import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useLayoutEffect, useState } from 'react'
 import { AuthPage, TextLink } from '@/components/AuthPage'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { getAccountFn } from '@/fns/account'
@@ -119,20 +119,16 @@ function ResetPasswordPage() {
             autoComplete="new-password"
             autoFocus
             required
-            minLength={MIN_PASSWORD_LENGTH}
             value={password}
             onChange={(event) => {
               setPassword(event.target.value)
               setProblem(null)
             }}
             aria-invalid={problem !== null}
-            aria-describedby={problem ? 'reset-problem' : 'reset-hint'}
+            aria-describedby={problem ? 'reset-problem' : undefined}
           />
-          {problem ? (
-            <FieldError id="reset-problem">{PROBLEMS[problem]}</FieldError>
-          ) : (
-            <FieldDescription id="reset-hint">At least {MIN_PASSWORD_LENGTH} characters.</FieldDescription>
-          )}
+          {/* The length rule is not shown up front; a password that is too short says so here. */}
+          {problem && <FieldError id="reset-problem">{PROBLEMS[problem]}</FieldError>}
         </Field>
         <Button type="submit" size="lg" disabled={pending || token === undefined} className="w-full">
           {pending && <Spinner />}

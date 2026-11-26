@@ -3,10 +3,14 @@ import type { ReactNode } from 'react'
 import { BrandMark, BrandName } from '@/components/Brand'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-/** The page around the account forms: the brand, one card with a title, and a line under it. */
+/**
+ * The page around the account forms: the brand, one card with a title, and a line under it. As
+ * wide as the sign-in page, so the line about the terms fits on one line on a wide screen; on a
+ * narrow one it wraps into lines of even length.
+ */
 export function AuthPage({ title, children, below }: { title: string; children: ReactNode; below?: ReactNode }) {
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 pb-24">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 pb-24">
       <Link to="/" className="flex items-center gap-2.5 self-start">
         <BrandMark className="size-8" />
         <BrandName className="text-lg" />
@@ -19,7 +23,7 @@ export function AuthPage({ title, children, below }: { title: string; children: 
         </CardHeader>
         <CardContent className="flex flex-col gap-5">{children}</CardContent>
       </Card>
-      {below && <div className="mt-6 text-center text-sm text-muted-foreground">{below}</div>}
+      {below && <div className="mt-6 text-center text-sm text-balance text-muted-foreground">{below}</div>}
     </main>
   )
 }
