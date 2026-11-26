@@ -338,7 +338,7 @@ owner of an organization opens nothing yet: the dashboard password is still the 
 Nobody can create, join or switch organizations through the sign-in pages.
 
 **Make your own account the owner of `default`**, so it is ready once accounts can open the
-dashboard. Sign in once at `/request-access` first. Then, where you have a shell:
+dashboard. Sign in once at `/login` with Google or GitHub first. Then, where you have a shell:
 
 ```sh
 cd apps/api && npm run cli -- add-owner --email <your address>

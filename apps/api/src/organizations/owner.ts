@@ -32,7 +32,7 @@ export async function addOwner(
     .from(user)
     .where(eq(sql`lower(${user.email})`, input.email.trim().toLowerCase()))
     .limit(1)
-  if (!account) throw new OwnerError('No account has that address. Sign in once at /request-access first.')
+  if (!account) throw new OwnerError('No account has that address. Sign in once at /login with Google or GitHub first.')
 
   return db.transaction(async (tx) => {
     const [before] = await tx
