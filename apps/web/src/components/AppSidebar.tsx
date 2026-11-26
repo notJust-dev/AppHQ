@@ -69,7 +69,8 @@ const APPS_SHOWN = 12
  * The navigation: the three sections, the apps for switching between them, and the theme and
  * sign-out at the bottom. Collapsed, each item keeps its icon and names itself in a tooltip.
  */
-export function AppSidebar() {
+/** `organization`: the name of the organization the dashboard works in, when the API said. */
+export function AppSidebar({ organization }: { organization: string | null }) {
   const { data: apps = [] } = useQuery(appsQuery())
   const { data: unread } = useQuery(unreadReviewsQuery())
   const own = apps.filter((app) => app.kind !== 'portfolio')
@@ -84,11 +85,16 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="AppHQ">
+            <SidebarMenuButton asChild size="lg" tooltip={organization ? `AppHQ · ${organization}` : 'AppHQ'}>
               <Link to="/">
                 {/* The button sizes every svg inside it to size-4; the mark is the whole tile. */}
                 <BrandMark className="size-8! shrink-0" />
-                <BrandName className="truncate text-[16px]" />
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <BrandName className="truncate text-[16px]" />
+                  {organization && (
+                    <Private className="truncate text-xs font-normal text-muted-foreground">{organization}</Private>
+                  )}
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -275,7 +281,12 @@ function SignOut() {
     <SidebarMenuButton
       tooltip="Sign out"
       onClick={async () => {
+        // Both ways in: the password session here, and the account session, if any. Signing out
+        // of an account that isn't signed in changes nothing.
         await signOut()
+        await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(
+          () => undefined,
+        )
         queryClient.clear()
         await router.navigate({ to: '/login' })
       }}

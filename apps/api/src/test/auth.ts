@@ -78,7 +78,13 @@ export const nextAddress = () => `198.51.100.${(addressCounter++ % 250) + 1}`
 
 /** The app with accounts on, on an in-memory store unless another is given. */
 export async function buildTestApp(
-  options: { db?: Db; accounts?: boolean; database?: BetterAuthOptions['database'] } = {},
+  options: {
+    db?: Db
+    accounts?: boolean
+    database?: BetterAuthOptions['database']
+    /** `ALLOW_DASHBOARD_PASSWORD`; on unless a test turns it off. */
+    allowDashboardPassword?: boolean
+  } = {},
 ) {
   type Rows = Record<string, unknown>[]
   const memory: Record<'user' | 'session' | 'account' | 'verification' | 'organization' | 'member' | 'invitation', Rows> = {
@@ -97,6 +103,7 @@ export async function buildTestApp(
     secrets: createSecrets(undefined),
     pingDb: async () => 1,
     internalApiToken: TOKEN,
+    allowDashboardPassword: options.allowDashboardPassword ?? true,
     // A real database resolves this from the `organization` table; see organizations/dashboard.ts.
     dashboardOrganization: options.db ? undefined : async () => TEST_DASHBOARD_ORGANIZATION,
     accounts: options.accounts === false ? null : { auth, origin: ORIGIN, accounts: createAccounts(auth, CONFIG) },

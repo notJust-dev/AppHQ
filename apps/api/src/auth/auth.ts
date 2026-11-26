@@ -3,9 +3,9 @@ import { organization } from 'better-auth/plugins'
 import type { Env } from '../env.js'
 
 /**
- * Accounts, with Better Auth. People sign in with Google or GitHub and can ask for access. An
- * account opens nothing else: the dashboard still takes the dashboard password, which the web app
- * checks. Nothing here decides dashboard access; see `trpc/init.ts`.
+ * Accounts, with Better Auth. People sign in with Google or GitHub and can ask for access. Once
+ * approved, an account opens the dashboard in the organizations it belongs to. Nothing here
+ * decides dashboard access; see `trpc/init.ts`.
  */
 
 export type SocialProvider = 'google' | 'github'

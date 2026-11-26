@@ -14,11 +14,26 @@ export interface AccountUser {
   accessRequestedAt: Date | null
 }
 
-/** Accounts as the tRPC procedures use them; null in the context when accounts are off. */
+/** A signed-in account's session: who it is, and the organization it last worked in. */
+export interface AccountSession {
+  user: AccountUser
+  sessionId: string
+  /** The organization plugin's session field. Only the API sets it (see `trpc/init.ts`). */
+  activeOrganizationId: string | null
+}
+
+/**
+ * Accounts as the tRPC procedures use them; null in the context when accounts are off. These
+ * only read and write; what they mean for access is decided in `trpc/init.ts`.
+ */
 export interface Accounts {
   providers: SocialProvider[]
-  /** The signed-in user behind these cookies, or null. Reading never changes the session. */
-  userFor(cookieHeader: string | undefined): Promise<AccountUser | null>
+  /** The session behind these cookies, or null. Reading never changes the session. */
+  sessionFor(cookieHeader: string | undefined): Promise<AccountSession | null>
+  /** The organizations the user belongs to, oldest membership first. */
+  membershipsOf(userId: string): Promise<string[]>
+  /** Records the organization a session works in. Never reachable over HTTP. */
+  setActiveOrganization(sessionId: string, organizationId: string): Promise<void>
   /**
    * Records that the user asked for access. Only an account with no status changes, so asking
    * twice keeps the first date and an approval is never undone.
@@ -26,8 +41,8 @@ export interface Accounts {
   requestAccess(userId: string): Promise<AccountUser | null>
   /**
    * Gives an approved account an organization of its own, with the account as its owner, unless
-   * it already belongs to one. Safe to call again and from two requests at once. Membership
-   * grants nothing yet: the dashboard still takes the dashboard password.
+   * it already belongs to one. Safe to call again and from two requests at once. The account
+   * then opens the dashboard in that organization.
    */
   ensureOrganization(userId: string): Promise<{ organizationId: string; created: boolean }>
 }
@@ -52,14 +67,39 @@ export function createAccounts(auth: Auth, config: AuthConfig): Accounts {
   return {
     providers: providersOf(config),
 
-    async userFor(cookieHeader) {
+    async sessionFor(cookieHeader) {
       const cookie = authCookies(cookieHeader)
       if (!cookie) return null
       const result = await auth.api.getSession({
         headers: new Headers({ cookie }),
         query: { disableRefresh: true },
       })
-      return result ? toUser(result.user) : null
+      if (!result) return null
+      const active = (result.session as { activeOrganizationId?: unknown }).activeOrganizationId
+      return {
+        user: toUser(result.user),
+        sessionId: result.session.id,
+        activeOrganizationId: typeof active === 'string' && active.length > 0 ? active : null,
+      }
+    },
+
+    async membershipsOf(userId) {
+      const { adapter } = await auth.$context
+      const rows = await adapter.findMany<{ organizationId: string }>({
+        model: 'member',
+        where: [{ field: 'userId', value: userId }],
+        sortBy: { field: 'createdAt', direction: 'asc' },
+      })
+      return rows.map((row) => row.organizationId)
+    },
+
+    async setActiveOrganization(sessionId, organizationId) {
+      const { adapter } = await auth.$context
+      await adapter.update({
+        model: 'session',
+        where: [{ field: 'id', value: sessionId }],
+        update: { activeOrganizationId: organizationId },
+      })
     },
 
     async requestAccess(userId) {

@@ -23,8 +23,7 @@ export async function holdsData(scope: Scope): Promise<boolean> {
 /**
  * Makes the account with this address an owner of the organization, and removes the organization
  * that was made for the account on approval when it holds no data and nobody else belongs to it.
- * Running it again changes nothing. Membership grants nothing yet: the dashboard still takes the
- * dashboard password.
+ * Running it again changes nothing. Once approved, the account opens the dashboard there.
  */
 export async function addOwner(
   db: Db,

@@ -5,7 +5,12 @@ const schema = z.object({
   API_URL: z.url(),
   INTERNAL_API_TOKEN: z.string().min(32, 'must be at least 32 characters'),
   SESSION_SECRET: z.string().min(32, 'must be at least 32 characters'),
-  DASHBOARD_PASSWORD: z.string().min(12, 'must be at least 12 characters'),
+  // Optional: without it (or with it empty) the password is off, and only accounts open the
+  // dashboard. See password.ts.
+  DASHBOARD_PASSWORD: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().min(12, 'must be at least 12 characters').optional(),
+  ),
 })
 
 let cached: z.infer<typeof schema> | undefined

@@ -17,6 +17,11 @@ export interface AppDeps {
   /** Resolves when the database answers; used by /health. */
   pingDb: () => Promise<unknown>
   internalApiToken: string
+  /**
+   * Whether the web app's statement that the visitor signed in with the dashboard password counts
+   * (`ALLOW_DASHBOARD_PASSWORD`). Required, so no caller gets the password by default.
+   */
+  allowDashboardPassword: boolean
   /** Which organization the dashboard password works in; read from the database by default. */
   dashboardOrganization?: () => Promise<string>
   /** Accounts, when they are set up; without them /api/auth does not exist. */
@@ -49,21 +54,29 @@ export async function buildApp(deps: AppDeps) {
 
     const accounts = deps.accounts?.accounts ?? null
     const organizationOfDashboard = deps.dashboardOrganization ?? dashboardOrganization(deps.db)
+    let warnedOfPassword = false
     await internal.register(fastifyTRPCPlugin, {
       prefix: '/trpc',
       trpcOptions: {
         router: appRouter,
         createContext: ({ req }): ApiContext => {
           const cookie = req.headers.cookie
-          let account: ReturnType<ApiContext['account']> | undefined
+          const statesPassword = req.headers[ACCESS_HEADER] === DASHBOARD_ACCESS
+          if (statesPassword && !deps.allowDashboardPassword && !warnedOfPassword) {
+            warnedOfPassword = true
+            app.log.warn('the web app sent a dashboard password session, but ALLOW_DASHBOARD_PASSWORD is false: refused. Unset DASHBOARD_PASSWORD on the web app.')
+          }
+          let session: ReturnType<ApiContext['session']> | undefined
+          const sessionOnce = () => (session ??= accounts ? accounts.sessionFor(cookie) : Promise.resolve(null))
           return {
             db: deps.db,
             sql: deps.sql,
             secrets: deps.secrets,
             log: app.log,
-            dashboardAccess: req.headers[ACCESS_HEADER] === DASHBOARD_ACCESS,
+            passwordAccess: statesPassword && deps.allowDashboardPassword,
             accounts,
-            account: () => (account ??= accounts ? accounts.userFor(cookie) : Promise.resolve(null)),
+            session: sessionOnce,
+            account: () => sessionOnce().then((found) => found?.user ?? null),
             dashboardOrganization: organizationOfDashboard,
           }
         },

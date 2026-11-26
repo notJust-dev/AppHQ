@@ -48,9 +48,17 @@ const schema = z
     PUBLIC_URL: optional(
       z.url({ protocol: /^https?$/ }).refine((value) => new URL(value).pathname === '/', 'must be an origin, with no path'),
     ),
+    // Whether this API accepts the web app's statement that the visitor signed in with the
+    // dashboard password (DASHBOARD_PASSWORD on the web app). On unless set to `false`, so
+    // existing installs keep working. Set it to `false` once you sign in with an account: a
+    // password left set on the web app then opens nothing. Only `true` or `false`, so a typo
+    // stops the API instead of leaving the password on.
+    ALLOW_DASHBOARD_PASSWORD: optional(z.enum(['true', 'false'], 'must be true or false'))
+      .default('true')
+      .transform((value) => value === 'true'),
     // Accounts, optional (see "Accounts and access requests" in the README). Off unless the
-    // secret, PUBLIC_URL and at least one sign-in provider are set. An account never opens the
-    // dashboard, which still takes DASHBOARD_PASSWORD on the web app.
+    // secret, PUBLIC_URL and at least one sign-in provider are set. An approved account opens
+    // the dashboard in the organizations it belongs to.
     BETTER_AUTH_SECRET: optional(z.string().min(32, 'must be at least 32 characters')),
     AUTH_GOOGLE_CLIENT_ID: optional(z.string()),
     AUTH_GOOGLE_CLIENT_SECRET: optional(z.string()),

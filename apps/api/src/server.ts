@@ -42,9 +42,12 @@ const app = await buildApp({
   secrets,
   pingDb: () => sql`select 1`,
   internalApiToken: env.INTERNAL_API_TOKEN,
+  allowDashboardPassword: env.ALLOW_DASHBOARD_PASSWORD,
   accounts: auth && authConfig ? { auth, origin: authConfig.url, accounts: createAccounts(auth, authConfig) } : null,
 })
 app.log.info(authConfig ? `accounts are on, signing in at ${authConfig.url}` : 'accounts are off')
+app.log.info(env.ALLOW_DASHBOARD_PASSWORD ? 'the dashboard password is accepted' : 'the dashboard password is not accepted (ALLOW_DASHBOARD_PASSWORD=false)')
+if (!env.ALLOW_DASHBOARD_PASSWORD && !authConfig) app.log.warn('neither the dashboard password nor accounts are on: nobody can open the dashboard')
 app.log.info(role ? `organization data: row-level security, as the role ${role}` : 'organization data: row-level security, as the tables\' owner (no role can be made here)')
 
 // The API keeps the data fresh itself; see sync/schedule.ts for why not a Velocity cron entry.

@@ -8,16 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { getAccountFn, requestAccessFn, type AccountView } from '@/fns/account'
+import { getSessionFn } from '@/fns/auth'
 import { formatDay } from '@/lib/format'
 
 /**
- * Where people with an account (Google or GitHub) end up after signing in on /login. They can ask
- * for access and see that they did; nothing else. Signed out, it sends them to /login.
+ * Where people with an account (Google or GitHub) end up after signing in on /login, until they
+ * have dashboard access. They can ask for access and see that they did. Signed out, it sends them
+ * to /login; with access, to the dashboard.
+ *
+ * Reading the account makes an approved account its organization the first time (see the API's
+ * `account.get`), so an account approved since its last visit goes on to the dashboard from here.
  */
 export const Route = createFileRoute('/request-access')({
   loader: async () => {
     const { account } = await getAccountFn()
     if (!account) throw redirect({ to: '/login' })
+    if (account.accessStatus === 'approved' && (await getSessionFn()).dashboardAccess) throw redirect({ to: '/' })
     return { account }
   },
   head: () => ({ meta: [{ title: 'Request access · AppHQ' }] }),
@@ -108,11 +114,16 @@ function SignedIn({ account }: { account: AccountView }) {
             <span className="font-medium">
               {current.accessStatus === 'approved' ? 'You are approved.' : 'You have asked for access.'}
             </span>{' '}
-            <span className="text-muted-foreground">
-              {current.accessStatus === 'approved'
-                ? `We will email ${current.email} as soon as your account opens.`
-                : `${current.accessRequestedAt ? `Asked ${formatDay(current.accessRequestedAt.slice(0, 10))}. ` : ''}We will email ${current.email} when your account is ready.`}
-            </span>
+            {current.accessStatus === 'approved' ? (
+              // Approved, yet still here: the dashboard could not be opened a moment ago.
+              <Link to="/" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                Open the dashboard
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">
+                {`${current.accessRequestedAt ? `Asked ${formatDay(current.accessRequestedAt.slice(0, 10))}. ` : ''}We will email ${current.email} when your account is ready.`}
+              </span>
+            )}
           </span>
         </p>
       )}
