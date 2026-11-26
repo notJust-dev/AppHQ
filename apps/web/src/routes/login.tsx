@@ -3,6 +3,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 import { z } from 'zod'
 import { BrandMark, BrandName } from '@/components/Brand'
+import { EmailSignIn } from '@/components/EmailSignIn'
 import { SocialSignIn } from '@/components/SocialSignIn'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,10 +14,10 @@ import { getAccountFn } from '@/fns/account'
 import { getSessionFn, signInFn } from '@/fns/auth'
 
 /**
- * Every way in. Google and GitHub, when this server has them, lead to an account: an approved
- * member goes on to the dashboard, anyone else to the Request access page. The dashboard
- * password, when this server has one, is a separate block; without DASHBOARD_PASSWORD it isn't
- * shown at all.
+ * Every way in. Google, GitHub and an email address with a password, when this server has them,
+ * lead to an account: an approved member goes on to the dashboard, anyone else to the Request
+ * access page. The dashboard password, when this server has one, is a separate block; without
+ * DASHBOARD_PASSWORD it isn't shown at all.
  */
 export const Route = createFileRoute('/login')({
   // Better Auth sends a failed sign-in back here with an error code.
@@ -27,16 +28,17 @@ export const Route = createFileRoute('/login')({
     return { passwordEnabled }
   },
   loader: async ({ context }) => {
-    const { providers, account } = await getAccountFn()
+    const { providers, email, account } = await getAccountFn()
     if (account) throw redirect({ to: '/request-access' })
-    return { providers, passwordEnabled: context.passwordEnabled }
+    return { providers, email, passwordEnabled: context.passwordEnabled }
   },
   component: LoginPage,
 })
 
 function LoginPage() {
-  const { providers, passwordEnabled } = Route.useLoaderData()
+  const { providers, email, passwordEnabled } = Route.useLoaderData()
   const { error } = Route.useSearch()
+  const accounts = providers.length > 0 || email
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 pb-24">
@@ -52,14 +54,12 @@ function LoginPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           {providers.length > 0 && <SocialSignIn providers={providers} error={error} />}
-          {providers.length > 0 && passwordEnabled && (
-            <p className="flex items-center gap-3 text-xs text-faint before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-              or
-            </p>
-          )}
+          {providers.length > 0 && email && <Or />}
+          {email && <EmailSignIn autoFocus={providers.length === 0} />}
+          {accounts && passwordEnabled && <Or />}
           {/* With accounts off, this is the whole page, exactly as before. */}
-          {passwordEnabled && <PasswordSignIn alone={providers.length === 0} />}
-          {providers.length === 0 && !passwordEnabled && (
+          {passwordEnabled && <PasswordSignIn alone={!accounts} />}
+          {!accounts && !passwordEnabled && (
             <p className="text-muted-foreground">
               No way to sign in is set up on this server. Set DASHBOARD_PASSWORD on the dashboard, or
               turn on accounts on the API, as the README describes.
@@ -67,8 +67,8 @@ function LoginPage() {
           )}
         </CardContent>
       </Card>
-      {/* Signing in with Google or GitHub is the consent the privacy policy relies on. */}
-      {providers.length > 0 && (
+      {/* Signing in to an account is the consent the privacy policy relies on. */}
+      {accounts && (
         <p className="mt-6 text-center text-sm text-muted-foreground">
           By continuing, you agree to the{' '}
           <Link to="/terms" className="font-medium underline underline-offset-4 hover:text-foreground">
@@ -82,6 +82,15 @@ function LoginPage() {
         </p>
       )}
     </main>
+  )
+}
+
+/** The line between two ways to sign in. */
+function Or() {
+  return (
+    <p className="flex items-center gap-3 text-xs text-faint before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+      or
+    </p>
   )
 }
 

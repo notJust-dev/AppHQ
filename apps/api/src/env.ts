@@ -8,7 +8,15 @@ const optional = <T extends z.ZodType>(type: T) =>
 const pairs = [
   ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET'],
   ['AUTH_GITHUB_CLIENT_ID', 'AUTH_GITHUB_CLIENT_SECRET'],
+  ['SMTP_HOST', 'MAIL_FROM'],
+  ['SMTP_USER', 'SMTP_PASSWORD'],
 ] as const
+
+/** A bare address, or `Name <address>`. */
+const SENDER = /^(?:[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+|[^<>]*<[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+>)$/
+
+/** A mail server on this machine: the only place mail may go without encryption. */
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
 
 const schema = z
   .object({
@@ -57,13 +65,31 @@ const schema = z
       .default('true')
       .transform((value) => value === 'true'),
     // Accounts, optional (see "Accounts and access requests" in the README). Off unless the
-    // secret, PUBLIC_URL and at least one sign-in provider are set. An approved account opens
-    // the dashboard in the organizations it belongs to.
+    // secret, PUBLIC_URL and at least one way to sign in are set: Google, GitHub, or a mail
+    // server for signing up with an email address. An approved account opens the dashboard in
+    // the organizations it belongs to.
     BETTER_AUTH_SECRET: optional(z.string().min(32, 'must be at least 32 characters')),
     AUTH_GOOGLE_CLIENT_ID: optional(z.string()),
     AUTH_GOOGLE_CLIENT_SECRET: optional(z.string()),
     AUTH_GITHUB_CLIENT_ID: optional(z.string()),
     AUTH_GITHUB_CLIENT_SECRET: optional(z.string()),
+    // Signing up with an email address and a password, optional. It needs a mail server, for the
+    // confirmation code and the password reset link: any provider's SMTP server works. On when
+    // SMTP_HOST and MAIL_FROM are set (see "Signing up with an email address" in the README).
+    SMTP_HOST: optional(z.string()),
+    // Default 465, or the usual port for SMTP_TLS.
+    SMTP_PORT: optional(z.coerce.number().int().min(1).max(65535)),
+    // How the connection is protected: `implicit` (TLS from the start, port 465), `starttls`
+    // (upgraded before anything is sent, port 587) or `none`. Default: by the port. `none` is
+    // refused for any host but this machine, so mail and the SMTP password never travel in the
+    // clear.
+    SMTP_TLS: optional(z.enum(['implicit', 'starttls', 'none'], 'must be implicit, starttls or none')),
+    SMTP_USER: optional(z.string()),
+    SMTP_PASSWORD: optional(z.string()),
+    // The sender: `AppHQ <no-reply@apphq.example.com>`, on a domain the mail server may send for.
+    MAIL_FROM: optional(z.string().regex(SENDER, 'must be an address, or "Name <address>"')),
+    // Optional: where replies go, when that is not the sender.
+    MAIL_REPLY_TO: optional(z.email('must be an email address')),
   })
   .refine((env) => env.DATABASE_URL || (env.PGHOST && env.PGDATABASE && env.PGUSER), {
     path: ['DATABASE_URL'],
@@ -75,13 +101,22 @@ const schema = z
         ctx.addIssue({ code: 'custom', path: [env[a] === undefined ? a : b], message: `set together with ${env[a] === undefined ? b : a}` })
       }
     }
-    // PUBLIC_URL alone is fine; the secret or a provider without the rest is half an accounts setup.
-    const provider = env.AUTH_GOOGLE_CLIENT_ID || env.AUTH_GITHUB_CLIENT_ID
-    if ((provider || env.BETTER_AUTH_SECRET) && !env.PUBLIC_URL) {
+    // PUBLIC_URL alone is fine; the secret or a way to sign in without the rest is half an
+    // accounts setup.
+    const signIn = env.AUTH_GOOGLE_CLIENT_ID || env.AUTH_GITHUB_CLIENT_ID || env.SMTP_HOST
+    if ((signIn || env.BETTER_AUTH_SECRET) && !env.PUBLIC_URL) {
       ctx.addIssue({ code: 'custom', path: ['PUBLIC_URL'], message: 'accounts need the dashboard\'s public address here too' })
     }
-    if (provider && !env.BETTER_AUTH_SECRET) {
-      ctx.addIssue({ code: 'custom', path: ['BETTER_AUTH_SECRET'], message: 'a sign-in provider is set, so set BETTER_AUTH_SECRET too' })
+    if (signIn && !env.BETTER_AUTH_SECRET) {
+      ctx.addIssue({ code: 'custom', path: ['BETTER_AUTH_SECRET'], message: 'a way to sign in is set, so set BETTER_AUTH_SECRET too' })
+    }
+    for (const name of ['SMTP_PORT', 'SMTP_TLS', 'SMTP_USER', 'MAIL_REPLY_TO'] as const) {
+      if (env[name] !== undefined && !env.SMTP_HOST) {
+        ctx.addIssue({ code: 'custom', path: ['SMTP_HOST'], message: `${name} is set, so set SMTP_HOST too` })
+      }
+    }
+    if (env.SMTP_TLS === 'none' && env.SMTP_HOST && !LOOPBACK.has(env.SMTP_HOST.toLowerCase())) {
+      ctx.addIssue({ code: 'custom', path: ['SMTP_TLS'], message: 'none is only for a mail catcher on this machine (127.0.0.1 or localhost)' })
     }
   })
 

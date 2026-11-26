@@ -15,9 +15,10 @@ from both stores into one inbox.
 It reads from **App Store Connect, Google Play, RevenueCat, TikTok, Instagram, Facebook Pages,
 YouTube and Google Search Console** using your own API keys and developer apps. There is no
 third-party service in between. Credentials are encrypted before they are stored, and the
-dashboard is protected by a single password. Optionally, people can sign in with Google or GitHub;
-once you approve them, their account opens the dashboard in their own organization, and you can
-turn the password off (see [Accounts and access requests](#accounts-and-access-requests-optional)).
+dashboard is protected by a single password. Optionally, people can sign in with Google or GitHub,
+or sign up with an email address; once you approve them, their account opens the dashboard in
+their own organization, and you can turn the password off (see
+[Accounts and access requests](#accounts-and-access-requests-optional)).
 
 ## How it works
 
@@ -283,12 +284,13 @@ Good to know:
 If you want to sign in with your own account, or let other people ask for access, turn on
 accounts: the sign-in page (`/login`) then offers **Continue with Google** and **Continue with
 GitHub** above the dashboard password, and people who sign in that way land on a page where they
-can press **Request access**. This is off unless you set it up, and nothing else changes when it
-is off.
+can press **Request access**. With a mail server, people can also
+[sign up with an email address and a password](#signing-up-with-an-email-address). This is off
+unless you set it up, and nothing else changes when it is off.
 
 An account opens the dashboard when all of these hold:
 
-- the provider confirmed its address,
+- its address is confirmed: by the provider, or with the code emailed at sign-up,
 - you approved it (step 3 below),
 - it is a member of an organization. Approval makes it one of its own; `add-owner` adds it to
   yours (see [Organizations](#organizations)).
@@ -309,7 +311,8 @@ here as `<web address>`; locally it is `http://127.0.0.1:3000`.
 - **GitHub:** in **Settings → Developer settings → OAuth Apps**, create an app with the
   authorization callback URL `<web address>/api/auth/callback/github`.
 
-You can set up just one of them.
+You can set up just one of them, or neither if people will only
+[sign up with an email address](#signing-up-with-an-email-address).
 
 **2. Set the variables on the `api` app** and redeploy. Nothing new is needed on `web`.
 
@@ -334,8 +337,70 @@ The next time they sign in or open the Request access page, the API makes them a
 of their own (see below), with a generated name and slug, unless they already belong to one, and
 they go on to the dashboard, empty and theirs. Someone who only asked gets none.
 
-Only addresses the provider has confirmed can sign in. Someone who signed in with Google can't
-later sign in to the same account with GitHub, even with the same address.
+Only confirmed addresses can sign in, and an address has one way in: someone who signed in with
+Google can't later sign in to the same account with GitHub or give it a password, even with the
+same address.
+
+### Signing up with an email address
+
+With a mail server, `/login` also takes an email address and a password, and links to **Create an
+account** (`/sign-up`) and **Forgot password?**. It works next to Google and GitHub, or without
+them.
+
+- **Signing up.** The person enters an address and a password, gets a 6-digit code by email and
+  enters it. Only then is the account made, so no account exists for an address nobody confirmed,
+  and the database does not hold the address until then. The code works for 10 minutes and
+  survives a few wrong guesses.
+- **Resetting a password.** The person gets a link that works once, for 60 minutes. Choosing a
+  new password signs the account out everywhere and emails its owner that the password changed.
+- **Passwords** are at least 8 characters and are stored hashed.
+- **One way in per address.** Signing up with an address that already has an account emails its
+  owner to say so, instead of a code. An account made with Google or GitHub gets no password,
+  and an account with a password can't sign in with Google or GitHub.
+- **Approval is unchanged.** A new account lands on the Request access page, and opens nothing
+  until you approve it (step 3 above).
+- **Limits.** Signing in, signing up and resetting are limited per visitor, and one address is
+  emailed at most 5 times an hour, so the forms can't be used to fill someone's inbox.
+
+Any mail provider with an SMTP server works. Verify your sending domain with it first; it gives
+you the SPF and DKIM records to add to your DNS. Then set these on the `api` app, next to
+`BETTER_AUTH_SECRET` and `PUBLIC_URL` from step 2 above, and redeploy:
+
+| Variable | Value |
+|---|---|
+| `SMTP_HOST` | The provider's SMTP server, for example `smtp.example.com` |
+| `SMTP_PORT` | Optional. Default `465` |
+| `SMTP_TLS` | Optional: `implicit` (TLS from the start, port 465), `starttls` (port 587) or `none`. Default: by the port. `none` is refused for any server but one on the same machine |
+| `SMTP_USER`, `SMTP_PASSWORD` | The SMTP login the provider gives you |
+| `MAIL_FROM` | The sender, for example `AppHQ <no-reply@apphq.example.com>`, on the domain you verified |
+| `MAIL_REPLY_TO` | Optional. Where replies go, when that is not the sender |
+
+With [Resend](https://resend.com), for example: host `smtp.resend.com`, port `465`, user `resend`,
+and an API key as the password. Make the key with sending access only, for your domain alone.
+
+The API's log says `signing up with an email address is on` when it boots, and `/login` shows the
+form. The emails are plain: text with one code or one link, no images and nothing that tracks
+opens. Leave your provider's open and click tracking off too.
+
+**Try it locally** without sending real mail. Start the mail catcher that comes with the compose
+file:
+
+```bash
+docker compose --profile mail up -d
+```
+
+Add this to `apps/api/.env` and restart the API:
+
+```bash
+BETTER_AUTH_SECRET=<openssl rand -hex 32>
+PUBLIC_URL=http://127.0.0.1:3000
+SMTP_HOST=127.0.0.1
+SMTP_PORT=1025
+SMTP_TLS=none
+MAIL_FROM=AppHQ <no-reply@apphq.example.com>
+```
+
+Every message the API sends then shows up at http://127.0.0.1:8025 instead of being delivered.
 
 ### Organizations
 
@@ -346,8 +411,8 @@ works in an organization it is a member of: the one it last worked in, or else t
 first. The sidebar shows which, under the AppHQ name. Every member can do everything there.
 Nobody can create, join or switch organizations through the sign-in pages.
 
-**Make your own account the owner of `default`**, so it opens your data. Sign in once at `/login`
-with Google or GitHub first. Then, where you have a shell:
+**Make your own account the owner of `default`**, so it opens your data. Sign in or sign up once
+at `/login` first. Then, where you have a shell:
 
 ```sh
 cd apps/api && npm run cli -- add-owner --email <your address>
@@ -387,7 +452,7 @@ password left behind by mistake still opens nothing:
 Do it in this order, so you never lock yourself out:
 
 1. **Make your account an owner of `default` and approve it**, as above.
-2. **Sign out, sign in with Google or GitHub, and check.** You should land on the dashboard,
+2. **Sign out, sign in with your account, and check.** You should land on the dashboard,
    see `Default organization` under the AppHQ name in the sidebar, and see your apps.
 3. **Set `ALLOW_DASHBOARD_PASSWORD=false` on `api`** and redeploy it. Check again that your
    account still opens the dashboard. Password sessions stop working now.
@@ -555,7 +620,7 @@ and the funnel and flow charts never claim that a specific view caused a specifi
 | `apps/api` | `npm run cli -- add-owner --email <address>` | Make an account an owner of `default`; once approved, it opens the dashboard there |
 
 Every CLI command but `migrate` also takes `--organization <slug>`.
-| `apps/web` | `npm test` | Unit tests of the dashboard server's password rules |
+| `apps/web` | `npm test` | Unit tests of the dashboard server's password rules and of what analytics may send |
 | `apps/web` | `npm run typecheck` | Type check |
 | `apps/web` | `npm run build` then `npm run start` | Production build and server |
 

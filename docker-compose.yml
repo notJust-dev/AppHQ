@@ -1,5 +1,5 @@
-# Local development database only. Production uses the PostgreSQL attached to the
-# `api` application on Cloudways Velocity.
+# Local development only. Production uses the PostgreSQL attached to the `api` application on
+# Cloudways Velocity, and a real mail provider.
 services:
   db:
     image: postgres:17
@@ -16,6 +16,16 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # Optional: catches the emails of email sign-up instead of delivering them, and shows them at
+  # http://127.0.0.1:8025. Start it with `docker compose --profile mail up -d`; see "Signing up
+  # with an email address" in the README for the variables that point the API at it.
+  mail:
+    image: axllent/mailpit
+    profiles: ["mail"]
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 
 volumes:
   pgdata:

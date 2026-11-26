@@ -9,7 +9,7 @@ const PROVIDER_NAMES: Record<SignInProvider, string> = { google: 'Google', githu
 
 /** Codes Better Auth sends back with a failed sign-in; only these get their own words. */
 const ERRORS: Record<string, string> = {
-  account_not_linked: 'That address already has an account, made with the other sign-in. Use that one instead.',
+  account_not_linked: 'That address already has an account, made with a different sign-in. Use that one instead.',
   email_not_verified: 'Your provider has not confirmed that address yet. Confirm it there, then try again.',
   access_denied: 'The sign-in was cancelled.',
 }

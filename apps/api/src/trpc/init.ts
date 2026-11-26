@@ -96,7 +96,7 @@ export type DashboardVia = 'password' | 'account'
  * - An account with a verified address and approved access: one it is a member of. The session's
  *   active organization when the account still belongs to it; otherwise its oldest membership,
  *   which is then recorded on the session. Only this code sets the active organization: the
- *   plugin's own endpoints are not reachable (`AUTH_PATHS`). No membership: refused. Nothing here
+ *   plugin's own endpoints are not reachable (`authPaths`). No membership: refused. Nothing here
  *   makes an organization.
  *
  * The dashboard server sends one or the other, never both; if both came, the password wins.

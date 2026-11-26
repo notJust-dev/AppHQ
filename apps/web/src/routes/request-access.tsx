@@ -12,7 +12,7 @@ import { getSessionFn } from '@/fns/auth'
 import { formatDay } from '@/lib/format'
 
 /**
- * Where people with an account (Google or GitHub) end up after signing in on /login, until they
+ * Where people with an account end up after signing in on /login or signing up, until they
  * have dashboard access. They can ask for access and see that they did. Signed out, it sends them
  * to /login; with access, to the dashboard.
  *

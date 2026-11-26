@@ -604,7 +604,9 @@ export const appRouter = router({
    */
   account: router({
     /** How people can sign in here; empty when accounts are off. Public: the landing page asks. */
-    config: openProcedure.meta({ access: 'public' }).query(({ ctx }) => ({ providers: ctx.accounts?.providers ?? [] })),
+    config: openProcedure
+      .meta({ access: 'public' })
+      .query(({ ctx }) => ({ providers: ctx.accounts?.providers ?? [], email: ctx.accounts?.email ?? false })),
 
     get: openProcedure.meta({ access: 'account' }).query(async ({ ctx }) => {
       const account = await signedInAccount(ctx)

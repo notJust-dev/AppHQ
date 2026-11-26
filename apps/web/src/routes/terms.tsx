@@ -42,7 +42,7 @@ function TermsPage() {
           Only connect accounts you own or are allowed to use, and follow the terms of each platform you
           connect, such as Apple, Google, Meta, TikTok and RevenueCat.
         </li>
-        <li>You're responsible for keeping your dashboard password safe.</li>
+        <li>You're responsible for keeping your password safe.</li>
         <li>
           Your data stays yours. We use it only as described in the{' '}
           <Link to="/privacy">privacy policy</Link>.

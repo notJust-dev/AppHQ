@@ -26,8 +26,8 @@ interface Resolved extends DashboardAccess {
  * - A password session: a session cookie with the fingerprint of the current DASHBOARD_PASSWORD
  *   (see password-session.ts). Nothing when the password is unset. Calls carry the password
  *   statement, which the API accepts only while its ALLOW_DASHBOARD_PASSWORD is on.
- * - Otherwise, or when the API refuses the password, an account (Google or GitHub): calls carry
- *   its Better Auth cookies, and it counts
+ * - Otherwise, or when the API refuses the password, an account (Google, GitHub, or an email
+ *   address with a password): calls carry its Better Auth cookies, and it counts
  *   only if the API says which organization it works in: a verified address, approved access,
  *   and a membership.
  *

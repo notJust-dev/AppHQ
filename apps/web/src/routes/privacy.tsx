@@ -51,13 +51,21 @@ function PrivacyPage() {
         anything else.
       </p>
       <p>
+        When you create an account with an email address and a password instead, we store the address,
+        your password in a hashed form that we can't read, and whether and when you asked. We email you
+        a code to confirm the address and, if you ask for one, a link to choose a new password. An
+        address that is never confirmed gets no account and isn't saved to our database.
+      </p>
+      <p>
         We use this to let you in when your account is ready and to email you about it. We rely on
-        your consent, which you give by signing in. Email us to have your account deleted.
+        your consent, which you give by signing in or creating an account. Email us to have your
+        account deleted.
       </p>
       <h2>Technical data</h2>
       <p>
-        To stop abuse, the site uses your IP address to limit how often you can sign in or join the
-        waitlist. It's held in memory for up to an hour and not saved to our database. Our hosting
+        To stop abuse, the site uses your IP address to limit how often you can sign in, create an
+        account or join the waitlist, and counts how many emails it has sent to an address. Both are
+        held in memory for up to an hour and not saved to our database. Our hosting
         provider and Cloudflare, which sits in front of the site, may keep standard request logs,
         including IP addresses, for a short time for security and troubleshooting.
       </p>
@@ -87,8 +95,8 @@ function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        We don't use analytics or advertising cookies. Signing in to the dashboard, or with Google or
-        GitHub, sets a session cookie, which is needed to keep you signed in; a Google or GitHub
+        We don't use analytics or advertising cookies. Signing in sets a session cookie, which is
+        needed to keep you signed in; a Google or GitHub
         sign-in also sets a short-lived cookie that lets it finish safely. Your light or dark theme
         choice is kept in your own browser and never sent to us.
       </p>
@@ -144,7 +152,10 @@ function PrivacyPage() {
         <li>Cloudways, which hosts the servers and database.</li>
         <li>Cloudflare, which serves the site and protects it from attacks.</li>
         <li>PostHog, for the usage analytics described above, on its US servers.</li>
-        <li>An email delivery provider, once we start emailing the waitlist.</li>
+        <li>
+          Resend, which delivers the emails we send you, such as sign-up codes and password reset
+          links. It keeps a record of each email for 30 days, on its US servers.
+        </li>
       </ul>
       <p>
         These providers may process data outside your country, including in the United States, under
