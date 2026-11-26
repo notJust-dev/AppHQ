@@ -151,6 +151,113 @@ describe('dailyViews', () => {
     expect(total).toBe(13_100 + 900)
   })
 
+  it('does not start a post that was up before the connection from a reading of zero', () => {
+    // TikTok gave no views for the video on the connection day and its real total a day later.
+    const views = dailyViews({
+      watchStart: '2026-11-10',
+      through: '2026-11-12',
+      posts: [
+        {
+          publishedOn: '2026-04-02',
+          snapshots: [
+            { date: '2026-11-10', views: 0 },
+            { date: '2026-11-11', views: 80_000 },
+            { date: '2026-11-12', views: 80_500 },
+          ],
+        },
+      ],
+    })
+    // Its total is history, on the day it was posted, and only the growth after it is daily.
+    expect(asObject(views)).toMatchObject({ '2026-04-02': 80_000, '2026-11-10': 0, '2026-11-11': 0, '2026-11-12': 500 })
+  })
+
+  it('counts a total that drops to zero and comes back only once', () => {
+    const views = dailyViews({
+      watchStart: '2026-11-10',
+      through: '2026-11-12',
+      posts: [
+        {
+          publishedOn: '2026-01-01',
+          snapshots: [
+            { date: '2026-11-10', views: 1_000 },
+            { date: '2026-11-11', views: 0 },
+            { date: '2026-11-12', views: 1_300 },
+          ],
+        },
+      ],
+    })
+    // The 300 gained since the last good reading, over the two days since it.
+    expect(asObject(views)).toMatchObject({ '2026-01-01': 1_000, '2026-11-11': 150, '2026-11-12': 150 })
+    expect([...views.values()].reduce((sum, value) => sum + value, 0)).toBe(1_300)
+  })
+
+  it('counts no gain after a drop until the total is past its old one', () => {
+    const views = dailyViews({
+      watchStart: '2026-11-10',
+      through: '2026-11-13',
+      posts: [
+        {
+          publishedOn: '2026-01-01',
+          snapshots: [
+            { date: '2026-11-10', views: 1_000 },
+            { date: '2026-11-11', views: 900 },
+            { date: '2026-11-12', views: 980 },
+            { date: '2026-11-13', views: 1_060 },
+          ],
+        },
+      ],
+    })
+    expect(asObject(views)).toMatchObject({ '2026-01-01': 1_000, '2026-11-11': 20, '2026-11-12': 20, '2026-11-13': 20 })
+  })
+
+  it('believes a zero for a video posted on the connection day, or since', () => {
+    const views = dailyViews({
+      watchStart: '2026-11-10',
+      through: '2026-11-12',
+      posts: [
+        {
+          publishedOn: '2026-11-10',
+          snapshots: [
+            { date: '2026-11-10', views: 0 },
+            { date: '2026-11-11', views: 400 },
+          ],
+        },
+        {
+          publishedOn: '2026-11-11',
+          snapshots: [
+            { date: '2026-11-11', views: 0 },
+            { date: '2026-11-12', views: 90 },
+          ],
+        },
+      ],
+    })
+    // Nobody had watched them yet when they were first read; what came after is daily.
+    expect(asObject(views)).toEqual({ '2026-11-10': 0, '2026-11-11': 400, '2026-11-12': 90 })
+  })
+
+  it('keeps the post day of an older video that has no views at all', () => {
+    const views = dailyViews({
+      watchStart: '2026-11-10',
+      through: '2026-11-11',
+      posts: [
+        {
+          publishedOn: '2026-11-07',
+          snapshots: [
+            { date: '2026-11-10', views: 0 },
+            { date: '2026-11-11', views: 0 },
+          ],
+        },
+      ],
+    })
+    expect(asObject(views)).toEqual({
+      '2026-11-07': 0,
+      '2026-11-08': 0,
+      '2026-11-09': 0,
+      '2026-11-10': 0,
+      '2026-11-11': 0,
+    })
+  })
+
   it('puts a post first read only after watching started on its post day too', () => {
     // The first sync failed: the post was up before the connection but read two days later.
     const views = dailyViews({

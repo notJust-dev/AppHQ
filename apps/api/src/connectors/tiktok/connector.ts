@@ -4,12 +4,14 @@ import type { Scope, Tx } from '../../organizations/scope.js'
 import { connections, postSnapshots, posts, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { todayUtc, toIsoDate, type IsoDate } from '../../lib/dates.js'
+import type { Logger } from '../../lib/logger.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
-import { savePosts, type PostReading } from '../../posts/save.js'
+import { savePosts, storedPosts, type PostReading } from '../../posts/save.js'
 import type { AppConnector } from '../types.js'
 import { TikTokError, createTikTokClient, type TikTokClient, type TikTokVideo } from './client.js'
 import { TIKTOK, requireTikTokConfig, tiktokConfig } from './config.js'
 import { dailyViews, type PostHistory } from './daily-views.js'
+import { lacksViews, readVideos, type ReadVideo } from './readings.js'
 
 /** Refresh a little early, so a token never expires halfway through a sync. */
 const REFRESH_MARGIN_MS = 5 * 60_000
@@ -81,7 +83,50 @@ function tokenKeeper(deps: {
   }
 }
 
-const postRow = (video: TikTokVideo, appId: string, connectionId: string): PostReading => ({
+/**
+ * An account's videos whose totals can be saved. A video that comes without views is asked for
+ * again by id, and left out when TikTok still has no count to believe (see `readVideos`): what
+ * is stored for it stays, and the next sync reads it again.
+ */
+async function videosToSave(deps: {
+  scope: Scope
+  client: TikTokClient
+  keeper: ReturnType<typeof tokenKeeper>
+  log: Logger
+  /** Says which account a log line is about. */
+  label: string
+}): Promise<ReadVideo[]> {
+  const { scope, client, keeper, log, label } = deps
+  const listed = await keeper.use((token) => client.listVideos(token))
+  const doubtful = listed.filter(lacksViews)
+  if (doubtful.length === 0) return readVideos({ listed, again: [], stored: new Map() }).videos
+
+  const ids = doubtful.map((video) => video.id)
+  let again: TikTokVideo[] = []
+  try {
+    again = await keeper.use((token) => client.queryVideos(token, ids))
+  } catch (err) {
+    // The list itself was read, so the other videos are still saved. An account that has to be
+    // connected again must say so, though.
+    if (err instanceof TikTokError && err.isAuthProblem) throw err
+    const reason = err instanceof Error ? err.message : String(err)
+    log.warn(`${label}: asking again for ${ids.length} videos failed. ${reason}`)
+  }
+
+  const stored = await storedPosts(scope, TIKTOK, ids)
+  const { videos, recovered, skipped } = readVideos({ listed, again, stored })
+  if (recovered + skipped > 0) {
+    const noCount = doubtful.filter((video) => typeof video.view_count !== 'number').length
+    log.warn(
+      `${label}: ${doubtful.length} of ${listed.length} videos came without views ` +
+        `(${noCount} with no count, ${doubtful.length - noCount} with zero). Asked again: ` +
+        `${recovered} had views, ${skipped} were not saved this time`,
+    )
+  }
+  return videos
+}
+
+const postRow = (video: ReadVideo, appId: string, connectionId: string): PostReading => ({
   platform: TIKTOK,
   externalId: video.id,
   appId,
@@ -90,12 +135,11 @@ const postRow = (video: TikTokVideo, appId: string, connectionId: string): PostR
   caption: video.video_description || video.title || null,
   publishedAt: new Date(video.create_time * 1000),
   durationSeconds: video.duration ?? null,
-  views: video.view_count ?? 0,
+  views: video.view_count,
   likes: video.like_count ?? 0,
   comments: video.comment_count ?? 0,
   shares: video.share_count ?? 0,
 })
-
 
 /**
  * Recomputes the app's daily TikTok views from every snapshot, per account, and writes them to
@@ -163,7 +207,8 @@ async function writeDailyViewsIn(db: Tx, scope: Scope, appId: string) {
  * TikTok accounts, each connected to the app it promotes. Every sync reads each account's
  * public videos and saves their lifetime totals as today's snapshot; daily views are the gains
  * between days. TikTok keeps no history, so before an account was connected each video's views
- * sit on the day it was posted (see `dailyViews`).
+ * sit on the day it was posted (see `dailyViews`). A video TikTok gives no believable view count
+ * for is not saved that time (see `videosToSave`).
  */
 export function createTikTokConnector(
   options: {
@@ -209,7 +254,7 @@ export function createTikTokConnector(
           const keeper = tokenKeeper({ scope, secrets, client, now, connection: account })
           const scopes = (account.scopes ?? '').split(',').filter(Boolean)
           const user = await keeper.use((token) => client.getUser(token, scopes))
-          const videos = await keeper.use((token) => client.listVideos(token))
+          const videos = await videosToSave({ scope, client, keeper, log, label: `tiktok ${app.id}: ${name}` })
 
           await savePosts(
             scope,

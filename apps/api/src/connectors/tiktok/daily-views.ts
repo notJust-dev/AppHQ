@@ -21,7 +21,11 @@ export interface PostHistory {
  * - A post published since then counts in full: its first reading is spread over the days from
  *   publishing to that reading.
  * - Days between two readings share the gain evenly, so a missed sync smooths rather than
- *   spikes. A total that drops (TikTok removing views) counts as no gain.
+ *   spikes.
+ * - A lifetime total only goes up, so a reading lower than one before it is left out (see
+ *   `rising`), and a post that was up before the connection does not start from a reading of
+ *   zero (see `baseline`). TikTok answers with zero for a watched video at times; counted as
+ *   read, the video's whole lifetime would land on the day the real total came back.
  *
  * Returns one value per day, zeros included, so a quiet day shows as zero rather than as missing:
  * from the day after `watchStart` through `through`, and before that from the first post the
@@ -53,7 +57,8 @@ export function dailyViews(params: {
   }
 
   for (const post of params.posts) {
-    const readings = [...post.snapshots].sort((a, b) => a.date.localeCompare(b.date))
+    const read = rising(post.snapshots)
+    const readings = post.publishedOn < watchStart ? read.slice(baseline(read)) : read
     const [firstReading] = readings
     if (!firstReading) continue
 
@@ -86,4 +91,35 @@ export function dailyViews(params: {
 
   for (const [day, value] of totals) totals.set(day, Math.round(value))
   return totals
+}
+
+type Reading = PostHistory['snapshots'][number]
+
+/**
+ * A post's readings, oldest first, without those lower than one before them. What a post gains
+ * is then measured from its highest total so far: a total that dips and comes back adds only
+ * what it has above the old one, and the days of a post never add up to more than its highest
+ * total. When TikTok really takes views away, the post counts no gain until it is past its old
+ * total again.
+ */
+function rising(snapshots: Reading[]): Reading[] {
+  const kept: Reading[] = []
+  let highest = Number.NEGATIVE_INFINITY
+  for (const reading of [...snapshots].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (reading.views < highest) continue
+    kept.push(reading)
+    highest = reading.views
+  }
+  return kept
+}
+
+/**
+ * Where the history of a post that was up before the connection starts: its first reading with
+ * views, or its first reading when it has none. A video from before the day of the connection
+ * has had time to be watched, so a zero ahead of its real total is taken as not read. The first
+ * views of a video that truly had none yet then go on its post day, not the days they came in.
+ */
+function baseline(readings: Reading[]): number {
+  const withViews = readings.findIndex((reading) => reading.views > 0)
+  return withViews === -1 ? 0 : withViews
 }
