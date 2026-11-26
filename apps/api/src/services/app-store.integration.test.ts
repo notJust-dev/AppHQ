@@ -147,7 +147,6 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
   afterAll(async () => {
     const created = (await ourApps()).map((app) => app.id)
-    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(inArray(assets.externalId, [first.id, second.id, `proj_${run}`]))
     if (created.length > 0) {
       await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), inArray(apps.id, created)))
@@ -260,7 +259,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
   })
 
   it('leaves an app from outside the account alone', async () => {
-    const outsider = { id: `outsider-${run}`, name: 'Outsider' }
+    const outsider = { id: randomUUID(), name: 'Outsider' }
     const { organizationId } = scope
     await db.insert(apps).values({ organizationId, ...outsider })
     await db

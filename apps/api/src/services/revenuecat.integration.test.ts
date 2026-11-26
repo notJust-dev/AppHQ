@@ -88,7 +88,6 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
   })
 
   afterAll(async () => {
-    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(eq(assets.externalId, projectId))
     if (appId) await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await db.delete(connections).where(eq(connections.externalAccountId, projectId))
@@ -155,7 +154,7 @@ describe.skipIf(!url)('RevenueCat, against a real database', () => {
       /can see 2 projects/,
     )
     await expect(
-      connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_other', { appId: `gone-${projectId}` }),
+      connectRevenueCat({ ...scope, secrets, fetch: revenueCat() }, 'sk_other', { appId: randomUUID() }),
     ).rejects.toBeInstanceOf(ConnectInputError)
     expect((await assetOf(db, 'revenuecat_project', projectId)).appId).toBe(appId)
   })

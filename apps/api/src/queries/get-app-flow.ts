@@ -7,7 +7,7 @@ import { checkRange, rangeFields } from './range.js'
 
 const input = z
   .object({
-    appId: z.string().min(1).max(64).describe('The app, an id from list_apps.'),
+    appId: z.uuid().describe('The app, an id from list_apps.'),
     ...rangeFields,
   })
   .superRefine(checkRange)

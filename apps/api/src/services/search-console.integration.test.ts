@@ -24,7 +24,7 @@ describe.skipIf(!url)('Google Search Console, against a real database', () => {
   const secrets = createSecrets('e'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
   const run = randomUUID().slice(0, 8)
-  const appId = `sc-${run}`
+  const appId = randomUUID()
   const site = `sc-domain:example-${run}.com`
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const key = JSON.stringify({
@@ -80,7 +80,6 @@ describe.skipIf(!url)('Google Search Console, against a real database', () => {
 
   afterAll(async () => {
     await db.delete(connections).where(eq(connections.provider, 'search_console'))
-    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(inArray(assets.externalId, [site, `https://unverified-${run}.com/`]))
     await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await sql.end({ timeout: 5 })

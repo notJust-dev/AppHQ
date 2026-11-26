@@ -1,5 +1,5 @@
 {
-  "id": "9b0fbee6-fd4e-40cf-a8ec-da20a8bc2630",
+  "id": "b38b57ce-8a4e-40f7-99d3-da38a38e601f",
   "prevId": "80de8d1a-ff96-4c51-a6aa-93127cf5f959",
   "version": "7",
   "dialect": "postgresql",
@@ -131,15 +131,16 @@
       "name": "apps",
       "schema": "",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
         "organization_id": {
           "name": "organization_id",
           "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -169,6 +170,13 @@
           "notNull": true,
           "default": true
         },
+        "demo": {
+          "name": "demo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -177,7 +185,39 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "apps_org_idx": {
+          "name": "apps_org_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "apps_org_portfolio_idx": {
+          "name": "apps_org_portfolio_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"apps\".\"kind\" = 'portfolio'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "apps_organization_id_organization_id_fk": {
           "name": "apps_organization_id_organization_id_fk",
@@ -193,15 +233,7 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {
-        "apps_organization_id_id_pk": {
-          "name": "apps_organization_id_id_pk",
-          "columns": [
-            "organization_id",
-            "id"
-          ]
-        }
-      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -244,7 +276,7 @@
         },
         "app_id": {
           "name": "app_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -353,6 +385,19 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "assets_app_id_apps_id_fk": {
+          "name": "assets_app_id_apps_id_fk",
+          "tableFrom": "assets",
+          "tableTo": "apps",
+          "columnsFrom": [
+            "app_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "assets_connection_id_connections_id_fk": {
           "name": "assets_connection_id_connections_id_fk",
           "tableFrom": "assets",
@@ -364,21 +409,6 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "assets_organization_id_app_id_apps_organization_id_id_fk": {
-          "name": "assets_organization_id_app_id_apps_organization_id_id_fk",
-          "tableFrom": "assets",
-          "tableTo": "apps",
-          "columnsFrom": [
-            "organization_id",
-            "app_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
-          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -781,7 +811,7 @@
         },
         "app_id": {
           "name": "app_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -861,16 +891,14 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "metric_daily_organization_id_app_id_apps_organization_id_id_fk": {
-          "name": "metric_daily_organization_id_app_id_apps_organization_id_id_fk",
+        "metric_daily_app_id_apps_id_fk": {
+          "name": "metric_daily_app_id_apps_id_fk",
           "tableFrom": "metric_daily",
           "tableTo": "apps",
           "columnsFrom": [
-            "organization_id",
             "app_id"
           ],
           "columnsTo": [
-            "organization_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1023,16 +1051,14 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "post_snapshots_organization_id_post_id_posts_organization_id_id_fk": {
-          "name": "post_snapshots_organization_id_post_id_posts_organization_id_id_fk",
+        "post_snapshots_post_id_posts_id_fk": {
+          "name": "post_snapshots_post_id_posts_id_fk",
           "tableFrom": "post_snapshots",
           "tableTo": "posts",
           "columnsFrom": [
-            "organization_id",
             "post_id"
           ],
           "columnsTo": [
-            "organization_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1084,7 +1110,7 @@
         },
         "app_id": {
           "name": "app_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -1189,27 +1215,6 @@
           "method": "btree",
           "with": {}
         },
-        "posts_org_id_idx": {
-          "name": "posts_org_id_idx",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "posts_org_app_published_idx": {
           "name": "posts_org_app_published_idx",
           "columns": [
@@ -1252,6 +1257,19 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "posts_app_id_apps_id_fk": {
+          "name": "posts_app_id_apps_id_fk",
+          "tableFrom": "posts",
+          "tableTo": "apps",
+          "columnsFrom": [
+            "app_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "posts_connection_id_connections_id_fk": {
           "name": "posts_connection_id_connections_id_fk",
           "tableFrom": "posts",
@@ -1263,21 +1281,6 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "posts_organization_id_app_id_apps_organization_id_id_fk": {
-          "name": "posts_organization_id_app_id_apps_organization_id_id_fk",
-          "tableFrom": "posts",
-          "tableTo": "apps",
-          "columnsFrom": [
-            "organization_id",
-            "app_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -1306,7 +1309,7 @@
         },
         "app_id": {
           "name": "app_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -1505,16 +1508,14 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "reviews_organization_id_app_id_apps_organization_id_id_fk": {
-          "name": "reviews_organization_id_app_id_apps_organization_id_id_fk",
+        "reviews_app_id_apps_id_fk": {
+          "name": "reviews_app_id_apps_id_fk",
           "tableFrom": "reviews",
           "tableTo": "apps",
           "columnsFrom": [
-            "organization_id",
             "app_id"
           ],
           "columnsTo": [
-            "organization_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1669,7 +1670,7 @@
         },
         "app_id": {
           "name": "app_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1761,16 +1762,14 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "sync_runs_organization_id_app_id_apps_organization_id_id_fk": {
-          "name": "sync_runs_organization_id_app_id_apps_organization_id_id_fk",
+        "sync_runs_app_id_apps_id_fk": {
+          "name": "sync_runs_app_id_apps_id_fk",
           "tableFrom": "sync_runs",
           "tableTo": "apps",
           "columnsFrom": [
-            "organization_id",
             "app_id"
           ],
           "columnsTo": [
-            "organization_id",
             "id"
           ],
           "onDelete": "cascade",

@@ -29,7 +29,7 @@ import { sourceLabel } from '@/lib/sources'
 import { cn } from '@/lib/utils'
 
 const searchSchema = z.object({
-  app: z.string().min(1).max(64).optional().catch(undefined),
+  app: z.uuid().optional().catch(undefined),
   store: z.enum(['app_store', 'google_play']).optional().catch(undefined),
   rating: z.coerce.number().int().min(1).max(5).optional().catch(undefined),
   unread: z.boolean().optional().catch(undefined),

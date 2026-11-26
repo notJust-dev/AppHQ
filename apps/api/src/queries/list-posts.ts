@@ -23,7 +23,7 @@ export const listPosts = defineQuery({
     '"too_recent", "no_baseline" or "no_downloads" when it cannot be worked out.',
   input: z
     .object({
-      appId: z.string().min(1).max(64).describe('The app id from list_apps.'),
+      appId: z.uuid().describe('The app id from list_apps.'),
       ...rangeFields,
       limit: z.number().int().min(1).max(200).default(50).describe('At most this many posts.'),
     })

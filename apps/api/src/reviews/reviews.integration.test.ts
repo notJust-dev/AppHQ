@@ -16,7 +16,7 @@ const url = testDatabaseUrl()
 describe.skipIf(!url)('Reviews inbox, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
   const run = randomUUID().slice(0, 8)
-  const appId = `reviews-${run}`
+  const appId = randomUUID()
   const now = new Date()
   let scope: Scope
   const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000)

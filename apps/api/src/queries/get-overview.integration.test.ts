@@ -15,7 +15,7 @@ const url = testDatabaseUrl()
 
 describe.skipIf(!url)('Portfolio overview, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
-  const appId = `overview-${randomUUID().slice(0, 8)}`
+  const appId = randomUUID()
   const range = { from: '2026-11-10', to: '2026-11-12' }
   let scope: Scope
 

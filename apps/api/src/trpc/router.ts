@@ -44,7 +44,7 @@ import {
 } from '../connectors/google-play/connector.js'
 import { connectGooglePlay } from '../services/connect-google-play.js'
 import { connectMeta } from '../services/connect-meta.js'
-import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
+import { ASSET_KINDS, PORTFOLIO, isAssetKind } from '../assets/kinds.js'
 import { assignAsset, createApp, removeApp, renameApp, setIgnored } from '../assets/store.js'
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
@@ -236,7 +236,7 @@ export const appRouter = router({
 
     /** Renames an app; its id and address stay the same. */
     rename: procedure
-      .input(z.object({ appId: z.string().min(1).max(64), name: z.string().trim().min(1).max(80) }))
+      .input(z.object({ appId: z.uuid(), name: z.string().trim().min(1).max(80) }))
       .mutation(async ({ ctx, input }) => ({
         name: await renameApp(ctx, input.appId, input.name).catch((err: unknown) => {
           throw connectError(err)
@@ -247,7 +247,7 @@ export const appRouter = router({
      * Stops tracking an app: deletes it with its numbers and posts. What fed it stays, without an
      * app, on the Apps page.
      */
-    remove: procedure.input(z.object({ appId: z.string().min(1).max(64) })).mutation(async ({ ctx, input }) => ({
+    remove: procedure.input(z.object({ appId: z.uuid() })).mutation(async ({ ctx, input }) => ({
       name: await removeApp(ctx, input.appId).catch((err: unknown) => {
         throw connectError(err)
       }),
@@ -267,7 +267,7 @@ export const appRouter = router({
      * app's settings, and starts fetching its history once it belongs to an app.
      */
     connectRevenueCat: procedure
-      .input(z.object({ apiKey: z.string().trim().min(8).max(500), appId: z.string().min(1).max(64).optional() }))
+      .input(z.object({ apiKey: z.string().trim().min(8).max(500), appId: z.uuid().optional() }))
       .mutation(async ({ ctx, input }) => {
         const connected = await connectRevenueCat(ctx, input.apiKey, { appId: input.appId }).catch((err: unknown) => {
           ctx.log.error(`connect RevenueCat failed: ${err instanceof Error ? err.message : err}`)
@@ -338,7 +338,7 @@ export const appRouter = router({
         z.object({
           code: z.string().min(1).max(2000),
           redirectUri: z.url(),
-          appId: z.string().min(1).max(64),
+          appId: z.uuid(),
           organizationId: startedIn,
         }),
       )
@@ -412,9 +412,9 @@ export const appRouter = router({
   assets: router({
     list: procedure.query(({ ctx }) => listAssets.handler(ctx)),
 
-    /** Gives an asset to an app, to a new app (`'new'`), to the portfolio, or to none (`null`). */
+    /** Gives an asset to an app, to a new app (`'new'`), to the portfolio (`'portfolio'`), or to none (`null`). */
     assign: procedure
-      .input(z.object({ assetId: z.uuid(), appId: z.string().min(1).max(64).nullable() }))
+      .input(z.object({ assetId: z.uuid(), appId: z.union([z.uuid(), z.literal('new'), z.literal(PORTFOLIO)]).nullable() }))
       .mutation(async ({ ctx, input }) => {
         const { asset, appId } = await assignAsset(ctx, input).catch((err: unknown) => {
           throw connectError(err)
@@ -513,7 +513,7 @@ export const appRouter = router({
     top: procedure
       .input(
         z.object({
-          appId: z.string().min(1).max(64).optional(),
+          appId: z.uuid().optional(),
           from: z.iso.date(),
           to: z.iso.date(),
           dimension: z.enum(['query', 'page']),
@@ -619,7 +619,7 @@ export const appRouter = router({
     }),
   }),
   // Velocity has no shell, so the generated demo data is loaded and removed through the API.
-  // Both only ever touch apps whose id starts with `demo-`, in the context's organization.
+  // Both only ever touch apps marked as demo apps, in the context's organization.
   demo: router({
     seed: procedure
       .input(z.object({ days: z.number().int().min(1).max(400).default(200) }))

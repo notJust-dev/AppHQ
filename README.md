@@ -196,7 +196,7 @@ Open `https://<web address>/login` and sign in with `DASHBOARD_PASSWORD`. Then g
 **Accounts** to connect your first source.
 
 To look around with demo data first, send this request (with your internal token) to the API.
-It loads four made-up apps whose ids start with `demo-`:
+It loads four made-up apps, marked as demo apps:
 
 ```bash
 curl -X POST https://<api address>/trpc/demo.seed \

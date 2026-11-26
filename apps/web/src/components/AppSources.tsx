@@ -29,8 +29,7 @@ import type { AppSummary, Asset } from '@/lib/queries'
 export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets: Asset[] }) {
   const { app, apps, assets } = props
   const actions = useAssetActions()
-  const appName = (appId: string) =>
-    apps.find((other) => other.id === appId)?.name ?? 'another app'
+  const appOf = (appId: string) => apps.find((other) => other.id === appId)
   const mine = assets.filter((asset) => asset.appId === app.id)
   const portfolio = app.kind === 'portfolio'
 
@@ -54,7 +53,7 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
               appId={app.id}
               current={mine.find((asset) => asset.kind === kind)}
               candidates={assets.filter((asset) => asset.kind === kind && !asset.ignored)}
-              appName={appName}
+              appOf={appOf}
               actions={actions}
             />
           ))}
@@ -65,7 +64,7 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
             others={assets.filter(
               (asset) => asset.kind === 'revenuecat_project' && !asset.ignored && asset.appId !== app.id,
             )}
-            appName={appName}
+            appOf={appOf}
             actions={actions}
           />
         )}
@@ -73,7 +72,7 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
           appId={app.id}
           linked={mine.filter((asset) => asset.social)}
           candidates={assets.filter((asset) => asset.social && !asset.ignored && asset.appId !== app.id)}
-          appName={appName}
+          appOf={appOf}
           actions={actions}
         />
       </ul>
@@ -99,13 +98,14 @@ const ROW_LABEL = 'w-full pt-1.5 text-sm font-medium sm:w-56 sm:shrink-0'
 const ROW_BODY = 'w-full min-w-0 space-y-3 sm:w-auto sm:flex-1'
 
 /** Where an asset belongs now, said next to it in a list of choices. */
-function whereNow(asset: Asset, appName: (appId: string) => string): ReactNode {
+function whereNow(asset: Asset, appOf: (appId: string) => AppSummary | undefined): ReactNode {
   if (asset.appId === null) return ''
-  if (asset.appId === 'portfolio') return ' (in Shared accounts)'
+  const other = appOf(asset.appId)
+  if (other?.kind === 'portfolio') return ' (in Shared accounts)'
   return (
     <>
       {' (now in '}
-      <Private>{appName(asset.appId)}</Private>)
+      <Private>{other?.name ?? 'another app'}</Private>)
     </>
   )
 }
@@ -115,10 +115,10 @@ function SlotRow(props: {
   appId: string
   current: Asset | undefined
   candidates: Asset[]
-  appName: (appId: string) => string
+  appOf: (appId: string) => AppSummary | undefined
   actions: AssetActions
 }) {
-  const { kind, appId, current, candidates, appName, actions } = props
+  const { kind, appId, current, candidates, appOf, actions } = props
   const selectId = useId()
   const label = KIND_LABEL[kind] ?? kind
 
@@ -162,7 +162,7 @@ function SlotRow(props: {
                         {asset.name}
                         {detail ? ` · ${detail}` : ''}
                       </Private>
-                      {asset.appId === appId ? '' : whereNow(asset, appName)}
+                      {asset.appId === appId ? '' : whereNow(asset, appOf)}
                     </SelectItem>
                   )
                 })}
@@ -187,10 +187,10 @@ function SocialRow(props: {
   appId: string
   linked: Asset[]
   candidates: Asset[]
-  appName: (appId: string) => string
+  appOf: (appId: string) => AppSummary | undefined
   actions: AssetActions
 }) {
-  const { appId, linked, candidates, appName, actions } = props
+  const { appId, linked, candidates, appOf, actions } = props
   const [adding, setAdding] = useState('')
   const selectId = useId()
 
@@ -246,7 +246,7 @@ function SocialRow(props: {
                   <SelectItem key={asset.id} value={asset.id}>
                     <SourceLogo source={LOGO_OF_KIND[asset.kind] ?? asset.kind} className="text-muted-foreground" />
                     <Private>{asset.name}</Private>
-                    {whereNow(asset, appName)}
+                    {whereNow(asset, appOf)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -277,10 +277,10 @@ function RevenueCatRow(props: {
   app: AppSummary
   current: Asset | undefined
   others: Asset[]
-  appName: (appId: string) => string
+  appOf: (appId: string) => AppSummary | undefined
   actions: AssetActions
 }) {
-  const { app, current, others, appName, actions } = props
+  const { app, current, others, appOf, actions } = props
   const [replacing, setReplacing] = useState(false)
   const [choice, setChoice] = useState('')
   const selectId = useId()
@@ -339,7 +339,7 @@ function RevenueCatRow(props: {
                 {others.map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
                     <Private>{asset.name}</Private>
-                    {whereNow(asset, appName)}
+                    {whereNow(asset, appOf)}
                   </SelectItem>
                 ))}
               </SelectContent>

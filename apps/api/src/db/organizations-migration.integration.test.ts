@@ -43,7 +43,7 @@ describe.skipIf(!url)('migration 0011: one organization holds everything that wa
     await migrate(db, { migrationsFolder: before })
 
     // Rows in the old shape: no organization anywhere. Invented values only.
-    await sql`insert into apps (id, name) values ('kicks', 'Kicks'), ('zen', 'Zen')`
+    await sql`insert into apps (id, name) values ('kicks', 'Kicks'), ('zen', 'Zen'), ('demo-trailmate', 'Trailmate')`
     const [conn] = await sql<{ id: string }[]>`
       insert into connections (provider, external_account_id, display_name)
       values ('tiktok', 'open-id-1', '@kicks.app') returning id`
@@ -114,51 +114,62 @@ describe.skipIf(!url)('migration 0011: one organization holds everything that wa
     expect(snapshot?.views).toBe('500')
   })
 
-  it('keeps the values and links: the portfolio row, assets on their apps, numbers', async () => {
-    expect(await sql`select id, kind from apps order by id`).toEqual([
-      { id: 'kicks', kind: 'app' },
-      { id: 'portfolio', kind: 'portfolio' },
-      { id: 'zen', kind: 'app' },
+  it('gives every app a uuid and keeps it linked: the portfolio row, demo apps, assets, numbers', async () => {
+    const appRows = await sql<{ id: string; name: string; kind: string; demo: boolean }[]>`select id, name, kind, demo from apps order by name`
+    expect(appRows.map(({ name, kind, demo }) => ({ name, kind, demo }))).toEqual([
+      { name: 'Kicks', kind: 'app', demo: false },
+      { name: 'Shared accounts', kind: 'portfolio', demo: false },
+      { name: 'Trailmate', kind: 'app', demo: true },
+      { name: 'Zen', kind: 'app', demo: false },
     ])
-    expect(await sql`select external_id, app_id from assets order by external_id`).toEqual([
-      { external_id: '1000000001', app_id: 'kicks' },
-      { external_id: 'com.example.waiting', app_id: null },
-      { external_id: 'ig-1', app_id: 'portfolio' },
-      { external_id: 'open-id-1', app_id: 'kicks' },
+    for (const app of appRows) expect(app.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(new Set(appRows.map((app) => app.id)).size).toBe(appRows.length)
+
+    // Every link points at the same app as before, through its new id.
+    expect(
+      await sql`select a.external_id, apps.name from assets a left join apps on apps.id = a.app_id order by a.external_id`,
+    ).toEqual([
+      { external_id: '1000000001', name: 'Kicks' },
+      { external_id: 'com.example.waiting', name: null },
+      { external_id: 'ig-1', name: 'Shared accounts' },
+      { external_id: 'open-id-1', name: 'Kicks' },
     ])
-    const [sum] = await sql`select sum(value)::float as total from metric_daily`
-    expect(sum?.total).toBeCloseTo(12 + 15 + 9.99 + 300)
+    expect(
+      await sql`select apps.name, sum(m.value)::float as total from metric_daily m join apps on apps.id = m.app_id group by apps.name order by apps.name`,
+    ).toEqual([
+      { name: 'Kicks', total: 27 },
+      { name: 'Shared accounts', total: 300 },
+      { name: 'Zen', total: 9.99 },
+    ])
+    expect(await sql`select apps.name from posts p join apps on apps.id = p.app_id`).toEqual([{ name: 'Kicks' }])
+    expect(await sql`select apps.name from reviews r join apps on apps.id = r.app_id`).toEqual([{ name: 'Kicks' }])
+    expect(await sql`select s.source, apps.name from sync_runs s left join apps on apps.id = s.app_id order by s.source`).toEqual([
+      { source: 'scheduled', name: null },
+      { source: 'tiktok', name: 'Kicks' },
+    ])
   })
 
-  it('lets a second organization reuse the same app slug and external ids, and nothing points across', async () => {
+  it('lets a second organization reuse app names and external ids, with one portfolio each', async () => {
     const [other] = await sql<{ id: string }[]>`insert into organization (name, slug) values ('Other', 'other') returning id`
-    await sql`insert into apps (organization_id, id, name) values (${other!.id}, 'kicks', 'Their Kicks'), (${other!.id}, 'portfolio', 'Shared accounts')`
+    const [theirKicks] = await sql<{ id: string }[]>`insert into apps (organization_id, name) values (${other!.id}, 'Kicks') returning id`
+    await sql`insert into apps (organization_id, name, kind) values (${other!.id}, 'Shared accounts', 'portfolio')`
+    await expect(
+      sql`insert into apps (organization_id, name, kind) values (${other!.id}, 'Another portfolio', 'portfolio')`,
+    ).rejects.toThrow(/apps_org_portfolio_idx/)
     await sql`insert into connections (organization_id, provider, external_account_id) values (${other!.id}, 'tiktok', 'open-id-1')`
-    await sql`insert into assets (organization_id, kind, external_id, name, app_id) values (${other!.id}, 'tiktok_account', 'open-id-1', 'x', 'kicks')`
-    await sql`insert into posts (organization_id, platform, external_id, app_id, published_at) values (${other!.id}, 'tiktok', 'video-1', 'kicks', now())`
-    await sql`insert into reviews (organization_id, app_id, store, external_id, rating, created_at) values (${other!.id}, 'kicks', 'app_store', 'review-1', 1, now())`
+    await sql`insert into assets (organization_id, kind, external_id, name, app_id) values (${other!.id}, 'tiktok_account', 'open-id-1', 'x', ${theirKicks!.id})`
+    await sql`insert into posts (organization_id, platform, external_id, app_id, published_at) values (${other!.id}, 'tiktok', 'video-1', ${theirKicks!.id}, now())`
+    await sql`insert into reviews (organization_id, app_id, store, external_id, rating, created_at) values (${other!.id}, ${theirKicks!.id}, 'app_store', 'review-1', 1, now())`
 
-    // A row can't point at another organization's app.
-    await expect(
-      sql`insert into metric_daily (organization_id, app_id, date, source, metric, value) values (${other!.id}, 'zen', '2026-10-01', 'x', 'y', 1)`,
-    ).rejects.toThrow(/foreign key/)
-
-    // Nor can a snapshot belong to another organization's post.
-    const [theirsNot] = await sql<{ id: string }[]>`select id from posts where organization_id <> ${other!.id}`
-    await expect(
-      sql`insert into post_snapshots (organization_id, post_id, date, views, likes, comments, shares) values (${other!.id}, ${theirsNot!.id}, '2026-10-02', 1, 0, 0, 0)`,
-    ).rejects.toThrow(/foreign key/)
-
-    // An app with linked assets can't be deleted (removeApp unlinks them first).
-    await expect(sql`delete from apps where organization_id = ${other!.id} and id = 'kicks'`).rejects.toThrow(/foreign key/)
-    // Removing one organization's app takes its posts and reviews, and leaves the other's alone.
-    await sql`update assets set app_id = null where organization_id = ${other!.id}`
-    await sql`delete from apps where organization_id = ${other!.id} and id = 'kicks'`
+    // Removing their app takes its posts and reviews, keeps its asset without an app, and leaves
+    // the first organization's alone.
+    await sql`delete from apps where id = ${theirKicks!.id}`
     const [first] = await sql<{ id: string }[]>`select id from organization where slug = 'default'`
     expect(await sql`select organization_id from posts`).toEqual([{ organization_id: first!.id }])
     expect(await sql`select organization_id from reviews`).toEqual([{ organization_id: first!.id }])
-    const [kept] = await sql`select count(*)::int as n from metric_daily where organization_id = ${first!.id} and app_id = 'kicks'`
-    expect(kept?.n).toBe(2)
+    expect(await sql`select app_id from assets where organization_id = ${other!.id}`).toEqual([{ app_id: null }])
+    const [kept] = await sql`select count(*)::int as n from metric_daily where organization_id = ${first!.id}`
+    expect(kept?.n).toBe(counts.metric_daily)
   })
 
   it('refuses to delete an organization that still holds data', async () => {

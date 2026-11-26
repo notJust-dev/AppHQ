@@ -7,7 +7,7 @@ export const REVIEW_STORES = ['app_store', 'google_play'] as const
 
 /** The filters every review query and the bulk "mark read" share. */
 export const reviewFilters = {
-  appId: z.string().min(1).max(64).optional().describe('Only this app (an id from list_apps).'),
+  appId: z.uuid().optional().describe('Only this app (an id from list_apps).'),
   store: z.enum(REVIEW_STORES).optional().describe('Only this store.'),
   rating: z.number().int().min(1).max(5).optional().describe('Only reviews with this many stars.'),
   unread: z.boolean().optional().describe('Only reviews not marked read in the dashboard.'),

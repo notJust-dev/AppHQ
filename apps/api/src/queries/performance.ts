@@ -15,9 +15,7 @@ const input = z
   .object({
     ...rangeFields,
     appId: z
-      .string()
-      .min(1)
-      .max(64)
+      .uuid()
       .optional()
       .describe('Limit to one app (an id from list_apps). Every app, shared accounts included, when left out.'),
   })

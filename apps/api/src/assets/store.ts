@@ -2,9 +2,8 @@ import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import type { Scope } from '../organizations/scope.js'
 import { sameConnection } from '../organizations/joins.js'
 import { apps, assets, connections, type App, type Asset, type Connection } from '../db/schema.js'
-import { uniqueSlug } from '../lib/slug.js'
 import { ConnectInputError } from '../services/errors.js'
-import { ASSET_KINDS, PORTFOLIO_APP_ID, type AssetKind } from './kinds.js'
+import { ASSET_KINDS, PORTFOLIO, type AssetKind } from './kinds.js'
 
 const CHUNK = 500
 
@@ -63,15 +62,39 @@ export async function linkedAssets(
   return rows
 }
 
-/** Makes an app and returns its id. */
+/** Makes an app and returns its id. Two apps may have the same name. */
 export async function createApp({ db, organizationId }: Scope, name: string): Promise<string> {
   const trimmed = name.trim()
   if (!trimmed) throw new ConnectInputError('Give the app a name.')
-  // Unique within the organization; another organization may have an app with the same id.
-  const known = await db.select({ id: apps.id }).from(apps).where(eq(apps.organizationId, organizationId))
-  const id = uniqueSlug(trimmed, new Set(known.map((app) => app.id)))
-  await db.insert(apps).values({ organizationId, id, name: trimmed })
-  return id
+  const [made] = await db.insert(apps).values({ organizationId, name: trimmed }).returning({ id: apps.id })
+  return made!.id
+}
+
+/** The organization's portfolio app, made the first time something is given to it. */
+export async function portfolioApp({ db, organizationId }: Scope): Promise<string> {
+  const find = () =>
+    db
+      .select({ id: apps.id })
+      .from(apps)
+      .where(and(eq(apps.organizationId, organizationId), eq(apps.kind, 'portfolio')))
+      .limit(1)
+  const [found] = await find()
+  if (found) return found.id
+  // At most one per organization (a partial unique index), so a second request at the same
+  // moment inserts nothing and reads the first one's.
+  await db.insert(apps).values({ organizationId, name: 'Shared accounts', kind: 'portfolio' }).onConflictDoNothing()
+  const [made] = await find()
+  return made!.id
+}
+
+/** The organization's app with this id, or undefined. */
+async function appIn({ db, organizationId }: Scope, appId: string) {
+  const [app] = await db
+    .select({ id: apps.id, kind: apps.kind })
+    .from(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+    .limit(1)
+  return app
 }
 
 /**
@@ -98,15 +121,15 @@ export async function assignAsset(
   if (appId === 'new') {
     if (kind.social) throw new ConnectInputError('Pick the app this account promotes, or the portfolio.')
     appId = await createApp(scope, detail(asset, 'title') ?? asset.name)
-  } else if (appId === PORTFOLIO_APP_ID) {
+  } else if (appId === PORTFOLIO) {
     if (!kind.social) throw new ConnectInputError(`A ${kind.label} belongs to one app, not to the portfolio.`)
+    appId = await portfolioApp(scope)
   } else if (appId !== null) {
-    const [app] = await db
-      .select({ id: apps.id })
-      .from(apps)
-      .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
-      .limit(1)
+    const app = await appIn(scope, appId)
     if (!app) throw new ConnectInputError('That app no longer exists. Reload the page.')
+    if (app.kind === 'portfolio' && !kind.social) {
+      throw new ConnectInputError(`A ${kind.label} belongs to one app, not to the portfolio.`)
+    }
   }
 
   await db.transaction(async (tx) => {
@@ -137,8 +160,9 @@ export async function setIgnored({ db, organizationId }: Scope, assetIds: string
 }
 
 /** Renames an app. Its id, and so its address, stays the same. */
-export async function renameApp({ db, organizationId }: Scope, appId: string, name: string) {
-  if (appId === PORTFOLIO_APP_ID) throw new ConnectInputError('Shared accounts keep their name.')
+export async function renameApp(scope: Scope, appId: string, name: string) {
+  const { db, organizationId } = scope
+  if ((await appIn(scope, appId))?.kind === 'portfolio') throw new ConnectInputError('Shared accounts keep their name.')
   const renamed = await db
     .update(apps)
     .set({ name })
@@ -152,20 +176,14 @@ export async function renameApp({ db, organizationId }: Scope, appId: string, na
  * Removes an app the person no longer wants to track. Its numbers and posts go with it; what fed
  * it (store apps, projects, social accounts) stays, without an app, on the Apps page.
  */
-export async function removeApp({ db, organizationId }: Scope, appId: string) {
-  if (appId === PORTFOLIO_APP_ID) throw new ConnectInputError('Shared accounts cannot be removed.')
-  const removed = await db.transaction(async (tx) => {
-    // What fed the app stays, without an app. Done here rather than by the foreign key, which
-    // can't clear only `app_id` of the (organization_id, app_id) pair on every Postgres version.
-    await tx
-      .update(assets)
-      .set({ appId: null, updatedAt: new Date() })
-      .where(and(eq(assets.organizationId, organizationId), eq(assets.appId, appId)))
-    return tx
-      .delete(apps)
-      .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
-      .returning({ name: apps.name })
-  })
+export async function removeApp(scope: Scope, appId: string) {
+  const { db, organizationId } = scope
+  if ((await appIn(scope, appId))?.kind === 'portfolio') throw new ConnectInputError('Shared accounts cannot be removed.')
+  // Its assets stay, without an app (the foreign key sets their app_id to null).
+  const removed = await db
+    .delete(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+    .returning({ name: apps.name })
   if (removed.length === 0) throw new ConnectInputError('That app no longer exists. Reload the page.')
   return removed[0]!.name
 }

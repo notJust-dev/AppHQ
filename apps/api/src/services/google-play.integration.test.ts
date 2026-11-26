@@ -69,7 +69,7 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
   const secrets = createSecrets('f'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
   const suffix = randomUUID().slice(0, 8)
-  const appId = `gp-${suffix}`
+  const appId = randomUUID()
   const google = fakeGoogle(suffix)
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const key = JSON.stringify({
@@ -105,7 +105,6 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
 
   afterAll(async () => {
     await db.delete(connections).where(eq(connections.provider, 'google_play'))
-    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(inArray(assets.externalId, [`ios-${suffix}`, google.pkg, google.other]))
     await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), inArray(apps.id, createdApps)))
     await sql.end({ timeout: 5 })

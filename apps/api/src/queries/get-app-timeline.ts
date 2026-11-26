@@ -137,7 +137,7 @@ export const getAppTimeline = defineQuery({
     '(`waitingFor`) have not reached the latest days; per-source values go on. Returns null for ' +
     'an unknown app.',
   input: z
-    .object({ appId: z.string().min(1).max(64).describe('The app id from list_apps.'), ...rangeFields })
+    .object({ appId: z.uuid().describe('The app id from list_apps.'), ...rangeFields })
     .superRefine(checkRange),
   async handler(scope, input) {
     const { db, organizationId } = scope

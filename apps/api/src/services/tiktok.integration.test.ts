@@ -125,7 +125,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
   ]
   const nonZero = (rows: { date: string; value: number }[]) => rows.filter((row) => row.value !== 0)
   const log = { info() {}, warn() {}, error() {} }
-  const appId = `tt-${randomUUID().slice(0, 8)}`
+  const appId = randomUUID()
   const openId = `open-${randomUUID().slice(0, 8)}`
   const tiktok = fakeTikTok(openId)
   const at = (iso: string) => () => new Date(iso)
@@ -158,7 +158,6 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
   })
 
   afterAll(async () => {
-    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(eq(assets.externalId, openId))
     await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await db.delete(connections).where(eq(connections.externalAccountId, openId))
@@ -272,40 +271,53 @@ describe.skipIf(!url)('the same TikTok account in two organizations', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
   const secrets = createSecrets('d'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
-  const appId = `kicks-${randomUUID().slice(0, 8)}`
+  // Each organization has its own app for the account; app ids are unique across organizations.
+  const xAppId = randomUUID()
+  const yAppId = randomUUID()
   const openId = `open-shared-${randomUUID().slice(0, 8)}`
   const redirectUri = 'https://dash.example/connect/tiktok/callback'
   const now = () => new Date('2026-11-10T09:00:00Z')
   let x: Scope
   let y: Scope
+  const appIdIn = ({ organizationId }: Scope) => (organizationId === x.organizationId ? xAppId : yAppId)
 
-  const rowsOf = async ({ organizationId }: Scope) => ({
-    connections: await db
-      .select()
-      .from(connections)
-      .where(and(eq(connections.organizationId, organizationId), eq(connections.externalAccountId, openId))),
-    assets: await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.externalId, openId))),
-    posts: await db.select().from(posts).where(and(eq(posts.organizationId, organizationId), eq(posts.appId, appId))),
-    metrics: await db
-      .select()
-      .from(metricDaily)
-      .where(and(eq(metricDaily.organizationId, organizationId), eq(metricDaily.appId, appId))),
-  })
+  const rowsOf = async (scope: Scope) => {
+    const { organizationId } = scope
+    const appId = appIdIn(scope)
+    return {
+      connections: await db
+        .select()
+        .from(connections)
+        .where(and(eq(connections.organizationId, organizationId), eq(connections.externalAccountId, openId))),
+      assets: await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.externalId, openId))),
+      // Ordered, so that the same rows always compare equal.
+      posts: await db
+        .select()
+        .from(posts)
+        .where(and(eq(posts.organizationId, organizationId), eq(posts.appId, appId)))
+        .orderBy(posts.externalId),
+      metrics: await db
+        .select()
+        .from(metricDaily)
+        .where(and(eq(metricDaily.organizationId, organizationId), eq(metricDaily.appId, appId)))
+        .orderBy(metricDaily.date, metricDaily.source, metricDaily.metric, metricDaily.dimension),
+    }
+  }
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
     x = await testOrganization(db, 'tiktok-x')
     y = await testOrganization(db, 'tiktok-y')
-    // The same app slug in both.
+    // An app with the same name in both.
     await db.insert(apps).values([
-      { organizationId: x.organizationId, id: appId, name: 'Kicks' },
-      { organizationId: y.organizationId, id: appId, name: 'Kicks' },
+      { organizationId: x.organizationId, id: xAppId, name: 'Kicks' },
+      { organizationId: y.organizationId, id: yAppId, name: 'Kicks' },
     ])
   })
   afterAll(async () => {
     for (const scope of [x, y]) {
       await db.delete(assets).where(and(eq(assets.organizationId, scope.organizationId), eq(assets.externalId, openId)))
-      await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
+      await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appIdIn(scope))))
       await db.delete(connections).where(and(eq(connections.organizationId, scope.organizationId), eq(connections.externalAccountId, openId)))
     }
     await sql.end()
@@ -314,18 +326,18 @@ describe.skipIf(!url)('the same TikTok account in two organizations', () => {
   it('connects and syncs it in each without touching the other', async () => {
     const inX = fakeTikTok(openId)
     const inY = fakeTikTok(openId)
-    await connectTikTok({ ...x, secrets, fetch: inX.impl, env }, { code: 'good-code', redirectUri, appId })
+    await connectTikTok({ ...x, secrets, fetch: inX.impl, env }, { code: 'good-code', redirectUri, appId: xAppId })
     const yBefore = await rowsOf(y)
     expect(yBefore.connections).toHaveLength(0)
 
     const connector = createTikTokConnector({ fetch: inX.impl, env, now, sleep: async () => {} })
-    const [xApp] = await db.select().from(apps).where(and(eq(apps.organizationId, x.organizationId), eq(apps.id, appId)))
+    const [xApp] = await db.select().from(apps).where(and(eq(apps.organizationId, x.organizationId), eq(apps.id, xAppId)))
     await connector.sync({ ...x, app: xApp!, range: { from: '2026-11-03', to: '2026-11-09' }, log, secrets })
     expect(await rowsOf(y)).toEqual(yBefore)
 
-    await connectTikTok({ ...y, secrets, fetch: inY.impl, env }, { code: 'good-code', redirectUri, appId })
+    await connectTikTok({ ...y, secrets, fetch: inY.impl, env }, { code: 'good-code', redirectUri, appId: yAppId })
     const xAfterSync = await rowsOf(x)
-    const [yApp] = await db.select().from(apps).where(and(eq(apps.organizationId, y.organizationId), eq(apps.id, appId)))
+    const [yApp] = await db.select().from(apps).where(and(eq(apps.organizationId, y.organizationId), eq(apps.id, yAppId)))
     await createTikTokConnector({ fetch: inY.impl, env, now, sleep: async () => {} }).sync({
       ...y,
       app: yApp!,
@@ -337,7 +349,7 @@ describe.skipIf(!url)('the same TikTok account in two organizations', () => {
     expect(await rowsOf(x)).toEqual(xAfterSync)
 
     const [inXRows, inYRows] = [await rowsOf(x), await rowsOf(y)]
-    for (const rows of [inXRows, inYRows]) {
+    for (const [rows, appId] of [[inXRows, xAppId], [inYRows, yAppId]] as const) {
       expect(rows.connections).toHaveLength(1)
       expect(rows.assets).toMatchObject([{ appId }])
       expect(rows.posts.map((post) => post.externalId).sort()).toEqual([`${openId}-v1`, `${openId}-v2`])

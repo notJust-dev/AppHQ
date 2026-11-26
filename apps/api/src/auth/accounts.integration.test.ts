@@ -142,7 +142,7 @@ describe.skipIf(!url)('Accounts, against a real database', () => {
     await db.update(user).set({ accessStatus: 'approved' }).where(eq(user.email, otherEmail))
     await call('account.get', signedIn.cookie)
     const [own] = await db.select().from(organization).where(eq(organization.slug, autoOrganizationSlug(signedIn.userId!)))
-    await db.insert(apps).values({ organizationId: own!.id, id: 'kept-app', name: 'Kept app' })
+    await db.insert(apps).values({ organizationId: own!.id, name: 'Kept app' })
     const [dashboard] = await db.select().from(organization).where(eq(organization.slug, DASHBOARD_ORGANIZATION_SLUG))
 
     expect(await addOwner(db, { email: otherEmail, organizationId: dashboard!.id })).toEqual({ added: true, removedEmpty: false })

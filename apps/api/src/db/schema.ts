@@ -1,9 +1,9 @@
+import { sql } from 'drizzle-orm'
 import {
   bigint,
   boolean,
   date,
   doublePrecision,
-  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,7 +13,6 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 
 /**
@@ -84,32 +83,33 @@ const organizationId = () =>
     .references(() => organization.id)
 
 /**
- * The portfolio. `id` is a short slug used in URLs and by the AI tools. What feeds an app (its
- * store listings, RevenueCat project, social accounts) is in `assets`.
+ * The portfolio. `id` is a uuid, also used in the dashboard's addresses: it says nothing about
+ * the app. What feeds an app (its store listings, RevenueCat project, social accounts) is in
+ * `assets`.
  *
- * One row has `kind` 'portfolio' (id `portfolio`): it holds accounts that promote several apps,
- * such as a personal build-in-public account, so their numbers count toward the portfolio's
- * totals without landing in any single app's funnel.
+ * An organization has at most one row of `kind` 'portfolio': it holds accounts that promote
+ * several apps, such as a personal build-in-public account, so their numbers count toward the
+ * portfolio's totals without landing in any single app's funnel.
  */
 export const apps = pgTable(
   'apps',
   {
+    id: uuid('id').primaryKey().defaultRandom(),
     organizationId: organizationId(),
-    /** Unique within its organization; two organizations may use the same slug. */
-    id: text('id').notNull(),
     name: text('name').notNull(),
     iconUrl: text('icon_url'),
     /** 'app' | 'portfolio' */
     kind: text('kind').notNull().default('app'),
     isActive: boolean('is_active').notNull().default(true),
+    /** Generated demo data (see src/seed/demo.ts), removed in bulk. */
+    demo: boolean('demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.organizationId, t.id] })],
+  (t) => [
+    index('apps_org_idx').on(t.organizationId),
+    uniqueIndex('apps_org_portfolio_idx').on(t.organizationId).where(sql`${t.kind} = 'portfolio'`),
+  ],
 )
-
-/** A row's app, in the row's own organization: a row can never point at another one's app. */
-const appOf = (t: { organizationId: AnyPgColumn; appId: AnyPgColumn }) =>
-  foreignKey({ columns: [t.organizationId, t.appId], foreignColumns: [apps.organizationId, apps.id] })
 
 /**
  * Credentials: one row per signed-in account or key, never tied to an app. App Store Connect and
@@ -160,8 +160,7 @@ export const assets = pgTable(
     /** Apple ID, package name, RevenueCat project id, Page id, Instagram id, TikTok open_id. */
     externalId: text('external_id').notNull(),
     name: text('name').notNull(),
-    /** Removing an app unlinks its assets first (see `removeApp`). */
-    appId: text('app_id'),
+    appId: uuid('app_id').references(() => apps.id, { onDelete: 'set null' }),
     /** The account it was found through, whose credentials read it. Null for demo assets. */
     connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'set null' }),
     ignored: boolean('ignored').notNull().default(false),
@@ -175,7 +174,6 @@ export const assets = pgTable(
   (t) => [
     uniqueIndex('assets_org_kind_external_idx').on(t.organizationId, t.kind, t.externalId),
     index('assets_org_app_idx').on(t.organizationId, t.appId),
-    appOf(t),
   ],
 )
 
@@ -188,7 +186,9 @@ export const metricDaily = pgTable(
   'metric_daily',
   {
     organizationId: organizationId(),
-    appId: text('app_id').notNull(),
+    appId: uuid('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
     date: date('date', { mode: 'string' }).notNull(),
     source: text('source').notNull(),
     metric: text('metric').notNull(),
@@ -199,7 +199,6 @@ export const metricDaily = pgTable(
   (t) => [
     primaryKey({ columns: [t.organizationId, t.appId, t.date, t.source, t.metric, t.dimension] }),
     index('metric_daily_org_date_idx').on(t.organizationId, t.date),
-    appOf(t).onDelete('cascade'),
   ],
 )
 
@@ -214,7 +213,9 @@ export const posts = pgTable(
     organizationId: organizationId(),
     platform: text('platform').notNull(),
     externalId: text('external_id').notNull(),
-    appId: text('app_id').notNull(),
+    appId: uuid('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
     connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'set null' }),
     url: text('url'),
     caption: text('caption'),
@@ -230,23 +231,22 @@ export const posts = pgTable(
   },
   (t) => [
     uniqueIndex('posts_org_platform_external_idx').on(t.organizationId, t.platform, t.externalId),
-    // What a snapshot's composite foreign key points at; `id` alone is already unique.
-    uniqueIndex('posts_org_id_idx').on(t.organizationId, t.id),
     index('posts_org_app_published_idx').on(t.organizationId, t.appId, t.publishedAt),
-    appOf(t).onDelete('cascade'),
   ],
 )
 
 /**
  * A post's lifetime totals as last read on each UTC day. Platforms such as TikTok only report
  * totals, so daily views are the difference between consecutive days. A snapshot is in its post's
- * organization, which the composite foreign key enforces.
+ * organization.
  */
 export const postSnapshots = pgTable(
   'post_snapshots',
   {
     organizationId: organizationId(),
-    postId: uuid('post_id').notNull(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
     date: date('date', { mode: 'string' }).notNull(),
     views: bigint('views', { mode: 'number' }).notNull(),
     likes: bigint('likes', { mode: 'number' }).notNull(),
@@ -254,10 +254,7 @@ export const postSnapshots = pgTable(
     shares: bigint('shares', { mode: 'number' }).notNull(),
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    primaryKey({ columns: [t.postId, t.date] }),
-    foreignKey({ columns: [t.organizationId, t.postId], foreignColumns: [posts.organizationId, posts.id] }).onDelete('cascade'),
-  ],
+  (t) => [primaryKey({ columns: [t.postId, t.date] })],
 )
 
 /**
@@ -271,7 +268,9 @@ export const reviews = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     organizationId: organizationId(),
-    appId: text('app_id').notNull(),
+    appId: uuid('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
     /** 'app_store' | 'google_play' */
     store: text('store').notNull(),
     /** The store's review id; for a Play review without one, its package and submit time. */
@@ -299,7 +298,6 @@ export const reviews = pgTable(
     uniqueIndex('reviews_org_store_external_idx').on(t.organizationId, t.store, t.externalId),
     index('reviews_org_app_created_idx').on(t.organizationId, t.appId, t.createdAt),
     index('reviews_org_created_idx').on(t.organizationId, t.createdAt),
-    appOf(t).onDelete('cascade'),
   ],
 )
 
@@ -310,7 +308,7 @@ export const syncRuns = pgTable(
     id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
     organizationId: organizationId(),
     source: text('source').notNull(),
-    appId: text('app_id'),
+    appId: uuid('app_id').references(() => apps.id, { onDelete: 'cascade' }),
     /** 'running' | 'ok' | 'error' */
     status: text('status').notNull(),
     rangeFrom: date('range_from', { mode: 'string' }),
@@ -320,10 +318,7 @@ export const syncRuns = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
-  (t) => [
-    index('sync_runs_org_source_started_idx').on(t.organizationId, t.source, t.startedAt),
-    appOf(t).onDelete('cascade'),
-  ],
+  (t) => [index('sync_runs_org_source_started_idx').on(t.organizationId, t.source, t.startedAt)],
 )
 
 /**

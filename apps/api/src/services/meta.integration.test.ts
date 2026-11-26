@@ -164,7 +164,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
   const secrets = createSecrets('e'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
   const suffix = randomUUID().slice(0, 8)
-  const appId = `meta-${suffix}`
+  const appId = randomUUID()
   const meta = fakeMeta(suffix)
   const at = (iso: string) => () => new Date(iso)
   const range = { from: '2026-11-10', to: '2026-11-12' }
@@ -195,7 +195,6 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   afterAll(async () => {
     const ids = [meta.ids.pageA, meta.ids.pageB, meta.ids.ig, meta.ids.igOnly]
-    // Assets first: an app that an asset still points at cannot be deleted.
     await db.delete(assets).where(inArray(assets.externalId, ids))
     await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await db.delete(connections).where(inArray(connections.externalAccountId, ids))
@@ -252,7 +251,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
     await assignAsset(scope, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageA)).id, appId })
     expect((await assetOf(db, 'instagram_account', meta.ids.ig)).appId).toBe(appId)
     await expect(
-      assignAsset(scope, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageB)).id, appId: 'no-such-app' }),
+      assignAsset(scope, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageB)).id, appId: randomUUID() }),
     ).rejects.toBeInstanceOf(ConnectInputError)
 
     await connectMeta({ ...scope, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })

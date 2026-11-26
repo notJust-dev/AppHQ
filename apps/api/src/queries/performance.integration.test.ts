@@ -16,10 +16,10 @@ const url = testDatabaseUrl()
 describe.skipIf(!url)('Performance pages, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
   const suffix = randomUUID().slice(0, 8)
-  const one = `perf-one-${suffix}`
-  const two = `perf-two-${suffix}`
+  const one = randomUUID()
+  const two = randomUUID()
   /** Posts a lot on one platform and once on another, for the top posts of each. */
-  const three = `perf-three-${suffix}`
+  const three = randomUUID()
   // The range, and the week before it for comparison.
   const range = { from: '2026-10-08', to: '2026-10-14' }
   let scope: Scope

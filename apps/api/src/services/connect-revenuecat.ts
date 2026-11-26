@@ -1,5 +1,4 @@
 import { and, eq, ne } from 'drizzle-orm'
-import { PORTFOLIO_APP_ID } from '../assets/kinds.js'
 import { assignAsset, autoLink, upsertAssets } from '../assets/store.js'
 import { RevenueCatError, createRevenueCatClient } from '../connectors/revenuecat/client.js'
 import { REVENUECAT } from '../connectors/revenuecat/connector.js'
@@ -38,11 +37,11 @@ export async function connectRevenueCat(
   const inOrg = eq(assets.organizationId, deps.organizationId)
   if (options.appId !== undefined) {
     const [target] = await deps.db
-      .select({ id: apps.id })
+      .select({ id: apps.id, kind: apps.kind })
       .from(apps)
       .where(and(eq(apps.organizationId, deps.organizationId), eq(apps.id, options.appId)))
       .limit(1)
-    if (!target || options.appId === PORTFOLIO_APP_ID) {
+    if (!target || target.kind === 'portfolio') {
       throw new ConnectInputError('That app no longer exists. Reload the page.')
     }
   }

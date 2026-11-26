@@ -15,9 +15,8 @@ const url = testDatabaseUrl()
 
 describe.skipIf(!url)('App flow totals, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
-  const suffix = randomUUID().slice(0, 8)
-  const full = `flow-full-${suffix}`
-  const bare = `flow-bare-${suffix}`
+  const full = randomUUID()
+  const bare = randomUUID()
   const range = { from: '2026-10-02', to: '2026-10-04' }
   let scope: Scope
 
@@ -80,6 +79,6 @@ describe.skipIf(!url)('App flow totals, against a real database', () => {
   })
 
   it('knows no app it was not given', async () => {
-    expect(await getAppFlow.handler(scope, { appId: `missing-${suffix}`, ...range })).toBeNull()
+    expect(await getAppFlow.handler(scope, { appId: randomUUID(), ...range })).toBeNull()
   })
 })

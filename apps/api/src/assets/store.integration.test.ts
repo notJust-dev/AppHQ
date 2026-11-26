@@ -9,8 +9,7 @@ import { assetOf } from '../test/assets.js'
 import { testDatabaseUrl } from '../test/database.js'
 import { defaultScope } from '../test/organizations.js'
 import type { Scope } from '../organizations/scope.js'
-import { assignAsset, autoLink, removeApp, renameApp, setIgnored } from './store.js'
-import { PORTFOLIO_APP_ID } from './kinds.js'
+import { assignAsset, autoLink, portfolioApp, removeApp, renameApp, setIgnored } from './store.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
 const url = testDatabaseUrl()
@@ -49,8 +48,10 @@ describe.skipIf(!url)('Apps and assets, against a real database', () => {
 
     expect(await renameApp(scope, appId, `Renamed ${run}`)).toBe(`Renamed ${run}`)
     const [app] = await db.select().from(apps).where(eq(apps.id, appId))
+    expect(app?.id).toBe(appId)
     expect(app?.name).toBe(`Renamed ${run}`)
-    await expect(renameApp(scope, PORTFOLIO_APP_ID, 'Mine')).rejects.toBeInstanceOf(ConnectInputError)
+    const portfolio = await portfolioApp(scope)
+    await expect(renameApp(scope, portfolio, 'Mine')).rejects.toBeInstanceOf(ConnectInputError)
 
     await assignAsset(scope, { assetId: third.id, appId: null })
   })
@@ -76,8 +77,8 @@ describe.skipIf(!url)('Apps and assets, against a real database', () => {
   })
 
   it('refuses to remove Shared accounts or an app that is gone', async () => {
-    await expect(removeApp(scope, PORTFOLIO_APP_ID)).rejects.toBeInstanceOf(ConnectInputError)
-    await expect(removeApp(scope, `gone-${run}`)).rejects.toBeInstanceOf(ConnectInputError)
+    await expect(removeApp(scope, await portfolioApp(scope))).rejects.toBeInstanceOf(ConnectInputError)
+    await expect(removeApp(scope, randomUUID())).rejects.toBeInstanceOf(ConnectInputError)
   })
 
   it('ignores several assets at once, and brings them back', async () => {

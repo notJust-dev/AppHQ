@@ -76,9 +76,18 @@ describe.skipIf(!url)('two organizations with the same data', () => {
 
   const sorted = <T>(rows: T[]) => [...rows].sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)))
 
-  /** What every query says about an organization, with nothing that depends on the clock. */
+  /** An app of the organization, by name. */
+  async function appIdOf({ organizationId }: Scope, name: string) {
+    const [app] = await db.select({ id: apps.id }).from(apps).where(and(eq(apps.organizationId, organizationId), eq(apps.name, name)))
+    return app!.id
+  }
+
+  /**
+   * What every query says about an organization, with nothing that depends on the clock, and with
+   * each app id written as its app's name: the two organizations' apps have different ids.
+   */
   async function reads(scope: Scope) {
-    const appId = 'demo-habitloop'
+    const appId = await appIdOf(scope, 'Habitloop')
     const read = (value: unknown) =>
       JSON.parse(JSON.stringify(value, (key, v) => (/At$|^lastSynced|^updated|^startedAt|^finishedAt|^id$/.test(key) ? undefined : v)))
     const result = read({
@@ -98,12 +107,17 @@ describe.skipIf(!url)('two organizations with the same data', () => {
       reviewSummary: await getReviewSummary.handler(scope, {}),
       syncSources: (await getSyncStatus.handler(scope, undefined)).map((run) => [run.source, run.status, run.rowsWritten]),
     }) as { reviews: unknown[] }
-    return { ...result, reviews: sorted(result.reviews) }
+    let text = JSON.stringify(result)
+    for (const app of await db.select().from(apps).where(eq(apps.organizationId, scope.organizationId))) {
+      text = text.replaceAll(app.id, `app:${app.name}`)
+    }
+    const named = JSON.parse(text) as { reviews: unknown[] }
+    return { ...named, reviews: sorted(named.reviews) }
   }
 
   /** The same data in an organization: the demo apps, a portfolio row, one real-looking account. */
   async function fill(scope: Scope) {
-    await db.insert(apps).values({ organizationId: scope.organizationId, id: 'portfolio', name: 'Shared accounts', kind: 'portfolio' })
+    await db.insert(apps).values({ organizationId: scope.organizationId, name: 'Shared accounts', kind: 'portfolio' })
     await seedDemo(scope, DEMO)
     const [connection] = await db
       .insert(connections)
@@ -113,7 +127,9 @@ describe.skipIf(!url)('two organizations with the same data', () => {
       { kind: 'tiktok_account', externalId: 'open-id-shared', name: '@shared', connectionId: connection!.id },
       { kind: 'android_app', externalId: 'com.example.waiting', name: 'Waiting', connectionId: connection!.id },
     ])
-    await db.insert(syncRuns).values({ organizationId: scope.organizationId, source: 'tiktok', appId: 'demo-habitloop', status: 'ok', rowsWritten: 3 })
+    await db
+      .insert(syncRuns)
+      .values({ organizationId: scope.organizationId, source: 'tiktok', appId: await appIdOf(scope, 'Habitloop'), status: 'ok', rowsWritten: 3 })
   }
 
   async function wipe() {
@@ -129,6 +145,7 @@ describe.skipIf(!url)('two organizations with the same data', () => {
   }
 
   let aAlone: unknown
+  let aKicks: string
   let bBefore: Awaited<ReturnType<typeof snapshot>>
 
   beforeAll(async () => {
@@ -151,14 +168,14 @@ describe.skipIf(!url)('two organizations with the same data', () => {
 
   it('the two organizations really hold the same keys', async () => {
     const keys = async (scope: Scope) => ({
-      apps: (await snapshot(scope)).apps.map((app) => app.id),
+      apps: (await snapshot(scope)).apps.map((app) => app.name).sort(),
       posts: (await snapshot(scope)).posts.map((post) => `${post.platform}:${post.externalId}`).sort(),
       reviews: (await snapshot(scope)).reviews.map((review) => `${review.store}:${review.externalId}`).sort(),
       assets: (await snapshot(scope)).assets.map((asset) => `${asset.kind}:${asset.externalId}`).sort(),
     })
     const [inA, inB] = [await keys(a), await keys(b)]
     expect(inA).toEqual(inB)
-    expect(inA.apps).toContain('portfolio')
+    expect(inA.apps).toContain('Shared accounts')
     expect(inA.posts.length).toBeGreaterThan(10)
     expect(inA.reviews.length).toBeGreaterThan(5)
   })
@@ -171,33 +188,41 @@ describe.skipIf(!url)('two organizations with the same data', () => {
 
   it('an app id or row id from the other organization is not found', async () => {
     const c = await testOrganization(db, 'isolation-c')
-    expect(await getAppTimeline.handler(c, { appId: 'demo-habitloop', ...RANGE })).toBeNull()
-    expect(await getAppFlow.handler(c, { appId: 'demo-habitloop', ...RANGE })).toBeNull()
+    const theirs = await appIdOf(b, 'Habitloop')
+    expect(await getAppTimeline.handler(c, { appId: theirs, ...RANGE })).toBeNull()
+    expect(await getAppFlow.handler(c, { appId: theirs, ...RANGE })).toBeNull()
+    expect(await listPosts.handler(c, { appId: theirs, ...RANGE, limit: 10 })).toEqual([])
     expect(await listApps.handler(c, undefined)).toEqual([])
     expect(await listReviews.handler(c, { limit: 10 })).toMatchObject({ reviews: [] })
 
     const [bAsset] = bBefore.assets
     await expect(assignAsset(c, { assetId: bAsset!.id, appId: null })).rejects.toThrow(/no longer connected/)
     await expect(setIgnored(c, [bAsset!.id], true)).rejects.toThrow(/no longer there/)
-    await expect(renameApp(c, 'demo-habitloop', 'Taken')).rejects.toThrow(/no longer exists/)
-    await expect(removeApp(c, 'demo-habitloop')).rejects.toThrow(/no longer exists/)
+    await expect(renameApp(c, theirs, 'Taken')).rejects.toThrow(/no longer exists/)
+    await expect(removeApp(c, theirs)).rejects.toThrow(/no longer exists/)
+    // An asset can't be given to another organization's app.
+    const [own] = await upsertAssets(c, [{ kind: 'tiktok_account', externalId: 'open-id-c', name: '@c', connectionId: null }])
+    await expect(assignAsset(c, { assetId: own!.id, appId: theirs })).rejects.toThrow(/no longer exists/)
     expect(await markReviews(c, undefined, true, bBefore.reviews.map((review) => review.id))).toBe(0)
     await bIsUntouched()
   })
 
   it("the helpers write only in their organization, even on the other's keys", async () => {
-    expect(await createApp(a, 'Kicks')).toBe('kicks')
-    expect(await createApp(b, 'Kicks')).toBe('kicks')
+    aKicks = await createApp(a, 'Kicks')
+    const bKicks = await createApp(b, 'Kicks')
+    expect(aKicks).not.toBe(bKicks)
     bBefore = await snapshot(b)
+    const habitloop = await appIdOf(a, 'Habitloop')
+    const trailmate = await appIdOf(a, 'Trailmate')
 
-    await renameApp(a, 'demo-habitloop', 'Renamed in A')
+    await renameApp(a, habitloop, 'Renamed in A')
     const aAssets = (await snapshot(a)).assets
     const waiting = aAssets.find((asset) => asset.externalId === 'com.example.waiting')!
-    await assignAsset(a, { assetId: waiting.id, appId: 'kicks' })
+    await assignAsset(a, { assetId: waiting.id, appId: aKicks })
     await setIgnored(a, [aAssets.find((asset) => asset.kind === 'tiktok_account' && asset.appId === null)!.id], true)
     await autoLink(a)
     await upsertAssets(a, [{ kind: 'ios_app', externalId: 'demo.demo-habitloop', name: 'Changed in A', connectionId: null }])
-    await upsertMetrics(a, [{ appId: 'demo-habitloop', date: '2026-10-05', source: 'app_store', metric: 'downloads', value: 99_999 }])
+    await upsertMetrics(a, [{ appId: habitloop, date: '2026-10-05', source: 'app_store', metric: 'downloads', value: 99_999 }])
     const [post] = (await snapshot(a)).posts
     await savePosts(
       a,
@@ -207,11 +232,11 @@ describe.skipIf(!url)('two organizations with the same data', () => {
     const [review] = (await snapshot(a)).reviews
     await saveReviews(a, [{ ...review!, rating: 1, body: 'changed in A' }])
     await markReviews(a, undefined, true, (await snapshot(a)).reviews.map((row) => row.id))
-    await removeApp(a, 'demo-trailmate')
+    await removeApp(a, trailmate)
     await bIsUntouched()
 
-    expect((await snapshot(a)).apps.find((app) => app.id === 'demo-habitloop')?.name).toBe('Renamed in A')
-    expect((await snapshot(a)).apps.some((app) => app.id === 'demo-trailmate')).toBe(false)
+    expect((await snapshot(a)).apps.find((app) => app.id === habitloop)?.name).toBe('Renamed in A')
+    expect((await snapshot(a)).apps.some((app) => app.id === trailmate)).toBe(false)
   })
 
   it('every dashboard procedure works in the organization of the context', async () => {
@@ -234,15 +259,23 @@ describe.skipIf(!url)('two organizations with the same data', () => {
     try {
       // Reads through the router are A's.
       const listed = data(await query('apps.list')) as { id: string; name: string }[]
-      expect(listed.find((row) => row.id === 'demo-habitloop')?.name).toBe('Renamed in A')
-      expect(listed.some((row) => row.id === 'demo-trailmate')).toBe(false)
-      expect((await query('apps.timeline', { appId: 'demo-trailmate', ...RANGE })).statusCode).toBe(404)
+      expect(listed.some((row) => row.name === 'Renamed in A')).toBe(true)
+      expect(listed.some((row) => row.name === 'Trailmate')).toBe(false)
+      const theirs = await appIdOf(b, 'Trailmate')
+      expect((await query('apps.timeline', { appId: theirs, ...RANGE })).statusCode).toBe(404)
+      expect((await query('apps.timeline', { appId: 'not-a-uuid', ...RANGE })).statusCode).toBe(400)
       expect(data(await query('reviews.unreadCount'))).toEqual({ count: 0 })
 
       // Writes through the router land in A.
-      expect(data(await mutate('apps.create', { name: 'Kicks' }))).toEqual({ appId: 'kicks-2' })
-      expect((await mutate('apps.rename', { appId: 'kicks', name: 'Kicks in A' })).statusCode).toBe(200)
-      expect((await mutate('apps.remove', { appId: 'kicks-2' })).statusCode).toBe(200)
+      const created = data(await mutate('apps.create', { name: 'Kicks' })) as { appId: string }
+      expect(created.appId).not.toBe(aKicks)
+      expect((await mutate('apps.rename', { appId: aKicks, name: 'Kicks in A' })).statusCode).toBe(200)
+      expect((await mutate('apps.remove', { appId: created.appId })).statusCode).toBe(200)
+      // B's apps can't be renamed, removed or given anything from here.
+      expect((await mutate('apps.rename', { appId: theirs, name: 'Taken' })).statusCode).toBe(400)
+      expect((await mutate('apps.remove', { appId: theirs })).statusCode).toBe(400)
+      const mine = (await snapshot(a)).assets.find((asset) => asset.kind === 'android_app')!
+      expect((await mutate('assets.assign', { assetId: mine.id, appId: theirs })).statusCode).toBe(400)
       expect((await mutate('reviews.mark', { filters: {}, read: false })).statusCode).toBe(200)
       const bAsset = bBefore.assets.find((asset) => asset.kind === 'android_app')!
       expect((await mutate('assets.assign', { assetId: bAsset.id, appId: null })).statusCode).toBe(400)
@@ -251,7 +284,7 @@ describe.skipIf(!url)('two organizations with the same data', () => {
       expect((await mutate('demo.clear', {})).statusCode).toBe(200)
       expect((await mutate('demo.seed', { days: 5 })).statusCode).toBe(200)
       // A sign-in started in another organization does not finish here.
-      const other = await mutate('tiktok.connect', { code: 'c', redirectUri: 'https://apphq.example.com/x', appId: 'kicks', organizationId: b.organizationId })
+      const other = await mutate('tiktok.connect', { code: 'c', redirectUri: 'https://apphq.example.com/x', appId: aKicks, organizationId: b.organizationId })
       expect(other.statusCode).toBe(400)
       expect(other.json()).toMatchObject({ error: { message: expect.stringMatching(/another organization/) } })
       await bIsUntouched()
@@ -340,7 +373,7 @@ describe.skipIf(!url)('two organizations with the same data', () => {
   it('clearing demo data in one organization leaves the other its demo apps', async () => {
     const before = (await snapshot(b)).apps.length
     await clearDemo(a)
-    expect((await snapshot(a)).apps.some((app) => app.id.startsWith('demo-'))).toBe(false)
+    expect((await snapshot(a)).apps.some((app) => app.demo)).toBe(false)
     expect((await snapshot(b)).apps.length).toBe(before)
   })
 })

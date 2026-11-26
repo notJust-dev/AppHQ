@@ -1,4 +1,4 @@
-import { and, eq, isNull, like, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
 import { apps, assets, posts, type NewApp, type NewMetric, type NewPost } from '../db/schema.js'
 import type { Scope } from '../organizations/scope.js'
@@ -13,7 +13,6 @@ import { saveReviews, type ReviewReading } from '../reviews/save.js'
  * be developed and recorded without real accounts or real revenue on screen.
  */
 
-const DEMO_PREFIX = 'demo-'
 
 interface Profile {
   id: string
@@ -365,35 +364,38 @@ async function deleteDemoAssets({ db, organizationId }: Scope) {
         eq(assets.organizationId, organizationId),
         isNull(assets.connectionId),
         or(
-          like(assets.appId, `${DEMO_PREFIX}%`),
+          inArray(assets.appId, demoAppIds({ db, organizationId })),
           ...demoAssetsOf().map((asset) => and(eq(assets.kind, asset.kind), eq(assets.externalId, asset.externalId))),
         ),
       ),
     )
-  // A real asset someone linked to a demo app stays, without an app.
-  await db
-    .update(assets)
-    .set({ appId: null, updatedAt: new Date() })
-    .where(and(eq(assets.organizationId, organizationId), like(assets.appId, `${DEMO_PREFIX}%`)))
 }
+
+/** The organization's demo apps, as a subquery. */
+const demoAppIds = ({ db, organizationId }: Scope) =>
+  db
+    .select({ id: apps.id })
+    .from(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
 
 /**
  * Removes the organization's demo apps and, through ON DELETE CASCADE, everything recorded for
- * them. Another organization's apps, demo or not, are untouched.
+ * them. A real asset someone linked to a demo app stays, without an app. Another organization's
+ * apps, demo or not, are untouched.
  */
 export async function clearDemo(scope: Scope) {
   const { db, organizationId } = scope
   await deleteDemoAssets(scope)
   const removed = await db
     .delete(apps)
-    .where(and(eq(apps.organizationId, organizationId), like(apps.id, `${DEMO_PREFIX}%`)))
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
     .returning({ id: apps.id })
   return { apps: removed.length }
 }
 
 /**
  * Replaces the organization's demo apps with their assets, metrics, posts and reviews. Real apps
- * (ids without the prefix) and other organizations are untouched.
+ * and other organizations are untouched.
  */
 export async function seedDemo({ db, organizationId }: Scope, options: DemoOptions) {
   const data = generateDemoData(options)
@@ -402,17 +404,23 @@ export async function seedDemo({ db, organizationId }: Scope, options: DemoOptio
     // Metrics and posts go with the apps through ON DELETE CASCADE; demo assets first, since
     // removing an app only unlinks its assets.
     await deleteDemoAssets(scope)
-    await tx.delete(apps).where(and(eq(apps.organizationId, organizationId), like(apps.id, `${DEMO_PREFIX}%`)))
-    await tx.insert(apps).values(data.apps.map((app) => ({ ...app, organizationId })))
+    await tx.delete(apps).where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
+    // The generated rows name their app by its profile key; the apps get uuids here.
+    const made = await tx
+      .insert(apps)
+      .values(data.apps.map(({ name }) => ({ organizationId, name, demo: true })))
+      .returning({ id: apps.id, name: apps.name })
+    const idOf = new Map(data.apps.map((app) => [app.id, made.find((row) => row.name === app.name)!.id]))
+    const placed = <T extends { appId?: string | null }>(row: T): T => ({ ...row, appId: row.appId ? idOf.get(row.appId)! : null })
     await tx
       .insert(assets)
-      .values(data.assets.map((asset) => ({ ...asset, organizationId })))
+      .values(data.assets.map((asset) => ({ ...placed(asset), organizationId })))
       .onConflictDoNothing()
-    await upsertMetrics(scope, data.metrics)
+    await upsertMetrics(scope, data.metrics.map(placed))
     for (let i = 0; i < data.posts.length; i += 500) {
-      await tx.insert(posts).values(data.posts.slice(i, i + 500).map((post) => ({ ...post, organizationId })))
+      await tx.insert(posts).values(data.posts.slice(i, i + 500).map((post) => ({ ...placed(post), organizationId })))
     }
-    await saveReviews(scope, generateDemoReviews(options))
+    await saveReviews(scope, generateDemoReviews(options).map(placed))
   })
   return { apps: data.apps.length, metrics: data.metrics.length, posts: data.posts.length }
 }
