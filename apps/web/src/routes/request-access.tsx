@@ -1,43 +1,31 @@
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { CheckCircle2, Clock } from 'lucide-react'
 import { useState } from 'react'
-import { z } from 'zod'
 import { BrandMark, BrandName } from '@/components/Brand'
 import { PublicFooter } from '@/components/Legal'
-import { SourceLogo } from '@/components/SourceLogo'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { getAccountFn, requestAccessFn, type AccountView, type SignInProvider } from '@/fns/account'
+import { getAccountFn, requestAccessFn, type AccountView } from '@/fns/account'
 import { formatDay } from '@/lib/format'
 
 /**
- * Where people with an account (Google or GitHub) end up. They can ask for access and see that
- * they did; nothing else. The dashboard itself still takes the dashboard password at /login.
+ * Where people with an account (Google or GitHub) end up after signing in on /login. They can ask
+ * for access and see that they did; nothing else. Signed out, it sends them to /login.
  */
 export const Route = createFileRoute('/request-access')({
-  // Better Auth sends people back here with an error code; only known codes get their own words.
-  validateSearch: z.object({ error: z.string().max(60).optional().catch(undefined) }),
-  loader: () => getAccountFn(),
+  loader: async () => {
+    const { account } = await getAccountFn()
+    if (!account) throw redirect({ to: '/login' })
+    return { account }
+  },
   head: () => ({ meta: [{ title: 'Request access · AppHQ' }] }),
   component: RequestAccessPage,
 })
 
-const PROVIDER_NAMES: Record<SignInProvider, string> = { google: 'Google', github: 'GitHub' }
-
-const ERRORS: Record<string, string> = {
-  account_not_linked:
-    'That address already has an account, made with the other sign-in. Use that one instead.',
-  email_not_verified: 'Your provider has not confirmed that address yet. Confirm it there, then try again.',
-  access_denied: 'The sign-in was cancelled.',
-}
-const SIGN_IN_FAILED = 'The sign-in did not finish. Try again.'
-
 function RequestAccessPage() {
-  const { providers, account } = Route.useLoaderData()
-  const { error } = Route.useSearch()
+  const { account } = Route.useLoaderData()
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -53,71 +41,12 @@ function RequestAccessPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
-            {error && !account && (
-              <Alert variant="destructive">
-                <AlertDescription>{ERRORS[error] ?? SIGN_IN_FAILED}</AlertDescription>
-              </Alert>
-            )}
-            {account ? (
-              <SignedIn account={account} />
-            ) : providers.length > 0 ? (
-              <SignInOptions providers={providers} />
-            ) : (
-              <p className="text-muted-foreground">Accounts are not open on this server.</p>
-            )}
+            <SignedIn account={account} />
           </CardContent>
         </Card>
-        <p className="mt-6 text-sm text-faint">
-          Running this dashboard yourself?{' '}
-          <Link to="/login" className="underline underline-offset-4 hover:text-foreground">
-            Sign in with its password
-          </Link>
-        </p>
       </main>
       <PublicFooter />
     </div>
-  )
-}
-
-function SignInOptions({ providers }: { providers: SignInProvider[] }) {
-  const [pending, setPending] = useState<SignInProvider | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  const start = async (provider: SignInProvider) => {
-    setPending(provider)
-    setFailed(false)
-    try {
-      // Better Auth answers with the provider's sign-in address; it sends the browser back here.
-      const response = await fetch('/api/auth/sign-in/social', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ provider, callbackURL: '/request-access', errorCallbackURL: '/request-access' }),
-      })
-      const { url } = (await response.json()) as { url?: string }
-      if (!response.ok || !url) throw new Error('no sign-in address')
-      window.location.assign(url)
-    } catch {
-      setFailed(true)
-      setPending(null)
-    }
-  }
-
-  return (
-    <>
-      <p className="text-muted-foreground">
-        AppHQ is opening to a few people at a time. Sign in to ask for access, and we will email
-        you when your account is ready.
-      </p>
-      <div className="flex flex-col gap-2">
-        {providers.map((provider) => (
-          <Button key={provider} variant="outline" size="lg" disabled={pending !== null} onClick={() => start(provider)}>
-            {pending === provider ? <Spinner /> : <SourceLogo source={provider} decorative />}
-            Continue with {PROVIDER_NAMES[provider]}
-          </Button>
-        ))}
-      </div>
-      {failed && <p className="text-sm text-destructive">{SIGN_IN_FAILED}</p>}
-    </>
   )
 }
 

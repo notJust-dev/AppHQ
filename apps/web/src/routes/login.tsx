@@ -1,33 +1,40 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
+import { z } from 'zod'
 import { BrandMark, BrandName } from '@/components/Brand'
+import { SocialSignIn } from '@/components/SocialSignIn'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { getAccountFn } from '@/fns/account'
 import { getSessionFn, signInFn } from '@/fns/auth'
 
+/**
+ * Every way in. Google and GitHub, when this server has them, lead to an account, which can only
+ * ask for access for now. The dashboard password opens the dashboard; it is a separate block so
+ * it can be removed on its own later.
+ */
 export const Route = createFileRoute('/login')({
+  // Better Auth sends a failed sign-in back here with an error code.
+  validateSearch: z.object({ error: z.string().max(60).optional().catch(undefined) }),
   beforeLoad: async () => {
     const { dashboardAccess } = await getSessionFn()
     if (dashboardAccess) throw redirect({ to: '/' })
   },
+  loader: async () => {
+    const { providers, account } = await getAccountFn()
+    if (account) throw redirect({ to: '/request-access' })
+    return { providers }
+  },
   component: LoginPage,
 })
 
-const MESSAGES = {
-  wrong: 'That password is not correct.',
-  locked: 'Too many attempts. Try again in 10 minutes.',
-} as const
-
 function LoginPage() {
-  const router = useRouter()
-  const signIn = useServerFn(signInFn)
-  const [password, setPassword] = useState('')
-  const [problem, setProblem] = useState<keyof typeof MESSAGES | null>(null)
-  const [pending, setPending] = useState(false)
+  const { providers } = Route.useLoaderData()
+  const { error } = Route.useSearch()
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 pb-24">
@@ -41,49 +48,76 @@ function LoginPage() {
             <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={async (event) => {
-              event.preventDefault()
-              setPending(true)
-              try {
-                const { result } = await signIn({ data: { password } })
-                if (result === 'ok') {
-                  await router.navigate({ to: '/' })
-                } else {
-                  setProblem(result)
-                }
-              } finally {
-                setPending(false)
-              }
-            }}
-          >
-            <Field data-invalid={problem !== null}>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                autoFocus
-                required
-                value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value)
-                  setProblem(null)
-                }}
-                aria-invalid={problem !== null}
-                aria-describedby={problem ? 'password-problem' : undefined}
-              />
-              {problem && <FieldError id="password-problem">{MESSAGES[problem]}</FieldError>}
-            </Field>
-            <Button type="submit" size="lg" disabled={pending} className="mt-5 w-full">
-              {pending && <Spinner />}
-              {pending ? 'Signing in…' : 'Sign in'}
-            </Button>
-          </form>
+        <CardContent className="flex flex-col gap-6">
+          {providers.length > 0 && (
+            <>
+              <SocialSignIn providers={providers} error={error} />
+              <p className="flex items-center gap-3 text-xs text-faint before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+                or
+              </p>
+            </>
+          )}
+          {/* With accounts off, this is the whole page, exactly as before. */}
+          <PasswordSignIn alone={providers.length === 0} />
         </CardContent>
       </Card>
     </main>
+  )
+}
+
+const MESSAGES = {
+  wrong: 'That password is not correct.',
+  locked: 'Too many attempts. Try again in 10 minutes.',
+} as const
+
+/** The dashboard password: the only way into the dashboard for now. */
+function PasswordSignIn({ alone }: { alone: boolean }) {
+  const router = useRouter()
+  const signIn = useServerFn(signInFn)
+  const [password, setPassword] = useState('')
+  const [problem, setProblem] = useState<keyof typeof MESSAGES | null>(null)
+  const [pending, setPending] = useState(false)
+
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault()
+        setPending(true)
+        try {
+          const { result } = await signIn({ data: { password } })
+          if (result === 'ok') {
+            await router.navigate({ to: '/' })
+          } else {
+            setProblem(result)
+          }
+        } finally {
+          setPending(false)
+        }
+      }}
+    >
+      <Field data-invalid={problem !== null}>
+        <FieldLabel htmlFor="password">{alone ? 'Password' : 'Dashboard password'}</FieldLabel>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          autoFocus={alone}
+          required
+          value={password}
+          onChange={(event) => {
+            setPassword(event.target.value)
+            setProblem(null)
+          }}
+          aria-invalid={problem !== null}
+          aria-describedby={problem ? 'password-problem' : undefined}
+        />
+        {problem && <FieldError id="password-problem">{MESSAGES[problem]}</FieldError>}
+      </Field>
+      <Button type="submit" size="lg" disabled={pending} className="mt-5 w-full">
+        {pending && <Spinner />}
+        {pending ? 'Signing in…' : 'Sign in'}
+      </Button>
+    </form>
   )
 }

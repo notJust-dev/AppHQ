@@ -21,12 +21,12 @@ import { appsQuery } from '@/lib/queries'
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ location }) => {
     const { dashboardAccess, sidebarOpen } = await getSessionFn()
-    if (dashboardAccess) return { dashboardAccess, sidebarOpen, accountsOpen: false }
+    if (dashboardAccess) return { dashboardAccess, sidebarOpen }
 
-    const { providers, account } = await getAccountFn()
+    const { account } = await getAccountFn()
     if (account) throw redirect({ to: '/request-access' })
     if (location.pathname !== '/') throw redirect({ to: '/login' })
-    return { dashboardAccess, sidebarOpen, accountsOpen: providers.length > 0 }
+    return { dashboardAccess, sidebarOpen }
   },
   // The sidebar lists the apps; loading them here keeps it from appearing empty.
   loader: async ({ context }) => {
@@ -42,9 +42,9 @@ export const Route = createFileRoute('/_app')({
  * the page from the button in each page's top bar.
  */
 function AppShell() {
-  const { dashboardAccess, sidebarOpen, accountsOpen } = Route.useRouteContext()
+  const { dashboardAccess, sidebarOpen } = Route.useRouteContext()
   useEffect(() => setSignedIn(dashboardAccess), [dashboardAccess])
-  if (!dashboardAccess) return <LandingPage accountsOpen={accountsOpen} />
+  if (!dashboardAccess) return <LandingPage />
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
       <AppSidebar />

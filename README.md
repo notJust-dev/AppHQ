@@ -279,9 +279,10 @@ Good to know:
 
 ## Accounts and access requests (optional)
 
-If you want other people to ask for access, turn on accounts: visitors can then sign in with
-Google or GitHub at `/request-access` and press **Request access**. This is off unless you set it
-up, and nothing else changes when it is off.
+If you want other people to ask for access, turn on accounts: the sign-in page (`/login`) then
+offers **Continue with Google** and **Continue with GitHub** above the dashboard password, and
+people who sign in that way land on a page where they can press **Request access**. This is off
+unless you set it up, and nothing else changes when it is off.
 
 An account never opens the dashboard. The dashboard password is still the only way in, and
 approving someone's request doesn't change that yet: it records who may join once accounts can
@@ -311,8 +312,7 @@ You can set up just one of them.
 | `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET` | From the Google OAuth client |
 | `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` | From the GitHub OAuth App |
 
-The API's log says `accounts are on` when it boots. The landing page then shows a **Request
-access** button.
+The API's log says `accounts are on` when it boots, and `/login` shows the sign-in buttons.
 
 **3. See who asked**, in the database (for example with `psql`):
 
