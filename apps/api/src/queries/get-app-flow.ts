@@ -7,7 +7,7 @@ import { checkRange, rangeFields } from './range.js'
 
 const input = z
   .object({
-    appId: z.string().min(1).max(64).describe('The app, an id from list_apps.'),
+    appId: z.uuid().describe('The app, an id from list_apps.'),
     ...rangeFields,
   })
   .superRefine(checkRange)
@@ -25,8 +25,8 @@ export const getAppFlow = defineQuery({
     'stages are counted over the same days, not followed person by person: a download is not ' +
     'traced back to a view.',
   input,
-  async handler({ db }, input) {
-    const [app] = await db.select({ id: apps.id }).from(apps).where(eq(apps.id, input.appId)).limit(1)
+  async handler({ db, organizationId }, input) {
+    const [app] = await db.select({ id: apps.id }).from(apps).where(and(eq(apps.organizationId, organizationId), eq(apps.id, input.appId))).limit(1)
     if (!app) return null
 
     const rows = await db
@@ -38,6 +38,7 @@ export const getAppFlow = defineQuery({
       .from(metricDaily)
       .where(
         and(
+          eq(metricDaily.organizationId, organizationId),
           eq(metricDaily.appId, input.appId),
           gte(metricDaily.date, input.from),
           lte(metricDaily.date, input.to),

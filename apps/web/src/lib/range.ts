@@ -13,7 +13,7 @@ export const rangeSearchSchema = z.object({
 
 /** A performance page's search params: the range, and the one app it is limited to, if any. */
 export const performanceSearchSchema = rangeSearchSchema.extend({
-  app: z.string().min(1).max(64).optional().catch(undefined),
+  app: z.uuid().optional().catch(undefined),
 })
 
 export const RANGE_LABELS: Record<RangeKey, string> = {

@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
 import { apps } from '../db/schema.js'
 import { upsertMetrics } from '../metrics/upsert.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { getAppFlow } from './get-app-flow.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
@@ -13,16 +15,17 @@ const url = testDatabaseUrl()
 
 describe.skipIf(!url)('App flow totals, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
-  const suffix = randomUUID().slice(0, 8)
-  const full = `flow-full-${suffix}`
-  const bare = `flow-bare-${suffix}`
+  const full = randomUUID()
+  const bare = randomUUID()
   const range = { from: '2026-10-02', to: '2026-10-04' }
+  let scope: Scope
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
+    scope = await defaultScope(db)
     await db.insert(apps).values([
-      { id: full, name: 'Flow Full' },
-      { id: bare, name: 'Flow Bare' },
+      { organizationId: scope.organizationId, id: full, name: 'Flow Full' },
+      { organizationId: scope.organizationId, id: bare, name: 'Flow Bare' },
     ])
     const metrics = []
     // The 1st and 5th fall outside the range.
@@ -43,16 +46,18 @@ describe.skipIf(!url)('App flow totals, against a real database', () => {
         { appId: bare, date, source: 'app_store', metric: 'downloads', value: 0 },
       )
     }
-    await upsertMetrics(db, metrics)
+    await upsertMetrics(scope, metrics)
   })
 
   afterAll(async () => {
-    await db.delete(apps).where(inArray(apps.id, [full, bare]))
+    await db
+      .delete(apps)
+      .where(and(eq(apps.organizationId, scope.organizationId), inArray(apps.id, [full, bare])))
     await sql.end({ timeout: 5 })
   })
 
   it('sums each stage over the range, with views by platform and downloads by store', async () => {
-    expect(await getAppFlow.handler({ db }, { appId: full, ...range })).toEqual({
+    expect(await getAppFlow.handler(scope, { appId: full, ...range })).toEqual({
       range,
       socialViews: { total: 3600, bySource: { tiktok: 3000, instagram: 600 } },
       downloads: { total: 120, bySource: { app_store: 90, google_play: 30 } },
@@ -63,7 +68,7 @@ describe.skipIf(!url)('App flow totals, against a real database', () => {
   })
 
   it('tells a stage nothing reported (null) from one that reported zero', async () => {
-    expect(await getAppFlow.handler({ db }, { appId: bare, ...range })).toEqual({
+    expect(await getAppFlow.handler(scope, { appId: bare, ...range })).toEqual({
       range,
       socialViews: { total: null, bySource: {} },
       downloads: { total: 0, bySource: { app_store: 0 } },
@@ -74,6 +79,6 @@ describe.skipIf(!url)('App flow totals, against a real database', () => {
   })
 
   it('knows no app it was not given', async () => {
-    expect(await getAppFlow.handler({ db }, { appId: `missing-${suffix}`, ...range })).toBeNull()
+    expect(await getAppFlow.handler(scope, { appId: randomUUID(), ...range })).toBeNull()
   })
 })

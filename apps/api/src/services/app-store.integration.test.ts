@@ -16,6 +16,8 @@ import { listApps } from '../queries/list-apps.js'
 import { assetOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope, testOrganization } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError, connectAppStore } from './connect-app-store.js'
 import { connectRevenueCat } from './connect-revenuecat.js'
 
@@ -24,6 +26,7 @@ const url = testDatabaseUrl()
 
 describe.skipIf(!url)('App Store Connect, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
   const secrets = createSecrets('d'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
 
@@ -139,12 +142,15 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
+    scope = await defaultScope(db)
   })
 
   afterAll(async () => {
     const created = (await ourApps()).map((app) => app.id)
-    if (created.length > 0) await db.delete(apps).where(inArray(apps.id, created))
     await db.delete(assets).where(inArray(assets.externalId, [first.id, second.id, `proj_${run}`]))
+    if (created.length > 0) {
+      await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), inArray(apps.id, created)))
+    }
     await db.delete(connections).where(eq(connections.externalAccountId, `proj_${run}`))
     await db
       .delete(connections)
@@ -154,19 +160,19 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
   it('rejects a private key that is not one, before contacting Apple', async () => {
     await expect(
-      connectAppStore({ db, secrets, fetch: appStore() }, { ...input, privateKey: 'nonsense' }),
+      connectAppStore({ ...scope, secrets, fetch: appStore() }, { ...input, privateKey: 'nonsense' }),
     ).rejects.toBeInstanceOf(ConnectInputError)
   })
 
   it("finds the account's apps without adding any, and stores the key encrypted", async () => {
-    const result = await connectAppStore({ db, secrets, fetch: appStore() }, input)
+    const result = await connectAppStore({ ...scope, secrets, fetch: appStore() }, input)
 
     expect(result).toEqual({ apps: 2, linked: 0 })
     // They wait on the Apps page until the person adds the ones to track.
     expect(await ourApps()).toEqual([])
     expect(await assetOf(db, 'ios_app', first.id)).toMatchObject({ appId: null, details: { bundleId: first.bundleId } })
 
-    const connection = await findAppStoreConnection(db)
+    const connection = await findAppStoreConnection(scope)
     expect(connection?.displayName).toBe('Vendor 85999001')
     expect(connection?.accessTokenEnc).not.toContain('PRIVATE KEY')
     expect(readAppStoreCredentials(secrets, connection?.accessTokenEnc ?? '')).toMatchObject({
@@ -177,18 +183,18 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
   it('adds the apps the person picks', async () => {
     for (const app of [first, second]) {
-      await assignAsset(db, { assetId: (await assetOf(db, 'ios_app', app.id)).id, appId: 'new' })
+      await assignAsset(scope, { assetId: (await assetOf(db, 'ios_app', app.id)).id, appId: 'new' })
     }
     expect((await ourApps()).map((app) => app.bundleId)).toEqual([first.bundleId, second.bundleId])
   })
 
   it('still syncs with a key that may not ask for analytics reports, and notes it', async () => {
-    expect((await connectAppStore({ db, secrets, fetch: appStore({ admin: false }) }, input)).linked).toBe(2)
+    expect((await connectAppStore({ ...scope, secrets, fetch: appStore({ admin: false }) }, input)).linked).toBe(2)
 
     const connector = createAppStoreConnector({ fetch: appStore({ admin: false }) })
-    await connector.sync({ db, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
+    await connector.sync({ ...scope, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
 
-    const connection = await findAppStoreConnection(db)
+    const connection = await findAppStoreConnection(scope)
     expect(connection?.status).toBe('ok')
     expect(connection?.details).toMatchObject({ analytics: { needsAdmin: true }, reviews: { access: 'forbidden' } })
   })
@@ -197,9 +203,9 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     const connector = createAppStoreConnector({ fetch: appStore() })
     const range = { from: '2026-11-16', to: '2026-11-19' }
 
-    await connector.sync({ db, apps: [], range, log, secrets })
+    await connector.sync({ ...scope, apps: [], range, log, secrets })
     // Running it again must not duplicate anything.
-    await connector.sync({ db, apps: [], range, log, secrets })
+    await connector.sync({ ...scope, apps: [], range, log, secrets })
 
     const [one, two] = await ourApps()
     const downloads = (appId: string) =>
@@ -218,7 +224,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       { date: '2026-11-17', value: 4 },
       { date: '2026-11-18', value: 0 },
     ])
-    expect((await findAppStoreConnection(db))?.status).toBe('ok')
+    expect((await findAppStoreConnection(scope))?.status).toBe('ok')
 
     // The review written in the range, with its reply; the older one is left out.
     const saved = await db.select().from(reviews).where(eq(reviews.appId, one?.id ?? ''))
@@ -232,12 +238,12 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
         reply: 'Fixed in 1.2, thanks.',
       },
     ])
-    expect((await findAppStoreConnection(db))?.details).toMatchObject({ reviews: { access: 'ok' } })
+    expect((await findAppStoreConnection(scope))?.details).toMatchObject({ reviews: { access: 'ok' } })
   })
 
   it("shows each app's icon from its newest build, else from its store listing, and keeps it", async () => {
     const iconOf = async (appId: string | undefined) =>
-      (await listApps.handler({ db }, undefined)).find((app) => app.id === appId)?.iconUrl
+      (await listApps.handler(scope, undefined)).find((app) => app.id === appId)?.iconUrl
     const [one, two] = await ourApps()
     const firstIcon = `https://is1-ssl.mzstatic.com/${run}/one/256x256bb.png`
 
@@ -247,17 +253,21 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
 
     // A key that may not read builds: the first app's icon is not in its listing, yet it stays.
     const limited = createAppStoreConnector({ fetch: appStore({ admin: false }) })
-    await limited.sync({ db, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
+    await limited.sync({ ...scope, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
     expect(await iconOf(one?.id)).toBe(firstIcon)
-    expect((await findAppStoreConnection(db))?.status).toBe('ok')
+    expect((await findAppStoreConnection(scope))?.status).toBe('ok')
   })
 
   it('leaves an app from outside the account alone', async () => {
-    const outsider = { id: `outsider-${run}`, name: 'Outsider' }
-    await db.insert(apps).values(outsider)
-    await db.insert(assets).values({ kind: 'ios_app', externalId: `not-in-account-${run}`, name: 'Outsider', appId: outsider.id })
+    const outsider = { id: randomUUID(), name: 'Outsider' }
+    const { organizationId } = scope
+    await db.insert(apps).values({ organizationId, ...outsider })
+    await db
+      .insert(assets)
+      .values({ organizationId, kind: 'ios_app', externalId: `not-in-account-${run}`, name: 'Outsider', appId: outsider.id })
     try {
       await db.insert(metricDaily).values({
+        organizationId,
         appId: outsider.id,
         date: '2026-11-17',
         source: 'app_store',
@@ -266,7 +276,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       })
 
       const connector = createAppStoreConnector({ fetch: appStore() })
-      await connector.sync({ db, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
+      await connector.sync({ ...scope, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets })
 
       const rows = await db
         .select({ date: metricDaily.date, value: metricDaily.value })
@@ -274,8 +284,8 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
         .where(eq(metricDaily.appId, outsider.id))
       expect(rows).toEqual([{ date: '2026-11-17', value: 55 }])
     } finally {
-      await db.delete(apps).where(eq(apps.id, outsider.id))
       await db.delete(assets).where(eq(assets.externalId, `not-in-account-${run}`))
+      await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, outsider.id)))
     }
   })
 
@@ -289,7 +299,7 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
       return new Response(JSON.stringify(body))
     }) as typeof fetch
 
-    const [connected] = await connectRevenueCat({ db, secrets, fetch: revenueCat }, 'sk_live_key')
+    const [connected] = await connectRevenueCat({ ...scope, secrets, fetch: revenueCat }, 'sk_live_key')
 
     const [one] = await ourApps()
     expect(connected).toEqual({
@@ -307,9 +317,29 @@ describe.skipIf(!url)('App Store Connect, against a real database', () => {
     const connector = createAppStoreConnector({ fetch: appStore({ reject: true }) })
 
     await expect(
-      connector.sync({ db, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets }),
+      connector.sync({ ...scope, apps: [], range: { from: '2026-11-17', to: '2026-11-18' }, log, secrets }),
     ).rejects.toThrow(/failed/)
 
-    expect((await findAppStoreConnection(db))?.status).toBe('needs_reauth')
+    expect((await findAppStoreConnection(scope))?.status).toBe('needs_reauth')
+  })
+
+  it('connects the same App Store account in another organization without replacing this one', async () => {
+    const other = await testOrganization(db, 'app-store-other')
+    const own = await findAppStoreConnection(scope)
+    expect(own).toBeDefined()
+    try {
+      await connectAppStore({ ...other, secrets, fetch: appStore() }, input)
+      // One account per organization: a different vendor there replaces only that organization's.
+      await connectAppStore({ ...other, secrets, fetch: appStore() }, { ...input, vendorNumber: '85999002' })
+      const theirs = await db.select().from(connections).where(and(eq(connections.organizationId, other.organizationId), eq(connections.provider, 'app_store')))
+      expect(theirs.map((row) => row.externalAccountId)).toEqual(['85999002'])
+      expect(await findAppStoreConnection(scope)).toEqual(own)
+      const theirAssets = await db.select().from(assets).where(and(eq(assets.organizationId, other.organizationId), inArray(assets.externalId, [first.id, second.id])))
+      expect(theirAssets).toHaveLength(2)
+      expect(theirAssets.every((asset) => asset.connectionId === theirs[0]!.id)).toBe(true)
+    } finally {
+      await db.delete(assets).where(eq(assets.organizationId, other.organizationId))
+      await db.delete(connections).where(eq(connections.organizationId, other.organizationId))
+    }
   })
 })

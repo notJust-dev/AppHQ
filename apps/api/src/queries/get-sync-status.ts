@@ -1,4 +1,4 @@
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { syncRuns } from '../db/schema.js'
 import { defineQuery } from './define.js'
@@ -9,7 +9,7 @@ export const getSyncStatus = defineQuery({
     'The most recent sync run for each data source: when it ran, whether it succeeded, how ' +
     'many rows it wrote, and the error if it failed.',
   input: z.void(),
-  async handler({ db }) {
+  async handler({ db, organizationId }) {
     const latest = await db
       .selectDistinctOn([syncRuns.source], {
         source: syncRuns.source,
@@ -20,6 +20,7 @@ export const getSyncStatus = defineQuery({
         error: syncRuns.error,
       })
       .from(syncRuns)
+      .where(eq(syncRuns.organizationId, organizationId))
       .orderBy(syncRuns.source, desc(syncRuns.startedAt))
 
     return latest.map((run) => ({

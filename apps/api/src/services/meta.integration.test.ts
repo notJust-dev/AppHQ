@@ -11,6 +11,8 @@ import { createSecrets } from '../lib/crypto.js'
 import { addDays, eachDay } from '../lib/dates.js'
 import { listAccounts } from '../queries/list-accounts.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 import { assignAsset } from '../assets/store.js'
 import { assetOf } from '../test/assets.js'
@@ -158,10 +160,11 @@ function fakeMeta(suffix: string) {
 
 describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
   const secrets = createSecrets('e'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
   const suffix = randomUUID().slice(0, 8)
-  const appId = `meta-${suffix}`
+  const appId = randomUUID()
   const meta = fakeMeta(suffix)
   const at = (iso: string) => () => new Date(iso)
   const range = { from: '2026-11-10', to: '2026-11-12' }
@@ -186,19 +189,20 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
-    await db.insert(apps).values({ id: appId, name: 'Meta Test App' })
+    scope = await defaultScope(db)
+    await db.insert(apps).values({ organizationId: scope.organizationId, id: appId, name: 'Meta Test App' })
   })
 
   afterAll(async () => {
-    await db.delete(apps).where(eq(apps.id, appId))
     const ids = [meta.ids.pageA, meta.ids.pageB, meta.ids.ig, meta.ids.igOnly]
     await db.delete(assets).where(inArray(assets.externalId, ids))
+    await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await db.delete(connections).where(inArray(connections.externalAccountId, ids))
     await sql.end({ timeout: 5 })
   })
 
   it('saves every Page and linked Instagram account, unassigned, with tokens encrypted', async () => {
-    const result = await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })
+    const result = await connectMeta({ ...scope, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })
     expect(result).toMatchObject({ pages: 2, instagram: 1, missing: [] })
 
     const page = await row(meta.ids.pageA)
@@ -215,7 +219,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
     expect(secrets.decrypt(ig.refreshTokenEnc ?? '')).toBe('user-long')
     expect(ig.expiresAt?.getTime()).toBeGreaterThan(Date.now() + 59 * 86_400_000)
 
-    const metaFamily = (await listAccounts.handler({ db })).find((family) => family.family === 'meta')
+    const metaFamily = (await listAccounts.handler(scope)).find((family) => family.family === 'meta')
     expect(metaFamily?.accounts.map((account) => account.displayName)).toEqual(
       expect.arrayContaining(['TinyKicks', 'Other Page', '@tinykicks.app']),
     )
@@ -223,7 +227,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
   })
 
   it('connects with Unified login: a lasting token and an Instagram account without a Page', async () => {
-    const result = await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'unified-code', redirectUri })
+    const result = await connectMeta({ ...scope, secrets, env, fetch: meta.impl }, { code: 'unified-code', redirectUri })
     // The sign-in works, and says which Page permissions it was not given.
     expect(result).toEqual({
       pages: 0,
@@ -244,13 +248,13 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
   })
 
   it('links a Page to an app, brings its Instagram account along, and keeps both through a reconnect', async () => {
-    await assignAsset(db, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageA)).id, appId })
+    await assignAsset(scope, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageA)).id, appId })
     expect((await assetOf(db, 'instagram_account', meta.ids.ig)).appId).toBe(appId)
     await expect(
-      assignAsset(db, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageB)).id, appId: 'no-such-app' }),
+      assignAsset(scope, { assetId: (await assetOf(db, 'facebook_page', meta.ids.pageB)).id, appId: randomUUID() }),
     ).rejects.toBeInstanceOf(ConnectInputError)
 
-    await connectMeta({ db, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })
+    await connectMeta({ ...scope, secrets, env, fetch: meta.impl }, { code: 'good-code', redirectUri })
     expect((await assetOf(db, 'facebook_page', meta.ids.pageA)).appId).toBe(appId)
     expect((await assetOf(db, 'instagram_account', meta.ids.ig)).appId).toBe(appId)
     expect((await assetOf(db, 'facebook_page', meta.ids.pageB)).appId).toBeNull()
@@ -258,8 +262,8 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   it('reads Page insights onto Pacific days, and posts and reels with their views', async () => {
     const connector = createFacebookConnector({ fetch: meta.impl, env, now: at('2026-11-13T12:00:00Z') })
-    expect(await connector.isConfigured(await app(), db)).toBe(true)
-    await connector.sync({ db, app: await app(), range, log, secrets })
+    expect(await connector.isConfigured(await app(), scope)).toBe(true)
+    await connector.sync({ ...scope, app: await app(), range, log, secrets })
 
     expect(await metric('facebook', 'views')).toEqual([
       { date: '2026-11-10', value: 100 },
@@ -283,7 +287,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
   it('keeps a reel once when Facebook also lists it as a post, and removes the earlier copy', async () => {
     meta.state.reelAlsoPosted = true
     const connector = createFacebookConnector({ fetch: meta.impl, env, now: at('2026-11-13T18:00:00Z') })
-    await connector.sync({ db, app: await app(), range, log, secrets })
+    await connector.sync({ ...scope, app: await app(), range, log, secrets })
 
     const saved = await db
       .select({ caption: posts.caption, views: posts.views, likes: posts.likes, duration: posts.durationSeconds })
@@ -300,7 +304,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
 
   it('reads Instagram day by day, falling back to the user token when the Page token is refused', async () => {
     const connector = createInstagramConnector({ fetch: meta.impl, env, now: at('2026-11-13T12:00:00Z') })
-    await connector.sync({ db, app: await app(), range, log, secrets })
+    await connector.sync({ ...scope, app: await app(), range, log, secrets })
 
     expect(await metric('instagram', 'views')).toEqual([
       { date: '2026-11-10', value: 50 },
@@ -326,7 +330,7 @@ describe.skipIf(!url)('Facebook and Instagram, against a real database', () => {
     meta.state.userTokenWorks = false
     const connector = createInstagramConnector({ fetch: meta.impl, env, now: at('2026-11-14T12:00:00Z') })
     await expect(
-      connector.sync({ db, app: await app(), range: { from: '2026-11-13', to: '2026-11-13' }, log, secrets }),
+      connector.sync({ ...scope, app: await app(), range: { from: '2026-11-13', to: '2026-11-13' }, log, secrets }),
     ).rejects.toThrow(/1 of 1 Instagram accounts failed/)
     expect((await row(meta.ids.ig)).status).toBe('needs_reauth')
     // Facebook is unaffected: Page tokens do not expire with the sign-in.

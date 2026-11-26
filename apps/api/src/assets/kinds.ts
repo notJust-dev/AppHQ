@@ -18,5 +18,8 @@ export const ASSET_KIND_NAMES = Object.keys(ASSET_KINDS) as AssetKind[]
 
 export const isAssetKind = (value: string): value is AssetKind => value in ASSET_KINDS
 
-/** The one app row of kind 'portfolio', for accounts that promote several apps. */
-export const PORTFOLIO_APP_ID = 'portfolio'
+/**
+ * Said instead of an app id to give an asset to the organization's portfolio: its one app of kind
+ * 'portfolio', which holds accounts that promote several apps.
+ */
+export const PORTFOLIO = 'portfolio'

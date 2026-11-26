@@ -6,6 +6,7 @@ import { requireBearerToken } from './auth/bearer.js'
 import { authRoutes } from './auth/routes.js'
 import type { Db, Sql } from './db/client.js'
 import type { Secrets } from './lib/crypto.js'
+import { dashboardOrganization } from './organizations/dashboard.js'
 import { ACCESS_HEADER, DASHBOARD_ACCESS, type ApiContext } from './trpc/init.js'
 import { appRouter, type AppRouter } from './trpc/router.js'
 
@@ -16,6 +17,8 @@ export interface AppDeps {
   /** Resolves when the database answers; used by /health. */
   pingDb: () => Promise<unknown>
   internalApiToken: string
+  /** Which organization the dashboard password works in; read from the database by default. */
+  dashboardOrganization?: () => Promise<string>
   /** Accounts, when they are set up; without them /api/auth does not exist. */
   accounts?: { auth: Auth; origin: string; accounts: Accounts } | null
   logLevel?: 'info' | 'silent'
@@ -45,6 +48,7 @@ export async function buildApp(deps: AppDeps) {
     if (deps.accounts) await internal.register(authRoutes(deps.accounts.auth, deps.accounts.origin))
 
     const accounts = deps.accounts?.accounts ?? null
+    const organizationOfDashboard = deps.dashboardOrganization ?? dashboardOrganization(deps.db)
     await internal.register(fastifyTRPCPlugin, {
       prefix: '/trpc',
       trpcOptions: {
@@ -60,6 +64,7 @@ export async function buildApp(deps: AppDeps) {
             dashboardAccess: req.headers[ACCESS_HEADER] === DASHBOARD_ACCESS,
             accounts,
             account: () => (account ??= accounts ? accounts.userFor(cookie) : Promise.resolve(null)),
+            dashboardOrganization: organizationOfDashboard,
           }
         },
         onError({ path, error }) {

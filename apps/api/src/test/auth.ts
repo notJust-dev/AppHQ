@@ -9,6 +9,9 @@ import { createSecrets } from '../lib/crypto.js'
 export const TOKEN = 'test-token-that-is-at-least-32-characters'
 export const ORIGIN = 'https://apphq.example.com'
 
+/** The organization the test app's dashboard password works in. Invented. */
+export const TEST_DASHBOARD_ORGANIZATION = '00000000-0000-4000-8000-00000000d0d0'
+
 export const CONFIG: AuthConfig = {
   secret: 'test-secret-that-is-at-least-32-characters',
   url: ORIGIN,
@@ -78,7 +81,15 @@ export async function buildTestApp(
   options: { db?: Db; accounts?: boolean; database?: BetterAuthOptions['database'] } = {},
 ) {
   type Rows = Record<string, unknown>[]
-  const memory: { user: Rows; session: Rows; account: Rows; verification: Rows } = { user: [], session: [], account: [], verification: [] }
+  const memory: Record<'user' | 'session' | 'account' | 'verification' | 'organization' | 'member' | 'invitation', Rows> = {
+    user: [],
+    session: [],
+    account: [],
+    verification: [],
+    organization: [],
+    member: [],
+    invitation: [],
+  }
   const auth = createAuth(testAuthOptions(options.database ?? memoryAdapter(memory)) as ReturnType<typeof authOptions>)
   const app = await buildApp({
     db: options.db ?? unreachableDb,
@@ -86,6 +97,8 @@ export async function buildTestApp(
     secrets: createSecrets(undefined),
     pingDb: async () => 1,
     internalApiToken: TOKEN,
+    // A real database resolves this from the `organization` table; see organizations/dashboard.ts.
+    dashboardOrganization: options.db ? undefined : async () => TEST_DASHBOARD_ORGANIZATION,
     accounts: options.accounts === false ? null : { auth, origin: ORIGIN, accounts: createAccounts(auth, CONFIG) },
     logLevel: 'silent',
   })

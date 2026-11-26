@@ -18,7 +18,7 @@ export interface YouTubeConnectResult {
  * with several channels picks one at sign-in; sign in again for each of the others.
  */
 export async function connectYouTube(
-  deps: { db: Db; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
+  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
   input: { code: string; redirectUri: string },
 ): Promise<YouTubeConnectResult> {
   const config = requireYouTubeConfig(deps.env)
@@ -50,12 +50,13 @@ export async function connectYouTube(
   }
   const [connection] = await deps.db
     .insert(connections)
-    .values({ provider: YOUTUBE, externalAccountId: channel.id, ...values })
-    .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+    .values({ organizationId: deps.organizationId, provider: YOUTUBE, externalAccountId: channel.id, ...values })
+    .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
     .returning()
   if (!connection) throw new Error('could not save the YouTube connection')
 
-  await upsertAssets(deps.db, [
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  await upsertAssets(scope, [
     {
       kind: 'youtube_channel',
       externalId: channel.id,
@@ -64,6 +65,6 @@ export async function connectYouTube(
       details: { title: channel.title },
     },
   ])
-  await autoLink(deps.db)
+  await autoLink(scope)
   return { channel: channel.handle ?? channel.title, channelId: channel.id }
 }

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { connections, type NewMetric } from '../../db/schema.js'
 import type { IsoDate } from '../../lib/dates.js'
 import { MetaError } from './client.js'
@@ -11,8 +12,8 @@ export const FRESH_POST_DAYS = 30
 export const POST_HISTORY_DAYS = 365
 
 /** The Pages or Instagram accounts linked to an app, as their connection rows (tokens, state). */
-export const metaConnections = (db: Db, provider: string, appId: string) =>
-  linkedAssets(db, provider === 'facebook' ? 'facebook_page' : 'instagram_account', appId).then((rows) =>
+export const metaConnections = (scope: Scope, provider: string, appId: string) =>
+  linkedAssets(scope, provider === 'facebook' ? 'facebook_page' : 'instagram_account', appId).then((rows) =>
     rows.flatMap((row) => (row.connection ? [row.connection] : [])),
   )
 

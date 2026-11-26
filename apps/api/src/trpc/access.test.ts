@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { TOKEN, buildTestApp } from '../test/auth.js'
+import { TEST_DASHBOARD_ORGANIZATION, TOKEN, buildTestApp } from '../test/auth.js'
 import { ACCESS_HEADER, DASHBOARD_ACCESS, type Access } from './init.js'
 import { appRouter } from './router.js'
 
@@ -78,15 +78,45 @@ describe('dashboard procedures', () => {
   let built: Awaited<ReturnType<typeof buildTestApp>>
   let verified: string
   let approved: string
+  /** Approved, and owner of the organization made for it on approval. */
+  let ownsOwn: string
+  /** Approved, and owner of the dashboard's own organization, with it active on the session. */
+  let ownsDashboard: string
 
   beforeAll(async () => {
     built = await buildTestApp()
     verified = (await built.signIn({ email: 'verified@example.com', emailVerified: true })).cookie
+    const context = await built.auth.$context
 
     const signedIn = await built.signIn({ email: 'approved@example.com', emailVerified: true })
     approved = signedIn.cookie
-    const context = await built.auth.$context
     await context.internalAdapter.updateUser(signedIn.userId!, { accessStatus: 'approved' })
+
+    const owner = await built.signIn({ email: 'owner@example.com', emailVerified: true })
+    ownsOwn = owner.cookie
+    await context.internalAdapter.updateUser(owner.userId!, { accessStatus: 'approved' })
+    // Being seen approved makes its organization, with the account as owner.
+    expect((await call('account.get', { cookie: ownsOwn })).statusCode).toBe(200)
+    const made = built.memory.member.find((row) => row.userId === owner.userId)
+    expect(made).toMatchObject({ role: 'owner' })
+    for (const row of built.memory.session.filter((row) => row.userId === owner.userId)) {
+      row.activeOrganizationId = made!.organizationId
+    }
+
+    const dashboardOwner = await built.signIn({ email: 'dashboard-owner@example.com', emailVerified: true })
+    ownsDashboard = dashboardOwner.cookie
+    await context.internalAdapter.updateUser(dashboardOwner.userId!, { accessStatus: 'approved' })
+    built.memory.organization.push({ id: TEST_DASHBOARD_ORGANIZATION, name: 'Default organization', slug: 'default', createdAt: new Date() })
+    built.memory.member.push({
+      id: '00000000-0000-4000-8000-0000000000aa',
+      organizationId: TEST_DASHBOARD_ORGANIZATION,
+      userId: dashboardOwner.userId!,
+      role: 'owner',
+      createdAt: new Date(),
+    })
+    for (const row of built.memory.session.filter((row) => row.userId === dashboardOwner.userId)) {
+      row.activeOrganizationId = TEST_DASHBOARD_ORGANIZATION
+    }
   })
   afterAll(() => built.app.close())
 
@@ -126,6 +156,14 @@ describe('dashboard procedures', () => {
 
   it.each(dashboardPaths)('%s refuses an account whose access was approved', async (path) => {
     expect((await call(path, { cookie: approved })).statusCode).toBe(403)
+  })
+
+  it.each(dashboardPaths)('%s refuses the owner of an organization made on approval, active on its session', async (path) => {
+    expect((await call(path, { cookie: ownsOwn })).statusCode).toBe(403)
+  })
+
+  it.each(dashboardPaths)("%s refuses an owner of the dashboard's own organization, active on its session", async (path) => {
+    expect((await call(path, { cookie: ownsDashboard })).statusCode).toBe(403)
   })
 
   it.each(['1', 'true', 'DASHBOARD', ' dashboard', 'dashboard, dashboard'])(

@@ -18,8 +18,8 @@ export const startMetaConnectFn = createServerFn({ method: 'POST' })
   .handler(async ({ context }) => {
     const state = randomBytes(24).toString('base64url')
     try {
-      const { url } = await context.api.meta.authorizeUrl.query({ redirectUri: metaRedirectUri(), state })
-      await beginOAuth('meta', state)
+      const { url, organizationId } = await context.api.meta.authorizeUrl.query({ redirectUri: metaRedirectUri(), state })
+      await beginOAuth('meta', state, organizationId)
       return { ok: true as const, url }
     } catch (err) {
       const message =

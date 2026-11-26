@@ -1,8 +1,9 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { appIcons } from '../assets/icons.js'
 import { ASSET_KINDS, isAssetKind } from '../assets/kinds.js'
 import { apps, assets, connections, metricDaily } from '../db/schema.js'
+import { sameConnection } from '../organizations/joins.js'
 import { defineQuery } from './define.js'
 
 export const listApps = defineQuery({
@@ -13,12 +14,18 @@ export const listApps = defineQuery({
     'Instagram and TikTok accounts) with the state of the account behind each. The app with ' +
     'kind "portfolio" holds accounts shared by several apps.',
   input: z.void(),
-  async handler({ db }) {
+  async handler(scope) {
+    const { db, organizationId } = scope
     const [rows, sourceRows, assetRows, icons] = await Promise.all([
-      db.select().from(apps).where(eq(apps.isActive, true)).orderBy(asc(apps.name)),
+      db
+        .select()
+        .from(apps)
+        .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+        .orderBy(asc(apps.name)),
       db
         .select({ appId: metricDaily.appId, source: metricDaily.source })
         .from(metricDaily)
+        .where(eq(metricDaily.organizationId, organizationId))
         .groupBy(metricDaily.appId, metricDaily.source),
       // Never the token columns: credentials do not leave the API.
       db
@@ -33,9 +40,10 @@ export const listApps = defineQuery({
           lastSyncedAt: connections.lastSyncedAt,
         })
         .from(assets)
-        .leftJoin(connections, eq(connections.id, assets.connectionId))
+        .leftJoin(connections, sameConnection)
+        .where(eq(assets.organizationId, organizationId))
         .orderBy(asc(assets.kind), asc(assets.name)),
-      appIcons(db),
+      appIcons(scope),
     ])
 
     const sourcesByApp = new Map<string, string[]>()

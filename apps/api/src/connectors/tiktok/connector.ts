@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
 import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { connections, postSnapshots, posts, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { todayUtc, toIsoDate, type IsoDate } from '../../lib/dates.js'
@@ -15,8 +16,8 @@ import { dailyViews, type PostHistory } from './daily-views.js'
 const REFRESH_MARGIN_MS = 5 * 60_000
 
 /** The TikTok accounts linked to an app, as their connection rows (tokens and state). */
-const tiktokConnections = (db: Db, appId: string) =>
-  linkedAssets(db, 'tiktok_account', appId).then((rows) =>
+const tiktokConnections = (scope: Scope, appId: string) =>
+  linkedAssets(scope, 'tiktok_account', appId).then((rows) =>
     rows.flatMap((row) => (row.connection ? [row.connection] : [])),
   )
 
@@ -96,8 +97,9 @@ const postRow = (video: TikTokVideo, appId: string, connectionId: string): PostR
  * `metric_daily` as `views`. Each account counts from the day after it was connected up to its
  * last successful sync, so an account that is failing leaves a gap rather than zeros.
  */
-async function writeDailyViews(db: Db, appId: string) {
-  const accounts = await tiktokConnections(db, appId)
+async function writeDailyViews(scope: Scope, appId: string) {
+  const { db, organizationId } = scope
+  const accounts = await tiktokConnections(scope, appId)
   const readings = await db
     .select({
       postId: posts.id,
@@ -107,8 +109,11 @@ async function writeDailyViews(db: Db, appId: string) {
       views: postSnapshots.views,
     })
     .from(posts)
-    .innerJoin(postSnapshots, eq(postSnapshots.postId, posts.id))
-    .where(and(eq(posts.appId, appId), eq(posts.platform, TIKTOK)))
+    .innerJoin(
+      postSnapshots,
+      and(eq(postSnapshots.organizationId, posts.organizationId), eq(postSnapshots.postId, posts.id)),
+    )
+    .where(and(eq(posts.organizationId, organizationId), eq(posts.appId, appId), eq(posts.platform, TIKTOK)))
 
   const byAccount = new Map<string, Map<string, PostHistory>>()
   for (const reading of readings) {
@@ -141,7 +146,7 @@ async function writeDailyViews(db: Db, appId: string) {
     metric: 'views',
     value,
   }))
-  return upsertMetrics(db, rows)
+  return upsertMetrics(scope, rows)
 }
 
 /**
@@ -164,12 +169,13 @@ export function createTikTokConnector(
     source: TIKTOK,
     scope: 'app',
 
-    async isConfigured(app, db) {
+    async isConfigured(app, scope) {
       if (!tiktokConfig(options.env)) return false
-      return (await tiktokConnections(db, app.id)).length > 0
+      return (await tiktokConnections(scope, app.id)).length > 0
     },
 
-    async sync({ db, app, log, secrets }) {
+    async sync({ db, organizationId, app, log, secrets }) {
+      const scope = { db, organizationId }
       const client = createTikTokClient({
         config: requireTikTokConfig(options.env),
         fetch: options.fetch,
@@ -177,7 +183,7 @@ export function createTikTokConnector(
         now,
       })
       const today = todayUtc(now())
-      const accounts = await tiktokConnections(db, app.id)
+      const accounts = await tiktokConnections(scope, app.id)
       const failures: string[] = []
       /** Summed over the accounts that report it; null until one does. */
       let followers: number | null = null
@@ -196,7 +202,7 @@ export function createTikTokConnector(
           const videos = await keeper.use((token) => client.listVideos(token))
 
           await savePosts(
-            db,
+            scope,
             videos.map((video) => postRow(video, app.id, account.id)),
             today,
           )
@@ -226,10 +232,10 @@ export function createTikTokConnector(
 
       // Recomputed even when an account failed: the others' days are still right, and the
       // failed account's gap is shared out evenly once it syncs again.
-      rowsWritten += await writeDailyViews(db, app.id)
+      rowsWritten += await writeDailyViews(scope, app.id)
       // A partial follower total would look like a drop, so it is only written when complete.
       if (followers !== null && failures.length === 0) {
-        rowsWritten += await upsertMetrics(db, [
+        rowsWritten += await upsertMetrics(scope, [
           { appId: app.id, date: today, source: TIKTOK, metric: 'followers', value: followers },
         ])
       }

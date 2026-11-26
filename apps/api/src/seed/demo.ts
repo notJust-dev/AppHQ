@@ -1,6 +1,7 @@
-import { and, eq, isNull, like, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
 import { apps, assets, posts, type NewApp, type NewMetric, type NewPost } from '../db/schema.js'
+import type { Scope } from '../organizations/scope.js'
 import { addDays, parseIsoDate, todayUtc, type IsoDate } from '../lib/dates.js'
 import type { Source } from '../metrics/catalog.js'
 import { upsertMetrics } from '../metrics/upsert.js'
@@ -12,7 +13,6 @@ import { saveReviews, type ReviewReading } from '../reviews/save.js'
  * be developed and recorded without real accounts or real revenue on screen.
  */
 
-const DEMO_PREFIX = 'demo-'
 
 interface Profile {
   id: string
@@ -109,16 +109,19 @@ export interface DemoOptions {
   endDate?: IsoDate
 }
 
+/** Rows as they are generated, before they are placed in an organization. */
+type Unplaced<T> = Omit<T, 'organizationId'>
+
 export function generateDemoData(options: DemoOptions): {
-  apps: NewApp[]
-  assets: (typeof assets.$inferInsert)[]
+  apps: Unplaced<NewApp>[]
+  assets: Unplaced<typeof assets.$inferInsert>[]
   metrics: NewMetric[]
-  posts: NewPost[]
+  posts: Unplaced<NewPost>[]
 } {
   const endDate = options.endDate ?? addDays(todayUtc(), -1)
   const startDate = addDays(endDate, -(options.days - 1))
   const metrics: NewMetric[] = []
-  const demoPosts: NewPost[] = []
+  const demoPosts: Unplaced<NewPost>[] = []
 
   for (const profile of PROFILES) {
     const { id, scale, monthlyPrice, androidShare } = profile
@@ -353,47 +356,71 @@ function demoAssetsOf() {
  * Demo assets have no account behind them; anything with an account is real and stays. That
  * includes a demo asset someone took off its app on the Apps page.
  */
-const deleteDemoAssets = (db: Db) =>
-  db
+async function deleteDemoAssets({ db, organizationId }: Scope) {
+  await db
     .delete(assets)
     .where(
       and(
+        eq(assets.organizationId, organizationId),
         isNull(assets.connectionId),
         or(
-          like(assets.appId, `${DEMO_PREFIX}%`),
+          inArray(assets.appId, demoAppIds({ db, organizationId })),
           ...demoAssetsOf().map((asset) => and(eq(assets.kind, asset.kind), eq(assets.externalId, asset.externalId))),
         ),
       ),
     )
+}
 
-/** Removes the demo apps and, through ON DELETE CASCADE, everything recorded for them. */
-export async function clearDemo(db: Db) {
-  await deleteDemoAssets(db)
+/** The organization's demo apps, as a subquery. */
+const demoAppIds = ({ db, organizationId }: Scope) =>
+  db
+    .select({ id: apps.id })
+    .from(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
+
+/**
+ * Removes the organization's demo apps and, through ON DELETE CASCADE, everything recorded for
+ * them. A real asset someone linked to a demo app stays, without an app. Another organization's
+ * apps, demo or not, are untouched.
+ */
+export async function clearDemo(scope: Scope) {
+  const { db, organizationId } = scope
+  await deleteDemoAssets(scope)
   const removed = await db
     .delete(apps)
-    .where(like(apps.id, `${DEMO_PREFIX}%`))
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
     .returning({ id: apps.id })
   return { apps: removed.length }
 }
 
 /**
- * Replaces the demo apps with their assets, metrics, posts and reviews. Real apps (ids without the
- * prefix) are untouched.
+ * Replaces the organization's demo apps with their assets, metrics, posts and reviews. Real apps
+ * and other organizations are untouched.
  */
-export async function seedDemo(db: Db, options: DemoOptions) {
+export async function seedDemo({ db, organizationId }: Scope, options: DemoOptions) {
   const data = generateDemoData(options)
   await db.transaction(async (tx) => {
+    const scope: Scope = { db: tx as unknown as Db, organizationId }
     // Metrics and posts go with the apps through ON DELETE CASCADE; demo assets first, since
     // removing an app only unlinks its assets.
-    await deleteDemoAssets(tx as unknown as Db)
-    await tx.delete(apps).where(like(apps.id, `${DEMO_PREFIX}%`))
-    await tx.insert(apps).values(data.apps)
-    await tx.insert(assets).values(data.assets).onConflictDoNothing()
-    await upsertMetrics(tx as unknown as Db, data.metrics)
+    await deleteDemoAssets(scope)
+    await tx.delete(apps).where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
+    // The generated rows name their app by its profile key; the apps get uuids here.
+    const made = await tx
+      .insert(apps)
+      .values(data.apps.map(({ name }) => ({ organizationId, name, demo: true })))
+      .returning({ id: apps.id, name: apps.name })
+    const idOf = new Map(data.apps.map((app) => [app.id, made.find((row) => row.name === app.name)!.id]))
+    const placed = <T extends { appId?: string | null }>(row: T): T => ({ ...row, appId: row.appId ? idOf.get(row.appId)! : null })
+    await tx
+      .insert(assets)
+      .values(data.assets.map((asset) => ({ ...placed(asset), organizationId })))
+      .onConflictDoNothing()
+    await upsertMetrics(scope, data.metrics.map(placed))
     for (let i = 0; i < data.posts.length; i += 500) {
-      await tx.insert(posts).values(data.posts.slice(i, i + 500))
+      await tx.insert(posts).values(data.posts.slice(i, i + 500).map((post) => ({ ...placed(post), organizationId })))
     }
-    await saveReviews(tx as unknown as Db, generateDemoReviews(options))
+    await saveReviews(scope, generateDemoReviews(options).map(placed))
   })
   return { apps: data.apps.length, metrics: data.metrics.length, posts: data.posts.length }
 }

@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm'
-import type { Db } from '../db/client.js'
+import type { Scope } from '../organizations/scope.js'
+import { sameConnection } from '../organizations/joins.js'
 import { apps, assets, connections, type App, type Asset, type Connection } from '../db/schema.js'
-import { uniqueSlug } from '../lib/slug.js'
 import { ConnectInputError } from '../services/errors.js'
-import { ASSET_KINDS, PORTFOLIO_APP_ID, type AssetKind } from './kinds.js'
+import { ASSET_KINDS, PORTFOLIO, type AssetKind } from './kinds.js'
 
 const CHUNK = 500
 
@@ -27,14 +27,14 @@ const detail = (asset: Pick<Asset, 'details'>, key: string): string | null => {
  * Saves what an account found. A known asset gets its name, account and details refreshed;
  * which app it belongs to, and whether it is ignored, stay as they are.
  */
-export async function upsertAssets(db: Db, inputs: AssetInput[]): Promise<Asset[]> {
+export async function upsertAssets({ db, organizationId }: Scope, inputs: AssetInput[]): Promise<Asset[]> {
   const saved: Asset[] = []
   for (let i = 0; i < inputs.length; i += CHUNK) {
     const rows = await db
       .insert(assets)
-      .values(inputs.slice(i, i + CHUNK).map((input) => ({ ...input, details: input.details ?? null })))
+      .values(inputs.slice(i, i + CHUNK).map((input) => ({ ...input, organizationId, details: input.details ?? null })))
       .onConflictDoUpdate({
-        target: [assets.kind, assets.externalId],
+        target: [assets.organizationId, assets.kind, assets.externalId],
         set: {
           name: sql`excluded.name`,
           connectionId: sql`excluded.connection_id`,
@@ -50,26 +50,51 @@ export async function upsertAssets(db: Db, inputs: AssetInput[]): Promise<Asset[
 
 /** The assets of a kind that belong to an app (any app when `appId` is left out), with their account. */
 export async function linkedAssets(
-  db: Db,
+  { db, organizationId }: Scope,
   kind: AssetKind,
   appId?: string,
 ): Promise<{ asset: Asset; connection: Connection | null }[]> {
   const rows = await db
     .select({ asset: assets, connection: connections })
     .from(assets)
-    .leftJoin(connections, eq(connections.id, assets.connectionId))
-    .where(and(eq(assets.kind, kind), appId === undefined ? isNotNull(assets.appId) : eq(assets.appId, appId)))
+    .leftJoin(connections, sameConnection)
+    .where(and(eq(assets.organizationId, organizationId), eq(assets.kind, kind), appId === undefined ? isNotNull(assets.appId) : eq(assets.appId, appId)))
   return rows
 }
 
-/** Makes an app and returns its id. */
-export async function createApp(db: Db, name: string): Promise<string> {
+/** Makes an app and returns its id. Two apps may have the same name. */
+export async function createApp({ db, organizationId }: Scope, name: string): Promise<string> {
   const trimmed = name.trim()
   if (!trimmed) throw new ConnectInputError('Give the app a name.')
-  const known = await db.select({ id: apps.id }).from(apps)
-  const id = uniqueSlug(trimmed, new Set(known.map((app) => app.id)))
-  await db.insert(apps).values({ id, name: trimmed })
-  return id
+  const [made] = await db.insert(apps).values({ organizationId, name: trimmed }).returning({ id: apps.id })
+  return made!.id
+}
+
+/** The organization's portfolio app, made the first time something is given to it. */
+export async function portfolioApp({ db, organizationId }: Scope): Promise<string> {
+  const find = () =>
+    db
+      .select({ id: apps.id })
+      .from(apps)
+      .where(and(eq(apps.organizationId, organizationId), eq(apps.kind, 'portfolio')))
+      .limit(1)
+  const [found] = await find()
+  if (found) return found.id
+  // At most one per organization (a partial unique index), so a second request at the same
+  // moment inserts nothing and reads the first one's.
+  await db.insert(apps).values({ organizationId, name: 'Shared accounts', kind: 'portfolio' }).onConflictDoNothing()
+  const [made] = await find()
+  return made!.id
+}
+
+/** The organization's app with this id, or undefined. */
+async function appIn({ db, organizationId }: Scope, appId: string) {
+  const [app] = await db
+    .select({ id: apps.id, kind: apps.kind })
+    .from(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+    .limit(1)
+  return app
 }
 
 /**
@@ -79,10 +104,15 @@ export async function createApp(db: Db, name: string): Promise<string> {
  * account whose Page just got its app), so those follow.
  */
 export async function assignAsset(
-  db: Db,
+  scope: Scope,
   input: { assetId: string; appId: string | null },
 ): Promise<{ asset: Asset; appId: string | null }> {
-  const [asset] = await db.select().from(assets).where(eq(assets.id, input.assetId)).limit(1)
+  const { db, organizationId } = scope
+  const [asset] = await db
+    .select()
+    .from(assets)
+    .where(and(eq(assets.organizationId, organizationId), eq(assets.id, input.assetId)))
+    .limit(1)
   if (!asset) throw new ConnectInputError('That account or app is no longer connected. Reload the page.')
   const kind = ASSET_KINDS[asset.kind as AssetKind]
   if (!kind) throw new ConnectInputError('Unknown kind of asset.')
@@ -90,12 +120,16 @@ export async function assignAsset(
   let appId = input.appId
   if (appId === 'new') {
     if (kind.social) throw new ConnectInputError('Pick the app this account promotes, or the portfolio.')
-    appId = await createApp(db, detail(asset, 'title') ?? asset.name)
-  } else if (appId === PORTFOLIO_APP_ID) {
+    appId = await createApp(scope, detail(asset, 'title') ?? asset.name)
+  } else if (appId === PORTFOLIO) {
     if (!kind.social) throw new ConnectInputError(`A ${kind.label} belongs to one app, not to the portfolio.`)
+    appId = await portfolioApp(scope)
   } else if (appId !== null) {
-    const [app] = await db.select({ id: apps.id }).from(apps).where(eq(apps.id, appId)).limit(1)
+    const app = await appIn(scope, appId)
     if (!app) throw new ConnectInputError('That app no longer exists. Reload the page.')
+    if (app.kind === 'portfolio' && !kind.social) {
+      throw new ConnectInputError(`A ${kind.label} belongs to one app, not to the portfolio.`)
+    }
   }
 
   await db.transaction(async (tx) => {
@@ -103,35 +137,36 @@ export async function assignAsset(
       await tx
         .update(assets)
         .set({ appId: null, updatedAt: new Date() })
-        .where(and(eq(assets.kind, asset.kind), eq(assets.appId, appId)))
+        .where(and(eq(assets.organizationId, organizationId), eq(assets.kind, asset.kind), eq(assets.appId, appId)))
     }
     await tx
       .update(assets)
       .set({ appId, ignored: false, decided: true, updatedAt: new Date() })
-      .where(eq(assets.id, asset.id))
+      .where(and(eq(assets.organizationId, organizationId), eq(assets.id, asset.id)))
   })
-  if (appId !== null) await autoLink(db)
+  if (appId !== null) await autoLink(scope)
   return { asset, appId }
 }
 
 /** Marks assets as not needing a decision, or brings them back. Ignoring also unlinks them. */
-export async function setIgnored(db: Db, assetIds: string[], ignored: boolean) {
+export async function setIgnored({ db, organizationId }: Scope, assetIds: string[], ignored: boolean) {
   const updated = await db
     .update(assets)
     .set({ ignored, decided: true, ...(ignored ? { appId: null } : {}), updatedAt: new Date() })
-    .where(inArray(assets.id, assetIds))
+    .where(and(eq(assets.organizationId, organizationId), inArray(assets.id, assetIds)))
     .returning({ id: assets.id })
   if (updated.length === 0) throw new ConnectInputError('That asset is no longer there. Reload the page.')
   return updated.length
 }
 
 /** Renames an app. Its id, and so its address, stays the same. */
-export async function renameApp(db: Db, appId: string, name: string) {
-  if (appId === PORTFOLIO_APP_ID) throw new ConnectInputError('Shared accounts keep their name.')
+export async function renameApp(scope: Scope, appId: string, name: string) {
+  const { db, organizationId } = scope
+  if ((await appIn(scope, appId))?.kind === 'portfolio') throw new ConnectInputError('Shared accounts keep their name.')
   const renamed = await db
     .update(apps)
     .set({ name })
-    .where(eq(apps.id, appId))
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
     .returning({ name: apps.name })
   if (renamed.length === 0) throw new ConnectInputError('That app no longer exists. Reload the page.')
   return renamed[0]!.name
@@ -141,9 +176,14 @@ export async function renameApp(db: Db, appId: string, name: string) {
  * Removes an app the person no longer wants to track. Its numbers and posts go with it; what fed
  * it (store apps, projects, social accounts) stays, without an app, on the Apps page.
  */
-export async function removeApp(db: Db, appId: string) {
-  if (appId === PORTFOLIO_APP_ID) throw new ConnectInputError('Shared accounts cannot be removed.')
-  const removed = await db.delete(apps).where(eq(apps.id, appId)).returning({ name: apps.name })
+export async function removeApp(scope: Scope, appId: string) {
+  const { db, organizationId } = scope
+  if ((await appIn(scope, appId))?.kind === 'portfolio') throw new ConnectInputError('Shared accounts cannot be removed.')
+  // Its assets stay, without an app (the foreign key sets their app_id to null).
+  const removed = await db
+    .delete(apps)
+    .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+    .returning({ name: apps.name })
   if (removed.length === 0) throw new ConnectInputError('That app no longer exists. Reload the page.')
   return removed[0]!.name
 }
@@ -156,10 +196,10 @@ export async function removeApp(db: Db, appId: string) {
  * Only unlinked, not ignored assets move, and only into a free slot; an asset a person has
  * placed, or taken off an app, stays where they left it.
  */
-export async function autoLink(db: Db): Promise<number> {
+export async function autoLink({ db, organizationId }: Scope): Promise<number> {
   let linked = 0
   for (let pass = 0; pass < 3; pass++) {
-    const all = await db.select().from(assets)
+    const all = await db.select().from(assets).where(eq(assets.organizationId, organizationId))
     const linkedOf = (kind: AssetKind) => all.filter((a) => a.kind === kind && a.appId !== null)
     const hasSlot = (appId: string, kind: AssetKind) => all.some((a) => a.kind === kind && a.appId === appId)
     const moves: { asset: Asset; appId: string }[] = []
@@ -205,7 +245,10 @@ export async function autoLink(db: Db): Promise<number> {
 
     if (moves.length === 0) break
     for (const move of moves) {
-      await db.update(assets).set({ appId: move.appId, updatedAt: new Date() }).where(eq(assets.id, move.asset.id))
+      await db
+        .update(assets)
+        .set({ appId: move.appId, updatedAt: new Date() })
+        .where(and(eq(assets.organizationId, organizationId), eq(assets.id, move.asset.id)))
     }
     linked += moves.length
   }
@@ -249,7 +292,7 @@ export function suggestApp(asset: Pick<Asset, 'name' | 'details'>, candidates: P
 }
 
 /** Unlinks and removes demo assets: they have no account behind them. */
-export async function deleteAssetsOf(db: Db, appIds: string[]) {
+export async function deleteAssetsOf({ db, organizationId }: Scope, appIds: string[]) {
   if (appIds.length === 0) return
-  await db.delete(assets).where(and(inArray(assets.appId, appIds), sql`${assets.connectionId} is null`))
+  await db.delete(assets).where(and(eq(assets.organizationId, organizationId), inArray(assets.appId, appIds), sql`${assets.connectionId} is null`))
 }

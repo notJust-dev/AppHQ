@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { iconOf } from '../../assets/icons.js'
 import { autoLink, upsertAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { assets } from '../../db/schema.js'
 import type { AppStoreApp } from './client.js'
 
@@ -12,11 +12,12 @@ import type { AppStoreApp } from './client.js'
  * page. Returns how many of the account's apps belong to an app.
  */
 export async function saveAppStoreApps(
-  db: Db,
+  scope: Scope,
   connectionId: string,
   storeApps: AppStoreApp[],
   icons: ReadonlyMap<string, string> = new Map(),
 ) {
+  const { db, organizationId } = scope
   const appleIds = storeApps.map((app) => app.appleId)
   // An icon Apple did not give this time (a refusal, an outage) stays as it was.
   const known =
@@ -25,11 +26,11 @@ export async function saveAppStoreApps(
       : await db
           .select({ externalId: assets.externalId, details: assets.details })
           .from(assets)
-          .where(and(eq(assets.kind, 'ios_app'), inArray(assets.externalId, appleIds)))
+          .where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'ios_app'), inArray(assets.externalId, appleIds)))
   const previousIcons = new Map(known.map((row) => [row.externalId, iconOf(row.details)]))
 
   await upsertAssets(
-    db,
+    scope,
     storeApps.map((app) => {
       const iconUrl = icons.get(app.appleId) ?? previousIcons.get(app.appleId)
       return {
@@ -41,13 +42,14 @@ export async function saveAppStoreApps(
       }
     }),
   )
-  await autoLink(db)
+  await autoLink(scope)
   if (storeApps.length === 0) return { linked: 0 }
   const linked = await db
     .select({ id: assets.id })
     .from(assets)
     .where(
       and(
+        eq(assets.organizationId, organizationId),
         eq(assets.kind, 'ios_app'),
         inArray(assets.externalId, appleIds),
         isNotNull(assets.appId),

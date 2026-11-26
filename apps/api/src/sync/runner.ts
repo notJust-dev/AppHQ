@@ -5,8 +5,12 @@ import { apps, syncRuns } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import type { DateRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
+import type { Scope } from '../organizations/scope.js'
 
-/** Arbitrary but fixed: the Postgres advisory lock that keeps two syncs from overlapping. */
+/**
+ * Arbitrary but fixed: with the organization, the Postgres advisory lock that keeps two syncs of
+ * one organization from overlapping. Organizations never wait for each other.
+ */
 const SYNC_LOCK_ID = 727_001
 
 interface RunRecord {
@@ -16,17 +20,18 @@ interface RunRecord {
 }
 
 /**
- * Wraps a piece of work in a `sync_runs` row: 'running' when it starts, then 'ok' with the row
- * count or 'error' with the message. Errors are recorded and rethrown.
+ * Wraps a piece of work in a `sync_runs` row of the organization: 'running' when it starts, then
+ * 'ok' with the row count or 'error' with the message. Errors are recorded and rethrown.
  */
 export async function recordRun(
-  db: Db,
+  { db, organizationId }: Scope,
   record: RunRecord,
   work: () => Promise<{ rowsWritten: number }>,
 ): Promise<{ rowsWritten: number }> {
   const [run] = await db
     .insert(syncRuns)
     .values({
+      organizationId,
       source: record.source,
       appId: record.appId ?? null,
       status: 'running',
@@ -54,11 +59,13 @@ export async function recordRun(
 }
 
 export interface SyncOptions {
+  /** The organization to sync. A sync never reads or writes another organization's rows. */
+  organizationId: string
   connectors: Connector[]
   range: DateRange
   /** Limit to these sources; all registered connectors when omitted. */
   sources?: string[]
-  /** Limit to these apps; all active apps when omitted. */
+  /** Limit to these apps of the organization; all its active apps when omitted. */
   appIds?: string[]
 }
 
@@ -77,23 +84,25 @@ export interface SyncSummary {
 }
 
 /**
- * Runs every selected connector: once per app, or once in all for a connector that covers a
+ * Runs every selected connector for one organization: once per app, or once in all for a connector that covers a
  * whole account. One failing source or app never stops the others: each run is recorded on its
- * own. Cron entries can overlap safely because a second
- * invocation exits immediately while the first holds the advisory lock.
+ * own. Cron entries can overlap safely because a second invocation for the same organization
+ * exits immediately while the first holds its advisory lock.
  */
 export async function runSync(
   deps: SyncDeps,
   options: SyncOptions,
 ): Promise<SyncSummary> {
   const { db, sql, log, secrets } = deps
+  const { organizationId } = options
+  const scope: Scope = { db, organizationId }
   const summary: SyncSummary = { skipped: false, ok: 0, failed: 0 }
 
   // Advisory locks belong to a session, so the lock and unlock must use the same connection.
   const reserved = await sql.reserve()
   try {
     const [lock] = await reserved<{ locked: boolean }[]>`
-      select pg_try_advisory_lock(${SYNC_LOCK_ID}) as locked
+      select pg_try_advisory_lock(${SYNC_LOCK_ID}, hashtext(${organizationId})) as locked
     `
     if (!lock?.locked) {
       log.warn('Another sync is still running; skipping this one.')
@@ -109,6 +118,7 @@ export async function runSync(
         .from(apps)
         .where(
           and(
+            eq(apps.organizationId, organizationId),
             eq(apps.isActive, true),
             options.appIds ? inArray(apps.id, options.appIds) : undefined,
           ),
@@ -116,7 +126,7 @@ export async function runSync(
 
       const run = async (label: string, record: RunRecord, work: () => Promise<{ rowsWritten: number }>) => {
         try {
-          const { rowsWritten } = await recordRun(db, record, work)
+          const { rowsWritten } = await recordRun(scope, record, work)
           summary.ok++
           log.info(`${label}: ${rowsWritten} rows`)
         } catch (err) {
@@ -126,10 +136,10 @@ export async function runSync(
       }
 
       for (const connector of selected) {
-        const context = { db, range: options.range, log, secrets }
+        const context = { db, organizationId, range: options.range, log, secrets }
 
         if (connector.scope === 'account') {
-          if (!(await connector.isConfigured(db))) continue
+          if (!(await connector.isConfigured(scope))) continue
           await run(connector.source, { source: connector.source, range: options.range }, () =>
             connector.sync({ ...context, apps: activeApps }),
           )
@@ -137,7 +147,7 @@ export async function runSync(
         }
 
         for (const app of activeApps) {
-          if (!(await connector.isConfigured(app, db))) continue
+          if (!(await connector.isConfigured(app, scope))) continue
           await run(
             `${connector.source} ${app.id}`,
             { source: connector.source, appId: app.id, range: options.range },
@@ -146,7 +156,7 @@ export async function runSync(
         }
       }
     } finally {
-      await reserved`select pg_advisory_unlock(${SYNC_LOCK_ID})`
+      await reserved`select pg_advisory_unlock(${SYNC_LOCK_ID}, hashtext(${organizationId}))`
     }
   } finally {
     reserved.release()

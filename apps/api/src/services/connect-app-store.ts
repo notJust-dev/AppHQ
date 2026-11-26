@@ -24,7 +24,7 @@ export interface AppStoreConnectResult {
  * reports are asked for later, by the sync, for the apps that are tracked.
  */
 export async function connectAppStore(
-  deps: { db: Db; secrets: Secrets; fetch?: typeof fetch },
+  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch },
   input: AppStoreCredentials,
 ): Promise<AppStoreConnectResult> {
   const credentials: AppStoreCredentials = {
@@ -57,15 +57,15 @@ export async function connectAppStore(
     updatedAt: new Date(),
   }
   const saved = await deps.db.transaction(async (tx) => {
-    // One App Store account at a time: a different vendor replaces the previous one.
+    // One App Store account per organization: a different vendor replaces the previous one.
     await tx
       .delete(connections)
-      .where(and(eq(connections.provider, APP_STORE), ne(connections.externalAccountId, credentials.vendorNumber)))
+      .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.provider, APP_STORE), ne(connections.externalAccountId, credentials.vendorNumber)))
     const [row] = await tx
       .insert(connections)
-      .values({ provider: APP_STORE, externalAccountId: credentials.vendorNumber, ...connection })
+      .values({ organizationId: deps.organizationId, provider: APP_STORE, externalAccountId: credentials.vendorNumber, ...connection })
       .onConflictDoUpdate({
-        target: [connections.provider, connections.externalAccountId],
+        target: [connections.organizationId, connections.provider, connections.externalAccountId],
         set: connection,
       })
       .returning({ id: connections.id })
@@ -73,7 +73,8 @@ export async function connectAppStore(
   })
   if (!saved) throw new Error('could not save the App Store connection')
 
-  const { linked } = await saveAppStoreApps(deps.db, saved.id, storeApps)
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  const { linked } = await saveAppStoreApps(scope, saved.id, storeApps)
 
   return { apps: storeApps.length, linked }
 }

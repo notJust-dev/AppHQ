@@ -1,4 +1,5 @@
 import { betterAuth, type BetterAuthOptions } from 'better-auth'
+import { organization } from 'better-auth/plugins'
 import type { Env } from '../env.js'
 
 /**
@@ -67,6 +68,7 @@ export function authOptions(config: AuthConfig, database: BetterAuthOptions['dat
     database,
     telemetry: { enabled: false },
     emailAndPassword: { enabled: false },
+    plugins: [organizationPlugin()],
     socialProviders: {
       ...(config.google && {
         google: {
@@ -174,6 +176,19 @@ export function authOptions(config: AuthConfig, database: BetterAuthOptions['dat
     },
   } satisfies BetterAuthOptions
 }
+
+/**
+ * Better Auth's organization plugin, for its tables and session field. Nothing of it is reachable
+ * over HTTP (none of its paths is in `AUTH_PATHS`), and people can neither create nor delete
+ * organizations through it: the API makes them itself (src/organizations/ensure.ts).
+ */
+export const organizationPlugin = () =>
+  organization({
+    allowUserToCreateOrganization: false,
+    disableOrganizationDeletion: true,
+    // For the invitations to come: only the verified owner of an address may accept one.
+    requireEmailVerificationOnInvitation: true,
+  })
 
 export function createAuth(options: ReturnType<typeof authOptions>) {
   return betterAuth(options)

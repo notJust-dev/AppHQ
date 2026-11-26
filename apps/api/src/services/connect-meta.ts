@@ -43,7 +43,7 @@ const unlessRefused = <T>(err: unknown): T[] => {
  * connector tries them in that order.
  */
 export async function connectMeta(
-  deps: { db: Db; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
+  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
   input: { code: string; redirectUri: string },
 ): Promise<MetaConnectResult> {
   const config = requireMetaConfig(deps.env)
@@ -121,8 +121,8 @@ export async function connectMeta(
       const values = { ...row, scopes: granted?.join(',') ?? null, status: 'ok', updatedAt: new Date() }
       const [saved] = await tx
         .insert(connections)
-        .values(values)
-        .onConflictDoUpdate({ target: [connections.provider, connections.externalAccountId], set: values })
+        .values({ ...values, organizationId: deps.organizationId })
+        .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
         .returning({ id: connections.id })
       if (!saved) throw new Error('could not save a Meta connection')
       return saved.id
@@ -162,8 +162,9 @@ export async function connectMeta(
 
   // New Pages and accounts wait for an app to be chosen; one linked to a Page that already has
   // its app follows the Page. Reconnecting keeps every choice made before.
-  await upsertAssets(deps.db, found)
-  await autoLink(deps.db)
+  const scope = { db: deps.db, organizationId: deps.organizationId }
+  await upsertAssets(scope, found)
+  await autoLink(scope)
 
   return {
     pages: pages.length,

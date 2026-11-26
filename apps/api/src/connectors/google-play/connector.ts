@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { autoLink, linkedAssets, upsertAssets } from '../../assets/store.js'
 import { z } from 'zod'
-import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { apps, assets, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { mapLimit } from '../../lib/pool.js'
@@ -37,12 +37,12 @@ const credentialsSchema = z.object({
 export type PlayCredentials = z.infer<typeof credentialsSchema>
 
 
-/** The single Google Play developer account: a connection that belongs to no particular app. */
-export const findPlayConnection = (db: Db) =>
+/** The organization's Google Play developer account: a connection that belongs to no particular app. */
+export const findPlayConnection = ({ db, organizationId }: Scope) =>
   db
     .select()
     .from(connections)
-    .where(eq(connections.provider, GOOGLE_PLAY))
+    .where(and(eq(connections.organizationId, organizationId), eq(connections.provider, GOOGLE_PLAY)))
     .limit(1)
     .then((rows) => rows[0])
 
@@ -101,12 +101,13 @@ export const packagesIn = (files: { installs: ReportFile[]; store: ReportFile[] 
  * the ones exact evidence settles (a package equal to an app's iOS bundle id, or named in its
  * RevenueCat project). The rest wait for a decision in the dashboard.
  */
-export async function savePackages(db: Db, connectionId: string, packageNames: string[], titles: Map<string, string>) {
+export async function savePackages(scope: Scope, connectionId: string, packageNames: string[], titles: Map<string, string>) {
+  const { db, organizationId } = scope
   const known = new Map(
-    (await db.select().from(assets).where(eq(assets.kind, 'android_app'))).map((asset) => [asset.externalId, asset]),
+    (await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'android_app')))).map((asset) => [asset.externalId, asset]),
   )
   await upsertAssets(
-    db,
+    scope,
     packageNames.map((packageName) => {
       const previous = known.get(packageName)
       const previousTitle = (previous?.details as { title?: string } | null)?.title ?? null
@@ -120,13 +121,20 @@ export async function savePackages(db: Db, connectionId: string, packageNames: s
       }
     }),
   )
-  await autoLink(db)
+  await autoLink(scope)
   // How many of this account's packages belong to an app now; autoLink's own count covers
   // every asset, not just these.
   const linked = await db
     .select({ id: assets.id })
     .from(assets)
-    .where(and(eq(assets.kind, 'android_app'), inArray(assets.externalId, packageNames), isNotNull(assets.appId)))
+    .where(
+      and(
+        eq(assets.organizationId, organizationId),
+        eq(assets.kind, 'android_app'),
+        inArray(assets.externalId, packageNames),
+        isNotNull(assets.appId),
+      ),
+    )
   return linked.length
 }
 
@@ -140,12 +148,13 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
     source: GOOGLE_PLAY,
     scope: 'account',
 
-    async isConfigured(db) {
-      return (await findPlayConnection(db)) !== undefined
+    async isConfigured(scope) {
+      return (await findPlayConnection(scope)) !== undefined
     },
 
-    async sync({ db, range, secrets, log }) {
-      const connection = await findPlayConnection(db)
+    async sync({ db, organizationId, range, secrets, log }) {
+      const scope = { db, organizationId }
+      const connection = await findPlayConnection(scope)
       if (!connection?.accessTokenEnc) throw new Error('No Google Play service account is stored')
       const client = createPlayClient(readPlayCredentials(secrets, connection.accessTokenEnc), options)
 
@@ -153,17 +162,22 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
         const files = await client.files()
         const packageNames = packagesIn(files)
         const titled = new Set(
-          (await db.select().from(assets).where(eq(assets.kind, 'android_app')))
+          (await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'android_app'))))
             .filter((asset) => (asset.details as { title?: string } | null)?.title)
             .map((asset) => asset.externalId),
         )
         const needTitles = packageNames.some((name) => !titled.has(name))
-        await savePackages(db, connection.id, packageNames, needTitles ? await client.titles() : new Map())
+        await savePackages(scope, connection.id, packageNames, needTitles ? await client.titles() : new Map())
 
         const active = new Set(
-          (await db.select({ id: apps.id }).from(apps).where(eq(apps.isActive, true))).map((app) => app.id),
+          (
+            await db
+              .select({ id: apps.id })
+              .from(apps)
+              .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+          ).map((app) => app.id),
         )
-        const tracked = (await linkedAssets(db, 'android_app'))
+        const tracked = (await linkedAssets(scope, 'android_app'))
           .map(({ asset }) => asset)
           .filter((asset) => asset.connectionId === connection.id && asset.appId !== null && active.has(asset.appId))
           .map((asset) => ({ id: asset.appId ?? '', androidPackage: asset.externalId }))
@@ -194,7 +208,7 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
           }
         })
 
-        const written = await upsertMetrics(db, rows)
+        const written = await upsertMetrics(scope, rows)
 
         // Reviews live in the same bucket. A problem reading them is logged, so it never holds
         // back the installs.
@@ -214,7 +228,7 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
               }
             },
           )
-          reviewsSaved = await saveReviews(db, readings)
+          reviewsSaved = await saveReviews(scope, readings)
         } catch (err) {
           log.warn(`google_play: reviews not read: ${err instanceof Error ? err.message : String(err)}`)
         }

@@ -37,6 +37,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
             code,
             redirectUri: tiktokRedirectUri(),
             appId: attempt.appId,
+            organizationId: attempt.organizationId,
           })
           return finish(
             true,

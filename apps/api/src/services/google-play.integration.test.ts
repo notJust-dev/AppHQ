@@ -8,6 +8,8 @@ import { apps, assets, connections, metricDaily } from '../db/schema.js'
 import { assetOf } from '../test/assets.js'
 import { createSecrets } from '../lib/crypto.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 import { assignAsset, autoLink } from '../assets/store.js'
 import { connectGooglePlay, parseBucket } from './connect-google-play.js'
@@ -63,10 +65,11 @@ function fakeGoogle(suffix: string, options: { deny?: boolean } = {}) {
 
 describe.skipIf(!url)('Google Play, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
   const secrets = createSecrets('f'.repeat(64))
   const log = { info() {}, warn() {}, error() {} }
   const suffix = randomUUID().slice(0, 8)
-  const appId = `gp-${suffix}`
+  const appId = randomUUID()
   const google = fakeGoogle(suffix)
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const key = JSON.stringify({
@@ -86,10 +89,12 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
+    scope = await defaultScope(db)
     await db.delete(connections).where(eq(connections.provider, 'google_play'))
-    await db.insert(apps).values({ id: appId, name: 'TinyKicks Play' })
+    await db.insert(apps).values({ organizationId: scope.organizationId, id: appId, name: 'TinyKicks Play' })
     // Its iOS app has the same bundle id as the Play package, so the package should follow.
     await db.insert(assets).values({
+      organizationId: scope.organizationId,
       kind: 'ios_app',
       externalId: `ios-${suffix}`,
       name: 'TinyKicks Play',
@@ -100,8 +105,8 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
 
   afterAll(async () => {
     await db.delete(connections).where(eq(connections.provider, 'google_play'))
-    await db.delete(apps).where(inArray(apps.id, createdApps))
     await db.delete(assets).where(inArray(assets.externalId, [`ios-${suffix}`, google.pkg, google.other]))
+    await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), inArray(apps.id, createdApps)))
     await sql.end({ timeout: 5 })
   })
 
@@ -113,17 +118,17 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
 
   it('explains a key that is not one, and an account Play Console has not invited yet', async () => {
     await expect(
-      connectGooglePlay({ db, secrets, fetch: google.impl }, { serviceAccountJson: '{"type":"user"}', storageUri }),
+      connectGooglePlay({ ...scope, secrets, fetch: google.impl }, { serviceAccountJson: '{"type":"user"}', storageUri }),
     ).rejects.toBeInstanceOf(ConnectInputError)
 
     const denied = fakeGoogle(suffix, { deny: true })
     await expect(
-      connectGooglePlay({ db, secrets, fetch: denied.impl }, { serviceAccountJson: key, storageUri }),
+      connectGooglePlay({ ...scope, secrets, fetch: denied.impl }, { serviceAccountJson: key, storageUri }),
     ).rejects.toThrow(/has not given reports@my-project.iam.gserviceaccount.com access/)
   })
 
   it('connects, lists the packages, and matches the one whose iOS bundle id is the same', async () => {
-    const result = await connectGooglePlay({ db, secrets, fetch: google.impl }, { serviceAccountJson: key, storageUri })
+    const result = await connectGooglePlay({ ...scope, secrets, fetch: google.impl }, { serviceAccountJson: key, storageUri })
     expect(result).toEqual({
       serviceAccount: 'reports@my-project.iam.gserviceaccount.com',
       packages: 2,
@@ -140,19 +145,19 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
 
   it('leaves a package taken off its app alone, even though its bundle id matches', async () => {
     const linked = await assetOf(db, 'android_app', google.pkg)
-    await assignAsset(db, { assetId: linked.id, appId: null })
-    await autoLink(db)
+    await assignAsset(scope, { assetId: linked.id, appId: null })
+    await autoLink(scope)
     expect((await assetOf(db, 'android_app', google.pkg)).appId).toBeNull()
 
     // Linking it again by hand works as before.
-    await assignAsset(db, { assetId: linked.id, appId })
+    await assignAsset(scope, { assetId: linked.id, appId })
     expect((await assetOf(db, 'android_app', google.pkg)).appId).toBe(appId)
   })
 
   it('syncs new users and store listing visitors, preferring the overview file', async () => {
     const connector = createGooglePlayConnector({ fetch: google.impl })
-    expect(await connector.isConfigured(db)).toBe(true)
-    await connector.sync({ db, apps: [], range: { from: '2026-10-31', to: '2026-11-02' }, log, secrets })
+    expect(await connector.isConfigured(scope)).toBe(true)
+    await connector.sync({ ...scope, apps: [], range: { from: '2026-10-31', to: '2026-11-02' }, log, secrets })
 
     expect(await metric(appId, 'downloads')).toEqual([
       { date: '2026-10-31', value: 6 },
@@ -165,7 +170,7 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
 
   it('makes a new app for an Android-only package, then sums its countries', async () => {
     const other = await assetOf(db, 'android_app', google.other)
-    const { appId: created } = await assignAsset(db, { assetId: other.id, appId: 'new' })
+    const { appId: created } = await assignAsset(scope, { assetId: other.id, appId: 'new' })
     expect(created).toBeTruthy()
     createdApps.push(created ?? '')
     const [app] = await db.select().from(apps).where(eq(apps.id, created ?? ''))
@@ -173,7 +178,7 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
     expect((await assetOf(db, 'android_app', google.other)).appId).toBe(created)
 
     await createGooglePlayConnector({ fetch: google.impl }).sync({
-      db,
+      ...scope,
       apps: [],
       range: { from: '2026-11-01', to: '2026-11-01' },
       log,
@@ -182,7 +187,7 @@ describe.skipIf(!url)('Google Play, against a real database', () => {
     expect(await metric(created ?? '', 'downloads')).toEqual([{ date: '2026-11-01', value: 7 }])
 
     // Taking it away again leaves the app without a package.
-    await assignAsset(db, { assetId: other.id, appId: null })
+    await assignAsset(scope, { assetId: other.id, appId: null })
     expect((await assetOf(db, 'android_app', google.other)).appId).toBeNull()
   })
 })

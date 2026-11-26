@@ -1,9 +1,8 @@
 import type { z } from 'zod'
-import type { Db } from '../db/client.js'
+import type { Scope } from '../organizations/scope.js'
 
-export interface QueryContext {
-  db: Db
-}
+/** A query reads one organization's data: the one in the context, never another. */
+export type QueryContext = Scope
 
 /**
  * A query is a named function with a Zod input schema. The same definitions back the tRPC

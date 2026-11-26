@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDb } from '../db/client.js'
 import { runMigrations } from '../db/migrate.js'
 import { apps, posts } from '../db/schema.js'
 import { upsertMetrics } from '../metrics/upsert.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { getMonetisationPerformance, getSocialPerformance, getStorePerformance } from './performance.js'
 
 // Runs only when a database is provided: TEST_DATABASE_URL=postgres://.../appdashboard_test
@@ -14,19 +16,22 @@ const url = testDatabaseUrl()
 describe.skipIf(!url)('Performance pages, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
   const suffix = randomUUID().slice(0, 8)
-  const one = `perf-one-${suffix}`
-  const two = `perf-two-${suffix}`
+  const one = randomUUID()
+  const two = randomUUID()
   /** Posts a lot on one platform and once on another, for the top posts of each. */
-  const three = `perf-three-${suffix}`
+  const three = randomUUID()
   // The range, and the week before it for comparison.
   const range = { from: '2026-10-08', to: '2026-10-14' }
+  let scope: Scope
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
+    scope = await defaultScope(db)
+    const { organizationId } = scope
     await db.insert(apps).values([
-      { id: one, name: 'Perf One' },
-      { id: two, name: 'Perf Two' },
-      { id: three, name: 'Perf Three' },
+      { organizationId, id: one, name: 'Perf One' },
+      { organizationId, id: two, name: 'Perf Two' },
+      { organizationId, id: three, name: 'Perf Three' },
     ])
     const metrics = []
     for (let day = 1; day <= 14; day++) {
@@ -44,9 +49,10 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
         { appId: one, date, source: 'revenuecat', metric: 'mrr', value: 100 + day },
       )
     }
-    await upsertMetrics(db, metrics)
+    await upsertMetrics(scope, metrics)
     await db.insert(posts).values([
       {
+        organizationId,
         platform: 'tiktok',
         externalId: `perf-a-${suffix}`,
         appId: one,
@@ -55,6 +61,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
         likes: 300,
       },
       {
+        organizationId,
         platform: 'tiktok',
         externalId: `perf-b-${suffix}`,
         appId: one,
@@ -63,6 +70,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
       },
       // Before the range: not counted.
       {
+        organizationId,
         platform: 'instagram',
         externalId: `perf-c-${suffix}`,
         appId: two,
@@ -71,6 +79,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
       },
       // Twelve TikTok videos, every one more viewed than the single Instagram post.
       ...Array.from({ length: 12 }, (_, index) => ({
+        organizationId,
         platform: 'tiktok',
         externalId: `perf-three-${index}-${suffix}`,
         appId: three,
@@ -78,6 +87,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
         views: 1000 + index,
       })),
       {
+        organizationId,
         platform: 'instagram',
         externalId: `perf-three-ig-${suffix}`,
         appId: three,
@@ -88,7 +98,9 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
   })
 
   afterAll(async () => {
-    await db.delete(apps).where(inArray(apps.id, [one, two, three]))
+    await db
+      .delete(apps)
+      .where(and(eq(apps.organizationId, scope.organizationId), inArray(apps.id, [one, two, three])))
     await sql.end({ timeout: 5 })
   })
 
@@ -100,12 +112,12 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
     }) | undefined
 
   it('sums the chosen apps, with the period before for comparison', async () => {
-    const both = await getSocialPerformance.handler({ db }, { ...range, appId: undefined })
+    const both = await getSocialPerformance.handler(scope, { ...range, appId: undefined })
     const views = series(both, 'views')
     // Other apps in the test database may add to "all apps"; these two at least are counted.
     expect(views?.summary).toBeGreaterThanOrEqual(7 * 150)
 
-    const single = await getSocialPerformance.handler({ db }, { ...range, appId: one })
+    const single = await getSocialPerformance.handler(scope, { ...range, appId: one })
     expect(series(single, 'views')?.summary).toBe(700)
     expect(series(single, 'views')?.previous).toBe(700)
     // Followers are a level: the latest value, not a total.
@@ -114,7 +126,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
   })
 
   it('counts the posts of the range by platform and ranks them by views', async () => {
-    const result = await getSocialPerformance.handler({ db }, { ...range, appId: one })
+    const result = await getSocialPerformance.handler(scope, { ...range, appId: one })
     expect(result.posts.byPlatform).toEqual([
       { platform: 'tiktok', posts: 2, views: 5800, likes: 300, comments: 0, shares: 0 },
     ])
@@ -127,7 +139,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
   })
 
   it('keeps the top ten posts of each platform, so a less viewed platform still has its own', async () => {
-    const result = await getSocialPerformance.handler({ db }, { ...range, appId: three })
+    const result = await getSocialPerformance.handler(scope, { ...range, appId: three })
     const views = result.posts.top.map((post) => post.views)
     expect(views).toEqual([1011, 1010, 1009, 1008, 1007, 1006, 1005, 1004, 1003, 1002, 5])
     expect(result.posts.top.at(-1)?.platform).toBe('instagram')
@@ -136,7 +148,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
   })
 
   it('splits the store funnel by store', async () => {
-    const result = await getStorePerformance.handler({ db }, { ...range, appId: two })
+    const result = await getStorePerformance.handler(scope, { ...range, appId: two })
     expect(series(result, 'impressions')?.summary).toBeNull()
     expect(series(result, 'pageViews')?.sources).toMatchObject([{ source: 'google_play', summary: 140 }])
     expect(series(result, 'downloads')?.summary).toBe(28)
@@ -147,7 +159,7 @@ describe.skipIf(!url)('Performance pages, against a real database', () => {
   })
 
   it('takes the latest MRR and totals revenue', async () => {
-    const result = await getMonetisationPerformance.handler({ db }, { ...range, appId: one })
+    const result = await getMonetisationPerformance.handler(scope, { ...range, appId: one })
     expect(series(result, 'revenue')?.summary).toBe(17.5)
     expect(series(result, 'mrr')?.summary).toBe(114)
     expect(series(result, 'mrr')?.previous).toBe(107)

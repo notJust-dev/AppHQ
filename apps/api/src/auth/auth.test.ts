@@ -7,10 +7,52 @@ import { authConfigFromEnv, authOptions, CLIENT_ADDRESS_HEADER, createAuth } fro
 const bearer = { authorization: `Bearer ${TOKEN}` }
 const json = { 'content-type': 'application/json' }
 
+const ORGANIZATION_PATHS = [
+  '/organization/accept-invitation',
+  '/organization/add-team-member',
+  '/organization/cancel-invitation',
+  '/organization/check-slug',
+  '/organization/create',
+  '/organization/create-role',
+  '/organization/create-team',
+  '/organization/delete',
+  '/organization/delete-role',
+  '/organization/get-active-member',
+  '/organization/get-active-member-role',
+  '/organization/get-full-organization',
+  '/organization/get-invitation',
+  '/organization/get-organization',
+  '/organization/get-role',
+  '/organization/has-permission',
+  '/organization/invite-member',
+  '/organization/leave',
+  '/organization/list',
+  '/organization/list-invitations',
+  '/organization/list-members',
+  '/organization/list-roles',
+  '/organization/list-team-members',
+  '/organization/list-teams',
+  '/organization/list-user-invitations',
+  '/organization/list-user-teams',
+  '/organization/reject-invitation',
+  '/organization/remove-member',
+  '/organization/remove-team',
+  '/organization/remove-team-member',
+  '/organization/set-active',
+  '/organization/set-active-team',
+  '/organization/update',
+  '/organization/update-member-role',
+  '/organization/update-role',
+  '/organization/update-team',
+]
+
 describe('/api/auth', () => {
   let built: Awaited<ReturnType<typeof buildTestApp>>
+  /** A real session, so a refusal can't be put down to being signed out. */
+  let signedIn: string
   beforeAll(async () => {
     built = await buildTestApp()
+    signedIn = (await built.signIn({ email: 'member@example.com', emailVerified: true })).cookie
   })
   afterAll(() => built.app.close())
 
@@ -52,6 +94,28 @@ describe('/api/auth', () => {
     expect(res.statusCode).toBe(404)
     const get = await built.app.inject({ method: 'GET', url: `/api/auth${path}`, headers: bearer })
     expect(get.statusCode).toBe(404)
+  })
+
+  // Every endpoint of the organization plugin. People can't create, join, switch, invite or
+  // leave over HTTP; the API makes organizations itself.
+  it.each(ORGANIZATION_PATHS)('does not serve the organization plugin\'s %s', async (path) => {
+    const res = await post(path, { cookie: signedIn }, { name: 'Made up', slug: 'made-up', organizationId: 'x' })
+    expect(res.statusCode).toBe(404)
+    const get = await built.app.inject({ method: 'GET', url: `/api/auth${path}`, headers: { ...bearer, cookie: signedIn } })
+    expect(get.statusCode).toBe(404)
+  })
+
+  it('the list above covers every organization endpoint Better Auth has', async () => {
+    const served = Object.values(built.auth.api)
+      .map((endpoint) => (endpoint as { path?: string }).path)
+      .filter((path): path is string => typeof path === 'string' && path.startsWith('/organization/'))
+    expect(served.length).toBeGreaterThan(10)
+    expect(ORGANIZATION_PATHS).toEqual(expect.arrayContaining(served))
+    // Called directly, it still refuses to let a person make an organization.
+    await expect(
+      built.auth.api.createOrganization({ headers: new Headers({ cookie: signedIn }), body: { name: 'Made up', slug: 'made-up' } }),
+    ).rejects.toThrow()
+    expect(built.memory.organization).toHaveLength(0)
   })
 
   it('starts a GitHub sign-in that comes back to the dashboard', async () => {
@@ -234,6 +298,28 @@ describe('requesting access', () => {
     const context = await built.auth.$context
     await context.internalAdapter.updateUser(userId!, { accessStatus: 'approved' })
     expect(data(await call('account.requestAccess', cookie)).accessStatus).toBe('approved')
+  })
+
+  it('gives an approved account one organization of its own, owned by it, and asking does not', async () => {
+    const asker = await built.signIn({ email: 'only-asked@example.com', emailVerified: true })
+    await call('account.requestAccess', asker.cookie)
+    await call('account.get', asker.cookie)
+    expect(built.memory.member.filter((row) => row.userId === asker.userId)).toHaveLength(0)
+
+    const { cookie, userId } = await built.signIn({ email: 'newly-approved@example.com', emailVerified: true })
+    const context = await built.auth.$context
+    await context.internalAdapter.updateUser(userId!, { accessStatus: 'approved' })
+    // Seen several times, and twice at once: still one organization.
+    await Promise.all([call('account.get', cookie), call('account.get', cookie)])
+    await call('account.requestAccess', cookie)
+
+    const memberships = built.memory.member.filter((row) => row.userId === userId)
+    expect(memberships).toHaveLength(1)
+    expect(memberships[0]).toMatchObject({ role: 'owner' })
+    const organization = built.memory.organization.find((row) => row.id === memberships[0]!.organizationId)
+    // Neutral and generated: nothing from the account's name or address.
+    expect(organization).toMatchObject({ name: 'Organization', slug: expect.stringMatching(/^org-[0-9a-f]{12}$/) })
+    expect(JSON.stringify(organization)).not.toMatch(/newly|approved|example/)
   })
 
   it('shows only the account itself', async () => {

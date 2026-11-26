@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { linkedAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { apps, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { eachDay, todayUtc } from '../../lib/dates.js'
@@ -29,12 +29,12 @@ const credentialsSchema = z.object({
   vendorNumber: z.string(),
 })
 
-/** The single App Store Connect account: a connection that belongs to no particular app. */
-export const findAppStoreConnection = (db: Db) =>
+/** The organization's App Store Connect account: a connection that belongs to no particular app. */
+export const findAppStoreConnection = ({ db, organizationId }: Scope) =>
   db
     .select()
     .from(connections)
-    .where(eq(connections.provider, APP_STORE))
+    .where(and(eq(connections.organizationId, organizationId), eq(connections.provider, APP_STORE)))
     .limit(1)
     .then((rows) => rows[0])
 
@@ -52,12 +52,13 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
     source: APP_STORE,
     scope: 'account',
 
-    async isConfigured(db) {
-      return (await findAppStoreConnection(db)) !== undefined
+    async isConfigured(scope) {
+      return (await findAppStoreConnection(scope)) !== undefined
     },
 
-    async sync({ db, range, secrets }) {
-      const connection = await findAppStoreConnection(db)
+    async sync({ db, organizationId, range, secrets }) {
+      const scope = { db, organizationId }
+      const connection = await findAppStoreConnection(scope)
       if (!connection?.accessTokenEnc) throw new Error('No App Store Connect key is stored')
       const client = createAppStoreClient({
         credentials: readAppStoreCredentials(secrets, connection.accessTokenEnc),
@@ -79,16 +80,21 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
           appleIds: storeApps.map((app) => app.appleId),
           fetch: options.fetch,
         })
-        await saveAppStoreApps(db, connection.id, storeApps, icons)
+        await saveAppStoreApps(scope, connection.id, storeApps, icons)
 
         // Only this account's iOS apps that belong to an active app. A report says nothing
         // about any other app, so an app from elsewhere (demo data, another account) must not
         // be given zeros.
         const owned = new Set(storeApps.map((app) => app.appleId))
         const active = new Set(
-          (await db.select({ id: apps.id }).from(apps).where(eq(apps.isActive, true))).map((app) => app.id),
+          (
+            await db
+              .select({ id: apps.id })
+              .from(apps)
+              .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+          ).map((app) => app.id),
         )
-        const tracked = (await linkedAssets(db, 'ios_app'))
+        const tracked = (await linkedAssets(scope, 'ios_app'))
           .map(({ asset }) => asset)
           .filter(
             (asset) =>
@@ -134,7 +140,7 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
           analyticsState = analytics.state
 
           const fetched = await syncAppStoreReviews({ client, tracked, range })
-          reviewsSaved = await saveReviews(db, fetched.readings)
+          reviewsSaved = await saveReviews(scope, fetched.readings)
           failures.push(...fetched.failures)
           reviewsState = fetched.state
         }
@@ -143,7 +149,7 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
         failures.push(err instanceof Error ? err.message : String(err))
       }
 
-      const rowsWritten = await upsertMetrics(db, rows)
+      const rowsWritten = await upsertMetrics(scope, rows)
       await db
         .update(connections)
         .set({

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
+import type { Scope } from '../../organizations/scope.js'
 import { connections, type App, type NewMetric } from '../../db/schema.js'
 import { addDays } from '../../lib/dates.js'
 import { upsertMetrics } from '../../metrics/upsert.js'
@@ -51,8 +51,8 @@ const CHARTS: readonly ChartSpec[] = [
 ]
 
 /** The app's RevenueCat project and the key that reads it. */
-const findProject = (db: Db, app: App) =>
-  linkedAssets(db, 'revenuecat_project', app.id).then((rows) => rows.find((row) => row.connection) ?? null)
+const findProject = (scope: Scope, app: App) =>
+  linkedAssets(scope, 'revenuecat_project', app.id).then((rows) => rows.find((row) => row.connection) ?? null)
 
 /** Revenue, subscription and trial metrics, one RevenueCat project per app. Eight requests per run. */
 export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}): AppConnector {
@@ -60,12 +60,13 @@ export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}
     source: REVENUECAT,
     scope: 'app',
 
-    async isConfigured(app, db) {
-      return (await findProject(db, app)) !== null
+    async isConfigured(app, scope) {
+      return (await findProject(scope, app)) !== null
     },
 
-    async sync({ db, app, range, log, secrets }) {
-      const found = await findProject(db, app)
+    async sync({ db, organizationId, app, range, log, secrets }) {
+      const scope = { db, organizationId }
+      const found = await findProject(scope, app)
       const connection = found?.connection
       const projectId = found?.asset.externalId
       if (!connection?.accessTokenEnc || !projectId) {
@@ -106,7 +107,7 @@ export function createRevenueCatConnector(options: { fetch?: typeof fetch } = {}
         }
       }
 
-      const rowsWritten = await upsertMetrics(db, rows)
+      const rowsWritten = await upsertMetrics(scope, rows)
       await db
         .update(connections)
         .set({

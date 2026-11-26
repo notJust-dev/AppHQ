@@ -28,7 +28,7 @@ export const SOURCE_OF_KIND: Record<string, string> = {
   search_console_site: 'Google Search Console',
 }
 
-/** The app row that holds accounts shared by several apps. */
+/** Sent instead of an app id to give an asset to the portfolio, the row that holds accounts shared by several apps. */
 export const PORTFOLIO_APP_ID = 'portfolio'
 
 export const isSocial = (kind: string) => (SOCIAL_KINDS as readonly string[]).includes(kind)

@@ -9,6 +9,8 @@ import { createSecrets } from '../lib/crypto.js'
 import { listPosts } from '../queries/list-posts.js'
 import { assetOf } from '../test/assets.js'
 import { testDatabaseUrl } from '../test/database.js'
+import { defaultScope, testOrganization } from '../test/organizations.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 import { connectTikTok } from './connect-tiktok.js'
 import { tiktokDailyFrom } from '../queries/tiktok-history.js'
@@ -114,6 +116,7 @@ function fakeTikTok(openId: string) {
 
 describe.skipIf(!url)('TikTok, against a real database', () => {
   const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
   const secrets = createSecrets('d'.repeat(64))
   /** The views the two videos had when the account was connected, on the days they went up. */
   const history = [
@@ -122,7 +125,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
   ]
   const nonZero = (rows: { date: string; value: number }[]) => rows.filter((row) => row.value !== 0)
   const log = { info() {}, warn() {}, error() {} }
-  const appId = `tt-${randomUUID().slice(0, 8)}`
+  const appId = randomUUID()
   const openId = `open-${randomUUID().slice(0, 8)}`
   const tiktok = fakeTikTok(openId)
   const at = (iso: string) => () => new Date(iso)
@@ -150,12 +153,13 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
 
   beforeAll(async () => {
     await runMigrations({ db, sql })
-    await db.insert(apps).values({ id: appId, name: 'TikTok Test App' })
+    scope = await defaultScope(db)
+    await db.insert(apps).values({ organizationId: scope.organizationId, id: appId, name: 'TikTok Test App' })
   })
 
   afterAll(async () => {
-    await db.delete(apps).where(eq(apps.id, appId))
     await db.delete(assets).where(eq(assets.externalId, openId))
+    await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
     await db.delete(connections).where(eq(connections.externalAccountId, openId))
     await sql.end({ timeout: 5 })
   })
@@ -163,7 +167,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
   it('refuses an account that did not grant access to its videos, and revokes the token', async () => {
     tiktok.state.scope = 'user.info.basic'
     await expect(
-      connectTikTok({ db, secrets, env, fetch: tiktok.impl }, { code: 'good-code', redirectUri, appId }),
+      connectTikTok({ ...scope, secrets, env, fetch: tiktok.impl }, { code: 'good-code', redirectUri, appId }),
     ).rejects.toBeInstanceOf(ConnectInputError)
     expect(tiktok.state.revoked).toEqual(['act.1'])
     tiktok.state.scope = 'user.info.basic,user.info.profile,user.info.stats,video.list'
@@ -171,7 +175,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
 
   it('stores the account against the app, with its tokens encrypted', async () => {
     const result = await connectTikTok(
-      { db, secrets, env, fetch: tiktok.impl },
+      { ...scope, secrets, env, fetch: tiktok.impl },
       { code: 'good-code', redirectUri, appId },
     )
     expect(result).toEqual({ appId, appName: 'TikTok Test App', account: '@tinykicks' })
@@ -192,9 +196,9 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
 
   it('takes the first snapshot on the day it is connected, with each video on its post day', async () => {
     const connector = createTikTokConnector({ fetch: tiktok.impl, env, now: at('2026-11-10T09:00:00Z') })
-    expect(await connector.isConfigured(await app(), db)).toBe(true)
+    expect(await connector.isConfigured(await app(), scope)).toBe(true)
 
-    await connector.sync({ db, app: await app(), range: { from: '2026-11-04', to: '2026-11-10' }, log, secrets })
+    await connector.sync({ ...scope, app: await app(), range: { from: '2026-11-04', to: '2026-11-10' }, log, secrets })
 
     const saved = await db.select().from(posts).where(eq(posts.appId, appId)).orderBy(posts.publishedAt)
     expect(saved.map((p) => [p.caption, p.views])).toEqual([
@@ -209,7 +213,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     expect(views[1]).toEqual({ date: '2026-10-02', value: 0 })
     expect(await metric('followers')).toEqual([{ date: '2026-11-10', value: 1200 }])
     // Real daily views begin the day after the connection.
-    expect(await tiktokDailyFrom(db, appId)).toBe('2026-11-11')
+    expect(await tiktokDailyFrom(scope, appId)).toBe('2026-11-11')
   })
 
   it('refreshes the expired token, keeps the new refresh token, and derives the next day', async () => {
@@ -223,7 +227,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     const before = tiktok.state.refreshToken
 
     const connector = createTikTokConnector({ fetch: tiktok.impl, env, now: at('2026-11-11T21:00:00Z') })
-    await connector.sync({ db, app: await app(), range: { from: '2026-11-05', to: '2026-11-11' }, log, secrets })
+    await connector.sync({ ...scope, app: await app(), range: { from: '2026-11-05', to: '2026-11-11' }, log, secrets })
 
     const row = await connection()
     expect(tiktok.state.refreshToken).not.toBe(before)
@@ -243,7 +247,7 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
   })
 
   it('lists the posts of a range, newest first', async () => {
-    const listed = await listPosts.handler({ db }, { appId, from: '2026-11-01', to: '2026-11-30', limit: 50 })
+    const listed = await listPosts.handler(scope, { appId, from: '2026-11-01', to: '2026-11-30', limit: 50 })
     expect(listed.map((p) => p.views)).toEqual([2_500, 8_100])
     expect(listed[0]).toMatchObject({ platform: 'tiktok', publishedAt: '2026-11-11T07:00:00.000Z' })
   })
@@ -253,12 +257,107 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     const connector = createTikTokConnector({ fetch: tiktok.impl, env, now: at('2026-11-13T09:00:00Z') })
 
     await expect(
-      connector.sync({ db, app: await app(), range: { from: '2026-11-07', to: '2026-11-13' }, log, secrets }),
+      connector.sync({ ...scope, app: await app(), range: { from: '2026-11-07', to: '2026-11-13' }, log, secrets }),
     ).rejects.toThrow(/1 of 1 TikTok accounts failed/)
     expect((await connection()).status).toBe('needs_reauth')
     // Days already derived stay; the days without a reading stay empty instead of turning to 0.
     const views = await metric('views')
     expect(nonZero(views)).toEqual([...history, { date: '2026-11-11', value: 3_000 }])
     expect(views.at(-1)?.date).toBe('2026-11-11')
+  })
+})
+
+describe.skipIf(!url)('the same TikTok account in two organizations', () => {
+  const { db, sql } = createDb(url ?? 'postgres://unused')
+  const secrets = createSecrets('d'.repeat(64))
+  const log = { info() {}, warn() {}, error() {} }
+  // Each organization has its own app for the account; app ids are unique across organizations.
+  const xAppId = randomUUID()
+  const yAppId = randomUUID()
+  const openId = `open-shared-${randomUUID().slice(0, 8)}`
+  const redirectUri = 'https://dash.example/connect/tiktok/callback'
+  const now = () => new Date('2026-11-10T09:00:00Z')
+  let x: Scope
+  let y: Scope
+  const appIdIn = ({ organizationId }: Scope) => (organizationId === x.organizationId ? xAppId : yAppId)
+
+  const rowsOf = async (scope: Scope) => {
+    const { organizationId } = scope
+    const appId = appIdIn(scope)
+    return {
+      connections: await db
+        .select()
+        .from(connections)
+        .where(and(eq(connections.organizationId, organizationId), eq(connections.externalAccountId, openId))),
+      assets: await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.externalId, openId))),
+      // Ordered, so that the same rows always compare equal.
+      posts: await db
+        .select()
+        .from(posts)
+        .where(and(eq(posts.organizationId, organizationId), eq(posts.appId, appId)))
+        .orderBy(posts.externalId),
+      metrics: await db
+        .select()
+        .from(metricDaily)
+        .where(and(eq(metricDaily.organizationId, organizationId), eq(metricDaily.appId, appId)))
+        .orderBy(metricDaily.date, metricDaily.source, metricDaily.metric, metricDaily.dimension),
+    }
+  }
+
+  beforeAll(async () => {
+    await runMigrations({ db, sql })
+    x = await testOrganization(db, 'tiktok-x')
+    y = await testOrganization(db, 'tiktok-y')
+    // An app with the same name in both.
+    await db.insert(apps).values([
+      { organizationId: x.organizationId, id: xAppId, name: 'Kicks' },
+      { organizationId: y.organizationId, id: yAppId, name: 'Kicks' },
+    ])
+  })
+  afterAll(async () => {
+    for (const scope of [x, y]) {
+      await db.delete(assets).where(and(eq(assets.organizationId, scope.organizationId), eq(assets.externalId, openId)))
+      await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appIdIn(scope))))
+      await db.delete(connections).where(and(eq(connections.organizationId, scope.organizationId), eq(connections.externalAccountId, openId)))
+    }
+    await sql.end()
+  })
+
+  it('connects and syncs it in each without touching the other', async () => {
+    const inX = fakeTikTok(openId)
+    const inY = fakeTikTok(openId)
+    await connectTikTok({ ...x, secrets, fetch: inX.impl, env }, { code: 'good-code', redirectUri, appId: xAppId })
+    const yBefore = await rowsOf(y)
+    expect(yBefore.connections).toHaveLength(0)
+
+    const connector = createTikTokConnector({ fetch: inX.impl, env, now, sleep: async () => {} })
+    const [xApp] = await db.select().from(apps).where(and(eq(apps.organizationId, x.organizationId), eq(apps.id, xAppId)))
+    await connector.sync({ ...x, app: xApp!, range: { from: '2026-11-03', to: '2026-11-09' }, log, secrets })
+    expect(await rowsOf(y)).toEqual(yBefore)
+
+    await connectTikTok({ ...y, secrets, fetch: inY.impl, env }, { code: 'good-code', redirectUri, appId: yAppId })
+    const xAfterSync = await rowsOf(x)
+    const [yApp] = await db.select().from(apps).where(and(eq(apps.organizationId, y.organizationId), eq(apps.id, yAppId)))
+    await createTikTokConnector({ fetch: inY.impl, env, now, sleep: async () => {} }).sync({
+      ...y,
+      app: yApp!,
+      range: { from: '2026-11-03', to: '2026-11-09' },
+      log,
+      secrets,
+    })
+    // Y's connect and sync left X's rows exactly as they were.
+    expect(await rowsOf(x)).toEqual(xAfterSync)
+
+    const [inXRows, inYRows] = [await rowsOf(x), await rowsOf(y)]
+    for (const [rows, appId] of [[inXRows, xAppId], [inYRows, yAppId]] as const) {
+      expect(rows.connections).toHaveLength(1)
+      expect(rows.assets).toMatchObject([{ appId }])
+      expect(rows.posts.map((post) => post.externalId).sort()).toEqual([`${openId}-v1`, `${openId}-v2`])
+    }
+    // Two accounts, each with its own tokens and its own posts.
+    expect(inXRows.connections[0]!.id).not.toBe(inYRows.connections[0]!.id)
+    expect(inXRows.assets[0]!.connectionId).toBe(inXRows.connections[0]!.id)
+    expect(inYRows.assets[0]!.connectionId).toBe(inYRows.connections[0]!.id)
+    expect(inXRows.posts.every((post) => post.connectionId === inXRows.connections[0]!.id)).toBe(true)
   })
 })
