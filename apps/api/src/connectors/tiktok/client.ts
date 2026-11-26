@@ -13,6 +13,8 @@ const MAX_ATTEMPTS = 3
 /** 20 videos per page, so up to 2,000 videos per account. */
 const MAX_PAGES = 100
 const PAGE_SIZE = 20
+/** The most video ids TikTok takes in one query. */
+const QUERY_SIZE = 20
 
 /** Error codes that mean the account's authorisation is gone, not that TikTok is unwell. */
 const AUTH_CODES = new Set(['access_token_invalid', 'scope_not_authorized', 'invalid_grant'])
@@ -286,6 +288,23 @@ export function createTikTokClient(options: TikTokClientOptions) {
         // A cursor that does not move would loop forever.
         if (data.cursor === cursor) break
         cursor = data.cursor
+      }
+      return videos
+    },
+
+    /**
+     * The account's videos with these ids: a second answer for videos, asked for by id rather
+     * than as a page of the list. Only the ones TikTok finds come back, in no promised order.
+     */
+    async queryVideos(accessToken: string, ids: readonly string[]): Promise<TikTokVideo[]> {
+      const videos: TikTokVideo[] = []
+      for (let i = 0; i < ids.length; i += QUERY_SIZE) {
+        const data = videoPage.parse(
+          await display(accessToken, '/v2/video/query/', VIDEO_FIELDS, {
+            filters: { video_ids: ids.slice(i, i + QUERY_SIZE) },
+          }),
+        )
+        videos.push(...(data.videos ?? []))
       }
       return videos
     },

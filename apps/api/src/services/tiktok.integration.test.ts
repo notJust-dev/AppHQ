@@ -24,9 +24,17 @@ const env = {
   TIKTOK_API_URL: 'https://tiktok.test',
 } as NodeJS.ProcessEnv
 
+interface FakeVideo {
+  id: string
+  create_time: number
+  view_count?: number | null
+  like_count?: number
+}
+
 /**
  * Stands in for TikTok: rotating refresh tokens (an old one stops working), two-hour access
- * tokens, and videos whose totals the test moves forward between "days".
+ * tokens, and videos whose totals the test moves forward between "days". An endpoint can be told
+ * to answer for a video with other counts than its real ones.
  */
 function fakeTikTok(openId: string) {
   const state = {
@@ -40,7 +48,12 @@ function fakeTikTok(openId: string) {
     videos: [
       { id: `${openId}-v1`, create_time: Date.parse('2026-10-01T12:00:00Z') / 1000, view_count: 50_000 },
       { id: `${openId}-v2`, create_time: Date.parse('2026-11-01T12:00:00Z') / 1000, view_count: 8_000 },
-    ],
+    ] as FakeVideo[],
+    /** What the list and the query say about a video in place of its real counts, by video id. */
+    listSays: new Map<string, Partial<FakeVideo>>(),
+    querySays: new Map<string, Partial<FakeVideo>>(),
+    /** The ids each call to the query asked for. */
+    queried: [] as string[][],
   }
 
   const issue = () => {
@@ -101,9 +114,26 @@ function fakeTikTok(openId: string) {
     if (pathname === '/v2/video/list/') {
       return json({
         data: {
-          videos: state.videos.map((v) => ({ ...v, title: '', video_description: `Video ${v.id}` })),
+          videos: state.videos.map((v) => ({
+            ...v,
+            ...state.listSays.get(v.id),
+            title: '',
+            video_description: `Video ${v.id}`,
+          })),
           cursor: 0,
           has_more: false,
+        },
+        error: ok,
+      })
+    }
+    if (pathname === '/v2/video/query/') {
+      const { filters } = JSON.parse(String(init?.body)) as { filters: { video_ids: string[] } }
+      state.queried.push(filters.video_ids)
+      return json({
+        data: {
+          videos: state.videos
+            .filter((v) => filters.video_ids.includes(v.id))
+            .map((v) => ({ ...v, ...state.querySays.get(v.id), video_description: `Video ${v.id}` })),
         },
         error: ok,
       })
@@ -264,6 +294,140 @@ describe.skipIf(!url)('TikTok, against a real database', () => {
     const views = await metric('views')
     expect(nonZero(views)).toEqual([...history, { date: '2026-11-11', value: 3_000 }])
     expect(views.at(-1)?.date).toBe('2026-11-11')
+  })
+})
+
+describe.skipIf(!url)('TikTok answering without view counts, against a real database', () => {
+  const { db, sql } = createDb(url ?? 'postgres://unused')
+  let scope: Scope
+  const secrets = createSecrets('d'.repeat(64))
+  const warnings: string[] = []
+  const log = { info() {}, warn: (message: string) => void warnings.push(message), error() {} }
+  const appId = randomUUID()
+  const openId = `open-${randomUUID().slice(0, 8)}`
+  const tiktok = fakeTikTok(openId)
+  const older = `${openId}-v1`
+  const spring = `${openId}-v3`
+  const at = (iso: string) => () => new Date(iso)
+  const nonZero = (rows: { date: string; value: number }[]) => rows.filter((row) => row.value !== 0)
+
+  const sync = async (iso: string) => {
+    const [app] = await db.select().from(apps).where(eq(apps.id, appId))
+    const connector = createTikTokConnector({ fetch: tiktok.impl, env, now: at(iso) })
+    await connector.sync({ ...scope, app: app!, range: { from: '2026-11-04', to: iso.slice(0, 10) }, log, secrets })
+  }
+  const dailyViews = () =>
+    db
+      .select({ date: metricDaily.date, value: metricDaily.value })
+      .from(metricDaily)
+      .where(and(eq(metricDaily.appId, appId), eq(metricDaily.source, 'tiktok'), eq(metricDaily.metric, 'views')))
+      .orderBy(metricDaily.date)
+  const saved = async (externalId: string) => {
+    const [post] = await db.select().from(posts).where(and(eq(posts.appId, appId), eq(posts.externalId, externalId)))
+    if (!post) return null
+    const snapshots = await db
+      .select({ date: postSnapshots.date, views: postSnapshots.views })
+      .from(postSnapshots)
+      .where(eq(postSnapshots.postId, post.id))
+      .orderBy(postSnapshots.date)
+    return { views: post.views, snapshots }
+  }
+
+  beforeAll(async () => {
+    await runMigrations({ db, sql })
+    scope = await testOrganization(db, 'tiktok-readings')
+    await db.insert(apps).values({ organizationId: scope.organizationId, id: appId, name: 'Readings Test App' })
+    await connectTikTok(
+      { ...scope, secrets, env, fetch: tiktok.impl },
+      { code: 'good-code', redirectUri: 'https://dash.example/connect/tiktok/callback', appId },
+    )
+    // Connected on the morning of Nov 10, with a token that expires soon after.
+    await db
+      .update(connections)
+      .set({ createdAt: new Date('2026-11-10T08:00:00Z'), expiresAt: new Date('2026-11-10T10:00:00Z') })
+      .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.externalAccountId, openId)))
+    tiktok.state.videos[0]!.like_count = 900
+    // A video from the spring that nobody has liked.
+    tiktok.state.videos.push({ id: spring, create_time: Date.parse('2026-04-02T12:00:00Z') / 1000, view_count: 80_000 })
+  })
+
+  afterAll(async () => {
+    await db.delete(assets).where(and(eq(assets.organizationId, scope.organizationId), eq(assets.externalId, openId)))
+    await db.delete(apps).where(and(eq(apps.organizationId, scope.organizationId), eq(apps.id, appId)))
+    await db
+      .delete(connections)
+      .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.externalAccountId, openId)))
+    await sql.end({ timeout: 5 })
+  })
+
+  it('asks again for the videos the list gives no views for, and saves the second answer', async () => {
+    // The list says zero for two watched videos. Asked for by id, one has its real total. The
+    // other is still zero: with no likes and nothing stored, it looks like a video nobody has
+    // watched, so the zero is saved.
+    tiktok.state.listSays.set(older, { view_count: 0 })
+    tiktok.state.listSays.set(spring, { view_count: 0 })
+    tiktok.state.querySays.set(spring, { view_count: 0 })
+
+    await sync('2026-11-10T09:00:00Z')
+
+    expect(tiktok.state.queried).toEqual([[older, spring]])
+    expect((await saved(older))?.views).toBe(50_000)
+    expect((await saved(spring))?.snapshots).toEqual([{ date: '2026-11-10', views: 0 }])
+    expect(nonZero(await dailyViews())).toEqual([
+      { date: '2026-10-01', value: 50_000 },
+      { date: '2026-11-01', value: 8_000 },
+    ])
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('2 of 3 videos came without views (0 with no count, 2 with zero)')
+    expect(warnings[0]).toContain('1 had views, 0 were not saved')
+  })
+
+  it('puts a total that follows a zero on the post day, and keeps what is stored for a video without a count', async () => {
+    tiktok.state.listSays.clear()
+    tiktok.state.querySays.clear()
+    tiktok.state.videos[1]!.view_count = 8_100
+    // Its real total is 50,400 by now, but neither answer has a count for it.
+    tiktok.state.listSays.set(older, { view_count: null })
+    tiktok.state.querySays.set(older, { view_count: null })
+
+    await sync('2026-11-11T21:00:00Z')
+
+    // The stored total stays, with no reading for the day.
+    expect(await saved(older)).toEqual({ views: 50_000, snapshots: [{ date: '2026-11-10', views: 50_000 }] })
+    // The spring video's 80,000 is its history, not what it gained in a day.
+    expect(nonZero(await dailyViews())).toEqual([
+      { date: '2026-04-02', value: 80_000 },
+      { date: '2026-10-01', value: 50_000 },
+      { date: '2026-11-01', value: 8_000 },
+      { date: '2026-11-11', value: 100 },
+    ])
+    expect(warnings.at(-1)).toContain('1 of 3 videos came without views (1 with no count, 0 with zero)')
+    expect(warnings.at(-1)).toContain('0 had views, 1 were not saved')
+  })
+
+  it('shares out what the video gained over the days it was not read', async () => {
+    tiktok.state.listSays.clear()
+    tiktok.state.querySays.clear()
+    tiktok.state.videos[0]!.view_count = 50_700
+    tiktok.state.videos[1]!.view_count = 8_150
+    tiktok.state.videos[2]!.view_count = 80_500
+    const queries = tiktok.state.queried.length
+
+    await sync('2026-11-12T21:00:00Z')
+
+    // Every video came with views, so nothing was asked for again.
+    expect(tiktok.state.queried).toHaveLength(queries)
+    const views = await dailyViews()
+    // 700 over two days for the older video; 100 and then 50 for the newer one; 500 for spring.
+    expect(nonZero(views)).toEqual([
+      { date: '2026-04-02', value: 80_000 },
+      { date: '2026-10-01', value: 50_000 },
+      { date: '2026-11-01', value: 8_000 },
+      { date: '2026-11-11', value: 450 },
+      { date: '2026-11-12', value: 900 },
+    ])
+    // Every view once: the three videos' latest totals.
+    expect(views.reduce((sum, row) => sum + row.value, 0)).toBe(50_700 + 8_150 + 80_500)
   })
 })
 

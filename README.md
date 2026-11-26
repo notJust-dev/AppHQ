@@ -492,6 +492,10 @@ TikTok has no daily view history. Every sync saves each video's lifetime totals,
 are the difference between days, so they begin the day after you connect. Before that, each
 video's views sit on the day it was posted, and the charts mark where daily views begin.
 
+TikTok sometimes answers for a video without its view count, or with zero. AppHQ asks for that
+video again and, when there is still no count to believe, keeps what it has stored and says so
+in the API's log. A total that dips and comes back is counted once.
+
 ### Facebook Pages and Instagram
 
 1. Create an app at [developers.facebook.com](https://developers.facebook.com), owned by your

@@ -141,6 +141,31 @@ describe('TikTok client', () => {
     expect(calls[0]?.url.searchParams.get('fields')).toContain('view_count')
   })
 
+  it('asks for videos by id, twenty at a time', async () => {
+    const ids = Array.from({ length: 23 }, (_, index) => `v${index + 1}`)
+    const { impl, calls } = fakeFetch([
+      { body: { data: { videos: [{ id: 'v1', create_time: 1_763_000_000, view_count: 10 }] }, error: ok } },
+      { body: { data: { videos: [{ id: 'v22', create_time: 1_763_000_000, view_count: 4 }] }, error: ok } },
+    ])
+    const client = createTikTokClient({ config, fetch: impl })
+
+    const videos = await client.queryVideos('act.1', ids)
+
+    // Only the videos TikTok found come back.
+    expect(videos.map((v) => [v.id, v.view_count])).toEqual([
+      ['v1', 10],
+      ['v22', 4],
+    ])
+    expect(calls.map((c) => [c.method, c.url.pathname])).toEqual([
+      ['POST', '/v2/video/query/'],
+      ['POST', '/v2/video/query/'],
+    ])
+    expect(JSON.parse(calls[0]?.body ?? '')).toEqual({ filters: { video_ids: ids.slice(0, 20) } })
+    expect(JSON.parse(calls[1]?.body ?? '')).toEqual({ filters: { video_ids: ['v21', 'v22', 'v23'] } })
+    expect(calls[0]?.url.searchParams.get('fields')).toContain('view_count')
+    expect(calls[0]?.headers.get('authorization')).toBe('Bearer act.1')
+  })
+
   it('reports a Display API error by its code', async () => {
     const { impl } = fakeFetch([
       {
