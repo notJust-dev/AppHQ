@@ -72,6 +72,9 @@ export function authOptions(config: AuthConfig, database: BetterAuthOptions['dat
         google: {
           ...config.google,
           prompt: 'select_account' as const,
+          // Ask for name and email only, never with what the person granted the YouTube
+          // connector before, even when both use the same Google Cloud project.
+          includeGrantedScopes: false,
           // Only the redirect sign-in is used.
           disableIdTokenSignIn: true,
           // An address the provider has not verified gets no session.

@@ -67,6 +67,15 @@ describe('/api/auth', () => {
     expect(built.memory.verification).toHaveLength(0)
   })
 
+  it('asks Google for the sign-in scopes only, without earlier grants', async () => {
+    const res = await post('/sign-in/social', {}, { provider: 'google', callbackURL: '/request-access' })
+    const authorize = new URL((res.json() as { url: string }).url)
+    expect(authorize.origin).toBe('https://accounts.google.com')
+    expect(authorize.searchParams.get('scope')?.split(' ').sort()).toEqual(['email', 'openid', 'profile'])
+    expect(authorize.searchParams.get('include_granted_scopes')).toBeNull()
+    expect(authorize.searchParams.get('redirect_uri')).toBe(`${ORIGIN}/api/auth/callback/google`)
+  })
+
   it('ignores the Host header when it writes addresses', async () => {
     const res = await post('/sign-in/social', { host: 'evil.example', 'x-forwarded-host': 'evil.example' }, { provider: 'github' })
     expect(new URL((res.json() as { url: string }).url).searchParams.get('redirect_uri')).toBe(`${ORIGIN}/api/auth/callback/github`)
