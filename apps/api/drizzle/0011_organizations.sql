@@ -40,6 +40,7 @@ ALTER TABLE "session" ADD COLUMN "active_organization_id" uuid;--> statement-bre
 INSERT INTO "organization" ("name", "slug") VALUES ('Default organization', 'default');--> statement-breakpoint
 ALTER TABLE "assets" DROP CONSTRAINT "assets_app_id_apps_id_fk";--> statement-breakpoint
 ALTER TABLE "metric_daily" DROP CONSTRAINT "metric_daily_app_id_apps_id_fk";--> statement-breakpoint
+ALTER TABLE "post_snapshots" DROP CONSTRAINT "post_snapshots_post_id_posts_id_fk";--> statement-breakpoint
 ALTER TABLE "posts" DROP CONSTRAINT "posts_app_id_apps_id_fk";--> statement-breakpoint
 ALTER TABLE "reviews" DROP CONSTRAINT "reviews_app_id_apps_id_fk";--> statement-breakpoint
 ALTER TABLE "sync_runs" DROP CONSTRAINT "sync_runs_app_id_apps_id_fk";--> statement-breakpoint
@@ -76,27 +77,34 @@ ALTER TABLE "reviews" ALTER COLUMN "organization_id" SET NOT NULL;--> statement-
 ALTER TABLE "sync_runs" ADD COLUMN "organization_id" uuid;--> statement-breakpoint
 UPDATE "sync_runs" SET "organization_id" = (SELECT "id" FROM "organization" WHERE "slug" = 'default');--> statement-breakpoint
 ALTER TABLE "sync_runs" ALTER COLUMN "organization_id" SET NOT NULL;--> statement-breakpoint
+-- A snapshot is in its post's organization.
+ALTER TABLE "post_snapshots" ADD COLUMN "organization_id" uuid;--> statement-breakpoint
+UPDATE "post_snapshots" SET "organization_id" = "posts"."organization_id" FROM "posts" WHERE "posts"."id" = "post_snapshots"."post_id";--> statement-breakpoint
+ALTER TABLE "post_snapshots" ALTER COLUMN "organization_id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "apps" ADD CONSTRAINT "apps_organization_id_id_pk" PRIMARY KEY("organization_id","id");--> statement-breakpoint
 ALTER TABLE "metric_daily" ADD CONSTRAINT "metric_daily_organization_id_app_id_date_source_metric_dimension_pk" PRIMARY KEY("organization_id","app_id","date","source","metric","dimension");--> statement-breakpoint
-ALTER TABLE "apps" ADD CONSTRAINT "apps_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "assets" ADD CONSTRAINT "assets_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connections" ADD CONSTRAINT "connections_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "metric_daily" ADD CONSTRAINT "metric_daily_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "posts" ADD CONSTRAINT "posts_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "reviews" ADD CONSTRAINT "reviews_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "sync_runs" ADD CONSTRAINT "sync_runs_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "assets" ADD CONSTRAINT "assets_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "metric_daily" ADD CONSTRAINT "metric_daily_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "posts" ADD CONSTRAINT "posts_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "reviews" ADD CONSTRAINT "reviews_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "sync_runs" ADD CONSTRAINT "sync_runs_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "assets_org_kind_external_idx" ON "assets" USING btree ("organization_id","kind","external_id");--> statement-breakpoint
 CREATE INDEX "assets_org_app_idx" ON "assets" USING btree ("organization_id","app_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "connections_org_provider_account_idx" ON "connections" USING btree ("organization_id","provider","external_account_id");--> statement-breakpoint
 CREATE INDEX "metric_daily_org_date_idx" ON "metric_daily" USING btree ("organization_id","date");--> statement-breakpoint
 CREATE UNIQUE INDEX "posts_org_platform_external_idx" ON "posts" USING btree ("organization_id","platform","external_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "posts_org_id_idx" ON "posts" USING btree ("organization_id","id");--> statement-breakpoint
 CREATE INDEX "posts_org_app_published_idx" ON "posts" USING btree ("organization_id","app_id","published_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "reviews_org_store_external_idx" ON "reviews" USING btree ("organization_id","store","external_id");--> statement-breakpoint
 CREATE INDEX "reviews_org_app_created_idx" ON "reviews" USING btree ("organization_id","app_id","created_at");--> statement-breakpoint
 CREATE INDEX "reviews_org_created_idx" ON "reviews" USING btree ("organization_id","created_at");--> statement-breakpoint
-CREATE INDEX "sync_runs_org_source_started_idx" ON "sync_runs" USING btree ("organization_id","source","started_at");
+CREATE INDEX "sync_runs_org_source_started_idx" ON "sync_runs" USING btree ("organization_id","source","started_at");--> statement-breakpoint
+ALTER TABLE "apps" ADD CONSTRAINT "apps_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "assets" ADD CONSTRAINT "assets_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "connections" ADD CONSTRAINT "connections_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "metric_daily" ADD CONSTRAINT "metric_daily_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "post_snapshots" ADD CONSTRAINT "post_snapshots_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "posts" ADD CONSTRAINT "posts_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sync_runs" ADD CONSTRAINT "sync_runs_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "assets" ADD CONSTRAINT "assets_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "metric_daily" ADD CONSTRAINT "metric_daily_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "post_snapshots" ADD CONSTRAINT "post_snapshots_organization_id_post_id_posts_organization_id_id_fk" FOREIGN KEY ("organization_id","post_id") REFERENCES "public"."posts"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "posts" ADD CONSTRAINT "posts_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sync_runs" ADD CONSTRAINT "sync_runs_organization_id_app_id_apps_organization_id_id_fk" FOREIGN KEY ("organization_id","app_id") REFERENCES "public"."apps"("organization_id","id") ON DELETE cascade ON UPDATE no action;

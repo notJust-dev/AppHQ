@@ -56,7 +56,7 @@ export async function savePosts({ db, organizationId }: Scope, readings: PostRea
 
       await tx
         .insert(postSnapshots)
-        .values(saved.map((post) => ({ ...post, date: today })))
+        .values(saved.map((post) => ({ ...post, organizationId, date: today })))
         .onConflictDoUpdate({
           target: [postSnapshots.postId, postSnapshots.date],
           set: {

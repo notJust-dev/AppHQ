@@ -230,6 +230,8 @@ export const posts = pgTable(
   },
   (t) => [
     uniqueIndex('posts_org_platform_external_idx').on(t.organizationId, t.platform, t.externalId),
+    // What a snapshot's composite foreign key points at; `id` alone is already unique.
+    uniqueIndex('posts_org_id_idx').on(t.organizationId, t.id),
     index('posts_org_app_published_idx').on(t.organizationId, t.appId, t.publishedAt),
     appOf(t).onDelete('cascade'),
   ],
@@ -237,14 +239,14 @@ export const posts = pgTable(
 
 /**
  * A post's lifetime totals as last read on each UTC day. Platforms such as TikTok only report
- * totals, so daily views are the difference between consecutive days.
+ * totals, so daily views are the difference between consecutive days. A snapshot is in its post's
+ * organization, which the composite foreign key enforces.
  */
 export const postSnapshots = pgTable(
   'post_snapshots',
   {
-    postId: uuid('post_id')
-      .notNull()
-      .references(() => posts.id, { onDelete: 'cascade' }),
+    organizationId: organizationId(),
+    postId: uuid('post_id').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     views: bigint('views', { mode: 'number' }).notNull(),
     likes: bigint('likes', { mode: 'number' }).notNull(),
@@ -252,7 +254,10 @@ export const postSnapshots = pgTable(
     shares: bigint('shares', { mode: 'number' }).notNull(),
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.postId, t.date] })],
+  (t) => [
+    primaryKey({ columns: [t.postId, t.date] }),
+    foreignKey({ columns: [t.organizationId, t.postId], foreignColumns: [posts.organizationId, posts.id] }).onDelete('cascade'),
+  ],
 )
 
 /**

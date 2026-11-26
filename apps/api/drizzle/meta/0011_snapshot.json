@@ -1,5 +1,5 @@
 {
-  "id": "318a878a-5640-4948-8bd4-0951645e2879",
+  "id": "9b0fbee6-fd4e-40cf-a8ec-da20a8bc2630",
   "prevId": "80de8d1a-ff96-4c51-a6aa-93127cf5f959",
   "version": "7",
   "dialect": "postgresql",
@@ -958,6 +958,12 @@
       "name": "post_snapshots",
       "schema": "",
       "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "post_id": {
           "name": "post_id",
           "type": "uuid",
@@ -1004,14 +1010,29 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "post_snapshots_post_id_posts_id_fk": {
-          "name": "post_snapshots_post_id_posts_id_fk",
+        "post_snapshots_organization_id_organization_id_fk": {
+          "name": "post_snapshots_organization_id_organization_id_fk",
+          "tableFrom": "post_snapshots",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "post_snapshots_organization_id_post_id_posts_organization_id_id_fk": {
+          "name": "post_snapshots_organization_id_post_id_posts_organization_id_id_fk",
           "tableFrom": "post_snapshots",
           "tableTo": "posts",
           "columnsFrom": [
+            "organization_id",
             "post_id"
           ],
           "columnsTo": [
+            "organization_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1158,6 +1179,27 @@
             },
             {
               "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "posts_org_id_idx": {
+          "name": "posts_org_id_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

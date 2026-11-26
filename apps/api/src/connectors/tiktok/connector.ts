@@ -109,7 +109,10 @@ async function writeDailyViews(scope: Scope, appId: string) {
       views: postSnapshots.views,
     })
     .from(posts)
-    .innerJoin(postSnapshots, eq(postSnapshots.postId, posts.id))
+    .innerJoin(
+      postSnapshots,
+      and(eq(postSnapshots.organizationId, posts.organizationId), eq(postSnapshots.postId, posts.id)),
+    )
     .where(and(eq(posts.organizationId, organizationId), eq(posts.appId, appId), eq(posts.platform, TIKTOK)))
 
   const byAccount = new Map<string, Map<string, PostHistory>>()

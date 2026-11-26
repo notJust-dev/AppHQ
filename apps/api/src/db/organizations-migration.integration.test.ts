@@ -16,7 +16,7 @@ import { runMigrations } from './migrate.js'
  */
 const url = testDatabaseUrl()
 
-const TABLES = ['apps', 'connections', 'assets', 'metric_daily', 'posts', 'reviews', 'sync_runs'] as const
+const TABLES = ['apps', 'connections', 'assets', 'metric_daily', 'posts', 'post_snapshots', 'reviews', 'sync_runs'] as const
 
 describe.skipIf(!url)('migration 0011: one organization holds everything that was there', () => {
   const server = new URL(url ?? 'postgres://unused/x_test')
@@ -72,7 +72,7 @@ describe.skipIf(!url)('migration 0011: one organization holds everything that wa
     await sql`insert into waitlist (email) values ('someone@example.com')`
     await sql`insert into "user" (name, email, email_verified) values ('Test Person', 'person@example.com', true)`
 
-    for (const table of [...TABLES, 'post_snapshots', 'waitlist', 'user']) {
+    for (const table of [...TABLES, 'waitlist', 'user']) {
       const [row] = await sql.unsafe<{ n: number }[]>(`select count(*)::int as n from "${table}"`)
       counts[table] = row!.n
     }
@@ -106,7 +106,7 @@ describe.skipIf(!url)('migration 0011: one organization holds everything that wa
   })
 
   it('leaves the tables that belong to no organization as they were', async () => {
-    for (const table of ['post_snapshots', 'waitlist', 'user']) {
+    for (const table of ['waitlist', 'user']) {
       const [row] = await sql.unsafe<{ n: number }[]>(`select count(*)::int as n from "${table}"`)
       expect(row?.n).toBe(counts[table])
     }
@@ -141,6 +141,12 @@ describe.skipIf(!url)('migration 0011: one organization holds everything that wa
     // A row can't point at another organization's app.
     await expect(
       sql`insert into metric_daily (organization_id, app_id, date, source, metric, value) values (${other!.id}, 'zen', '2026-10-01', 'x', 'y', 1)`,
+    ).rejects.toThrow(/foreign key/)
+
+    // Nor can a snapshot belong to another organization's post.
+    const [theirsNot] = await sql<{ id: string }[]>`select id from posts where organization_id <> ${other!.id}`
+    await expect(
+      sql`insert into post_snapshots (organization_id, post_id, date, views, likes, comments, shares) values (${other!.id}, ${theirsNot!.id}, '2026-10-02', 1, 0, 0, 0)`,
     ).rejects.toThrow(/foreign key/)
 
     // An app with linked assets can't be deleted (removeApp unlinks them first).
