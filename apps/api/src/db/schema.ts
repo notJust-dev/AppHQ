@@ -22,7 +22,8 @@ import {
  *
  * Nobody can create, join or switch organizations through Better Auth: none of the plugin's
  * endpoints is reachable. The API makes them itself (src/organizations), and the dashboard
- * password works in one of them (src/organizations/dashboard.ts). Membership grants nothing yet.
+ * password works in one of them (src/organizations/dashboard.ts). An approved account works in
+ * the ones it is a member of (src/trpc/init.ts).
  */
 export const organization = pgTable('organization', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -383,8 +384,8 @@ export const waitlist = pgTable('waitlist', {
  * Accounts, kept by Better Auth (see src/auth/auth.ts). The table and column names are Better
  * Auth's defaults, so its plugins can be added later with theirs. Ids are UUIDs made by Postgres.
  *
- * People sign in with Google or GitHub and can ask for access. An account does not open the
- * dashboard: that still takes the dashboard password.
+ * People sign in with Google or GitHub and can ask for access. An approved account opens the
+ * dashboard in the organizations it is a member of (src/trpc/init.ts).
  */
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -399,7 +400,7 @@ export const user = pgTable('user', {
     .notNull(),
   /**
    * Null, 'requested' or 'approved'. Written only by the API (people cannot set it through
-   * Better Auth) and, for approval, by hand in the database. It grants nothing yet.
+   * Better Auth) and, for approval, by hand in the database. Only 'approved' opens the dashboard.
    */
   accessStatus: text('access_status'),
   /** When they asked for access. */
@@ -421,7 +422,10 @@ export const session = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
-    /** The organization plugin's field. Nothing sets it yet, and it grants nothing. */
+    /**
+     * The organization plugin's field: the organization the session works in. Only the API sets
+     * it, and only to one the account belongs to (src/trpc/init.ts); it grants nothing alone.
+     */
     activeOrganizationId: uuid('active_organization_id'),
   },
   (t) => [index('session_userId_idx').on(t.userId)],

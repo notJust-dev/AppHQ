@@ -13,6 +13,7 @@ const build = (pingDb: () => Promise<unknown> = async () => 1) =>
     secrets: createSecrets(undefined),
     pingDb,
     internalApiToken: TOKEN,
+    allowDashboardPassword: true,
     logLevel: 'silent',
   })
 

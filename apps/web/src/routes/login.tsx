@@ -13,27 +13,29 @@ import { getAccountFn } from '@/fns/account'
 import { getSessionFn, signInFn } from '@/fns/auth'
 
 /**
- * Every way in. Google and GitHub, when this server has them, lead to an account, which can only
- * ask for access for now. The dashboard password opens the dashboard; it is a separate block so
- * it can be removed on its own later.
+ * Every way in. Google and GitHub, when this server has them, lead to an account: an approved
+ * member goes on to the dashboard, anyone else to the Request access page. The dashboard
+ * password, when this server has one, is a separate block; without DASHBOARD_PASSWORD it isn't
+ * shown at all.
  */
 export const Route = createFileRoute('/login')({
   // Better Auth sends a failed sign-in back here with an error code.
   validateSearch: z.object({ error: z.string().max(60).optional().catch(undefined) }),
   beforeLoad: async () => {
-    const { dashboardAccess } = await getSessionFn()
+    const { dashboardAccess, passwordEnabled } = await getSessionFn()
     if (dashboardAccess) throw redirect({ to: '/' })
+    return { passwordEnabled }
   },
-  loader: async () => {
+  loader: async ({ context }) => {
     const { providers, account } = await getAccountFn()
     if (account) throw redirect({ to: '/request-access' })
-    return { providers }
+    return { providers, passwordEnabled: context.passwordEnabled }
   },
   component: LoginPage,
 })
 
 function LoginPage() {
-  const { providers } = Route.useLoaderData()
+  const { providers, passwordEnabled } = Route.useLoaderData()
   const { error } = Route.useSearch()
 
   return (
@@ -49,16 +51,20 @@ function LoginPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          {providers.length > 0 && (
-            <>
-              <SocialSignIn providers={providers} error={error} />
-              <p className="flex items-center gap-3 text-xs text-faint before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-                or
-              </p>
-            </>
+          {providers.length > 0 && <SocialSignIn providers={providers} error={error} />}
+          {providers.length > 0 && passwordEnabled && (
+            <p className="flex items-center gap-3 text-xs text-faint before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+              or
+            </p>
           )}
           {/* With accounts off, this is the whole page, exactly as before. */}
-          <PasswordSignIn alone={providers.length === 0} />
+          {passwordEnabled && <PasswordSignIn alone={providers.length === 0} />}
+          {providers.length === 0 && !passwordEnabled && (
+            <p className="text-muted-foreground">
+              No way to sign in is set up on this server. Set DASHBOARD_PASSWORD on the dashboard, or
+              turn on accounts on the API, as the README describes.
+            </p>
+          )}
         </CardContent>
       </Card>
     </main>
@@ -68,9 +74,10 @@ function LoginPage() {
 const MESSAGES = {
   wrong: 'That password is not correct.',
   locked: 'Too many attempts. Try again in 10 minutes.',
+  off: 'Signing in with a password is off here.',
 } as const
 
-/** The dashboard password: the only way into the dashboard for now. */
+/** The dashboard password, when this server has one. */
 function PasswordSignIn({ alone }: { alone: boolean }) {
   const router = useRouter()
   const signIn = useServerFn(signInFn)

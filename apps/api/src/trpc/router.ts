@@ -34,7 +34,7 @@ import { SEARCH_CONSOLE, SEARCH_CONSOLE_HISTORY_DAYS, SearchConsoleError } from 
 import { getReviewSummary, listReviews, reviewConditions, reviewFilters } from '../queries/reviews.js'
 import { markReviews } from '../reviews/save.js'
 import { and, count, eq, isNull } from 'drizzle-orm'
-import { reviews as reviewsTable } from '../db/schema.js'
+import { organization as organizationTable, reviews as reviewsTable } from '../db/schema.js'
 import { clearDemo, seedDemo } from '../seed/demo.js'
 import { ConnectInputError, connectAppStore } from '../services/connect-app-store.js'
 import { connectRevenueCat } from '../services/connect-revenuecat.js'
@@ -189,8 +189,9 @@ function finishesWhereItStarted(ctx: { organizationId: string }, organizationId:
 
 /**
  * Approved accounts get an organization of their own the first time the API sees them approved
- * (approval is a database update, so there is no code at that moment). Accounts that only asked
- * get none. It grants nothing yet: the dashboard still takes the dashboard password.
+ * (approval is a database update, so there is no code at that moment), unless they already
+ * belong to one. Accounts that only asked get none. Dashboard procedures never make one: an
+ * approved account without a membership is refused there until this has run.
  */
 async function organizationIfApproved(ctx: ApiContext, account: AccountUser) {
   if (account.accessStatus !== 'approved' || !ctx.accounts) return
@@ -212,8 +213,9 @@ function profile(account: AccountUser) {
  * The dashboard's view of the API. Read procedures are thin wrappers around query definitions,
  * so tRPC, MCP and the Telegram agent can never drift apart.
  *
- * Every procedure is for the dashboard (the dashboard password) unless its `meta` says otherwise;
- * see `trpc/init.ts`, and the list in `access.test.ts`, which has to name each one.
+ * Every procedure is for the dashboard (the dashboard password, or an approved member account, in
+ * one organization) unless its `meta` says otherwise; see `trpc/init.ts`, and the list in
+ * `access.test.ts`, which has to name each one.
  */
 export const appRouter = router({
   apps: router({
@@ -597,8 +599,8 @@ export const appRouter = router({
     }),
   }),
   /**
-   * The visitor's own account, for the Request access page. An account sees only itself, and
-   * asking for access grants nothing yet: the dashboard still takes the dashboard password.
+   * The visitor's own account, for the Request access page. An account sees only itself. Asking
+   * grants nothing; approval is a database update (see the README).
    */
   account: router({
     /** How people can sign in here; empty when accounts are off. Public: the landing page asks. */
@@ -618,6 +620,20 @@ export const appRouter = router({
       if (account.accessStatus === null) ctx.log.info('accounts: new access request')
       await organizationIfApproved(ctx, updated)
       return profile(updated)
+    }),
+  }),
+  /** The organization this request works in, as `inOrganization` chose it. */
+  organization: router({
+    current: procedure.query(async ({ ctx }) => {
+      // The organization table has no row-level security and the tenant role can't read it, so
+      // this reads it as the login, by the id the middleware chose, and nothing else.
+      const [row] = await ctx.background.db
+        .select({ name: organizationTable.name })
+        .from(organizationTable)
+        .where(eq(organizationTable.id, ctx.organizationId))
+        .limit(1)
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'This organization no longer exists.' })
+      return { name: row.name, via: ctx.via }
     }),
   }),
   // Velocity has no shell, so the generated demo data is loaded and removed through the API.

@@ -68,7 +68,7 @@ describe.skipIf(!url)('Accounts, against a real database', () => {
     expect(method?.providerId).toBe('google')
 
     expect((await call('account.get', cookie)).statusCode).toBe(200)
-    // The account opens nothing on the dashboard.
+    // Without approved access, the account opens nothing on the dashboard.
     expect((await call('apps.list', cookie)).statusCode).toBe(403)
   })
 
@@ -90,13 +90,13 @@ describe.skipIf(!url)('Accounts, against a real database', () => {
     const [approved] = await db.select().from(user).where(eq(user.email, email))
     expect(approved?.accessStatus).toBe('approved')
 
-    // Approved still opens nothing on the dashboard; only the dashboard password does.
-    expect((await call('overview.get', cookie)).statusCode).toBe(403)
-    expect((await call('apps.list', cookie, { [ACCESS_HEADER]: 'yes' })).statusCode).toBe(403)
+    // Approved, and seen approved, it has its own organization and opens the dashboard there.
+    expect((await call('apps.list', cookie)).statusCode).toBe(200)
+    expect((await call('apps.list', '', { [ACCESS_HEADER]: 'yes' })).statusCode).toBe(403)
     expect((await call('apps.list', '', { [ACCESS_HEADER]: DASHBOARD_ACCESS })).statusCode).toBe(200)
   })
 
-  it('makes one organization for an approved account, owned by it, and it opens nothing', async () => {
+  it('makes one organization for an approved account, owned by it, and opens the dashboard in it', async () => {
     const [person] = await db.select().from(user).where(eq(user.email, email))
     const { cookie } = await built.signIn({ email, emailVerified: true })
     await Promise.all([call('account.get', cookie), call('account.get', cookie)])
@@ -113,8 +113,12 @@ describe.skipIf(!url)('Accounts, against a real database', () => {
     `
     expect(inSql?.slug).toBe(own?.slug)
 
-    // Owning an organization opens nothing either.
-    expect((await call('apps.list', cookie)).statusCode).toBe(403)
+    // The dashboard opens in it, and it is empty.
+    const listed = await call('apps.list', cookie)
+    expect(listed.statusCode).toBe(200)
+    expect(listed.json().result.data).toEqual([])
+    const current = await call('organization.current', cookie)
+    expect(current.json().result.data).toEqual({ name: 'Organization', via: 'account' })
   })
 
   it('add-owner makes the account an owner of the dashboard organization and removes its empty one', async () => {
@@ -132,8 +136,10 @@ describe.skipIf(!url)('Accounts, against a real database', () => {
     const { cookie } = await built.signIn({ email, emailVerified: true })
     await call('account.get', cookie)
     expect(await db.select().from(member).where(eq(member.userId, person!.id))).toHaveLength(1)
-    // And still no dashboard.
-    expect((await call('apps.list', cookie)).statusCode).toBe(403)
+    // The dashboard now opens in the dashboard organization, where the password works too.
+    const current = await call('organization.current', cookie)
+    expect(current.statusCode).toBe(200)
+    expect(current.json().result.data).toEqual({ name: dashboard!.name, via: 'account' })
     await db.delete(member).where(and(eq(member.userId, person!.id), eq(member.organizationId, dashboard!.id)))
   })
 

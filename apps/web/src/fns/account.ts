@@ -14,8 +14,8 @@ export interface AccountView {
 
 /**
  * Public: how people can sign in here (none when accounts are off), and the visitor's own account
- * when they are signed in to one. It never says anything about anyone else, and it never opens
- * the dashboard, which takes the dashboard password. If the API can't be reached, the visitor is
+ * when they are signed in to one. It never says anything about anyone else, and grants nothing:
+ * dashboard access is decided in server/access.ts. If the API can't be reached, the visitor is
  * treated as signed out, so the public pages still load.
  */
 export const getAccountFn = createServerFn({ method: 'GET' }).handler(async () => {

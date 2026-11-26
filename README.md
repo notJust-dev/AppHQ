@@ -15,9 +15,9 @@ from both stores into one inbox.
 It reads from **App Store Connect, Google Play, RevenueCat, TikTok, Instagram, Facebook Pages,
 YouTube and Google Search Console** using your own API keys and developer apps. There is no
 third-party service in between. Credentials are encrypted before they are stored, and the
-dashboard is protected by a single password. Optionally, people can sign in with Google or GitHub
-to ask for access; an account never opens the dashboard (see
-[Accounts and access requests](#accounts-and-access-requests-optional)).
+dashboard is protected by a single password. Optionally, people can sign in with Google or GitHub;
+once you approve them, their account opens the dashboard in their own organization, and you can
+turn the password off (see [Accounts and access requests](#accounts-and-access-requests-optional)).
 
 ## How it works
 
@@ -63,7 +63,7 @@ Fill in the blanks. Generate each secret with `openssl rand -hex 32`:
 | both | `INTERNAL_API_TOKEN` | The same random value in both files |
 | `apps/api/.env` | `ENCRYPTION_KEY` | Random, 64 hex characters. Encrypts stored credentials. |
 | `apps/web/.env` | `SESSION_SECRET` | Random, 32+ characters |
-| `apps/web/.env` | `DASHBOARD_PASSWORD` | The password you will sign in with, 12+ characters |
+| `apps/web/.env` | `DASHBOARD_PASSWORD` | The password you will sign in with, 12+ characters. Optional once accounts are on; see [Turning the dashboard password off](#turning-the-dashboard-password-off) |
 
 **3. Start the API** (it creates the tables on first boot)
 
@@ -86,7 +86,7 @@ cd apps/web && npm install && npm run dev
 Open http://127.0.0.1:3000/login and sign in with `DASHBOARD_PASSWORD`.
 
 Signed-out visitors to `/` see a public landing page with a waitlist form (sign-ups are stored
-in the `waitlist` table). The dashboard itself is always at `/login` and behind the password.
+in the `waitlist` table). The dashboard itself is always at `/login` and behind sign-in.
 
 ## Deploy to Cloudways Velocity
 
@@ -150,6 +150,7 @@ never shows a sensitive value again, so keep a copy somewhere safe.
 | `INTERNAL_API_TOKEN` | The first generated value |
 | `ENCRYPTION_KEY` | The second generated value. If you lose or change it, every connected source has to be connected again. |
 | `SYNC_EVERY_HOURS` | Optional. Hours between automatic syncs, default `3` |
+| `ALLOW_DASHBOARD_PASSWORD` | Optional, `true` (the default) or `false`. Whether the API accepts the web app's dashboard password. Set it to `false` only when you sign in with an account instead; see [Turning the dashboard password off](#turning-the-dashboard-password-off) |
 
 Add the variables for TikTok, Meta and YouTube later, when you set those sources up (see
 [Connecting your data](#connecting-your-data)).
@@ -181,7 +182,7 @@ Add a second application on the same server, from the same repository:
 | `API_URL` | The `api` application's public address, e.g. `https://nodejs-…cloudwaysnodeapps.com` (no trailing slash) |
 | `INTERNAL_API_TOKEN` | The **same** value as on `api` |
 | `SESSION_SECRET` | A new `openssl rand -hex 32` value |
-| `DASHBOARD_PASSWORD` | The password you will sign in with, 12+ characters |
+| `DASHBOARD_PASSWORD` | The password you will sign in with, 12+ characters. Changing it signs out everyone who signed in with the old one. Optional once accounts are on: unset, the password is off |
 | `PUBLIC_URL` | Optional. The dashboard's own address, if the sign-in redirect addresses on the Accounts page come out wrong (for example behind a custom domain) |
 | `POSTHOG_KEY` | Optional. A PostHog project API key turns on cookieless usage analytics, sent through the app's own `/ingest` path. Leave it unset and nothing is sent anywhere |
 | `POSTHOG_HOST` | Optional. Defaults to PostHog's US cloud, `https://us.i.posthog.com`. For the EU cloud, `https://eu.i.posthog.com` |
@@ -210,8 +211,8 @@ connect real data. The same request to `demo.clear` (or **Remove demo data**) de
 nothing else.
 
 The `x-apphq-access` header is how the dashboard server tells the API that someone signed in with
-the dashboard password. The API refuses every dashboard request without it, and only accepts it
-alongside the internal token.
+the dashboard password. The API only accepts it alongside the internal token, and only while
+`ALLOW_DASHBOARD_PASSWORD` is on. Without it, a dashboard request needs an approved account.
 
 ### 9. (Optional) Custom domains
 
@@ -279,14 +280,21 @@ Good to know:
 
 ## Accounts and access requests (optional)
 
-If you want other people to ask for access, turn on accounts: the sign-in page (`/login`) then
-offers **Continue with Google** and **Continue with GitHub** above the dashboard password, and
-people who sign in that way land on a page where they can press **Request access**. This is off
-unless you set it up, and nothing else changes when it is off.
+If you want to sign in with your own account, or let other people ask for access, turn on
+accounts: the sign-in page (`/login`) then offers **Continue with Google** and **Continue with
+GitHub** above the dashboard password, and people who sign in that way land on a page where they
+can press **Request access**. This is off unless you set it up, and nothing else changes when it
+is off.
 
-An account never opens the dashboard. The dashboard password is still the only way in, and
-approving someone's request doesn't change that yet: it records who may join once accounts can
-use their own data.
+An account opens the dashboard when all of these hold:
+
+- the provider confirmed its address,
+- you approved it (step 3 below),
+- it is a member of an organization. Approval makes it one of its own; `add-owner` adds it to
+  yours (see [Organizations](#organizations)).
+
+It then works in that organization only, and never sees another's data. The dashboard password
+keeps working alongside, in the `default` organization, until you turn it off.
 
 **1. Create the sign-in apps.** Use the dashboard's address (the `web` app, not the API), shown
 here as `<web address>`; locally it is `http://127.0.0.1:3000`.
@@ -322,9 +330,9 @@ order by access_requested_at desc nulls last;
 ```
 
 To approve someone: `update "user" set access_status = 'approved' where email = '<their address>';`
-They see that they are approved on the Request access page. The first time they open it after
-that, the API makes them an organization of their own (see below), with a generated name and
-slug. Someone who only asked gets none.
+The next time they sign in or open the Request access page, the API makes them an organization
+of their own (see below), with a generated name and slug, unless they already belong to one, and
+they go on to the dashboard, empty and theirs. Someone who only asked gets none.
 
 Only addresses the provider has confirmed can sign in. Someone who signed in with Google can't
 later sign in to the same account with GitHub, even with the same address.
@@ -333,12 +341,13 @@ later sign in to the same account with GitHub, even with the same address.
 
 Every app, account connection, number, post, review and sync run belongs to an **organization**.
 The first one, `default`, was made when you upgraded and holds everything you had; the dashboard
-password works in it. Approved accounts get their own, empty organization. Being a member or an
-owner of an organization opens nothing yet: the dashboard password is still the only way in.
+password works in it. Approved accounts get their own, empty organization. An approved account
+works in an organization it is a member of: the one it last worked in, or else the one it joined
+first. The sidebar shows which, under the AppHQ name. Every member can do everything there.
 Nobody can create, join or switch organizations through the sign-in pages.
 
-**Make your own account the owner of `default`**, so it is ready once accounts can open the
-dashboard. Sign in once at `/login` with Google or GitHub first. Then, where you have a shell:
+**Make your own account the owner of `default`**, so it opens your data. Sign in once at `/login`
+with Google or GitHub first. Then, where you have a shell:
 
 ```sh
 cd apps/api && npm run cli -- add-owner --email <your address>
@@ -353,6 +362,8 @@ select o.id, u.id, 'owner' from organization o, "user" u
 where o.slug = 'default' and u.email = '<your address>'
 on conflict (organization_id, user_id) do update set role = 'owner';
 
+update "user" set access_status = 'approved' where email = '<your address>';
+
 -- Only if you were approved before running the statement above: removes the empty organization
 -- made for your account. It fails, and changes nothing, if that organization holds any data.
 delete from organization o using "user" u
@@ -360,6 +371,33 @@ where u.email = '<your address>'
   and o.slug = 'org-' || left(encode(sha256(u.id::text::bytea), 'hex'), 12)
   and not exists (select 1 from member m where m.organization_id = o.id and m.user_id <> u.id);
 ```
+
+With a shell, approve yourself with the `update "user"` statement above too.
+
+### Turning the dashboard password off
+
+Once your account opens your data, you can switch the password off. There are two switches, so a
+password left behind by mistake still opens nothing:
+
+| Where | Variable | Off |
+|---|---|---|
+| `web` | `DASHBOARD_PASSWORD` | Unset (or empty): `/login` shows no password field, and signing in with a password is refused before anything is compared |
+| `api` | `ALLOW_DASHBOARD_PASSWORD` | `false`: the API refuses the web app's password sessions, even if `DASHBOARD_PASSWORD` is still set there. Default `true`, so existing installs keep working |
+
+Do it in this order, so you never lock yourself out:
+
+1. **Make your account an owner of `default` and approve it**, as above.
+2. **Sign out, sign in with Google or GitHub, and check.** You should land on the dashboard,
+   see `Default organization` under the AppHQ name in the sidebar, and see your apps.
+3. **Set `ALLOW_DASHBOARD_PASSWORD=false` on `api`** and redeploy it. Check again that your
+   account still opens the dashboard. Password sessions stop working now.
+4. **Unset `DASHBOARD_PASSWORD` on `web`** and redeploy it. The password field disappears.
+
+To turn it back on, set both again. Changing `DASHBOARD_PASSWORD` (or `SESSION_SECRET`) signs
+out every password session at once.
+
+With neither the password nor accounts set up, nobody can open the dashboard; the API says so in
+its log when it starts.
 
 ### Row-level security
 
@@ -514,9 +552,10 @@ and the funnel and flow charts never claim that a specific view caused a specifi
 | `apps/api` | `npm run db:generate` | Create a migration after changing `src/db/schema.ts` |
 | `apps/api` | `npm run cli -- sync` | Run every connector over the last 7 days, for every organization |
 | `apps/api` | `npm run cli -- seed` | Replace the demo apps with freshly generated data, in `default` |
-| `apps/api` | `npm run cli -- add-owner --email <address>` | Make an account an owner of `default`; grants no dashboard access |
+| `apps/api` | `npm run cli -- add-owner --email <address>` | Make an account an owner of `default`; once approved, it opens the dashboard there |
 
 Every CLI command but `migrate` also takes `--organization <slug>`.
+| `apps/web` | `npm test` | Unit tests of the dashboard server's password rules |
 | `apps/web` | `npm run typecheck` | Type check |
 | `apps/web` | `npm run build` then `npm run start` | Production build and server |
 

@@ -259,6 +259,7 @@ describe.skipIf(!url)('two organizations with the same data', () => {
       secrets: createSecrets(undefined),
       pingDb: async () => 1,
       internalApiToken: TOKEN,
+      allowDashboardPassword: true,
       dashboardOrganization: async () => a.organizationId,
       logLevel: 'silent',
     })
