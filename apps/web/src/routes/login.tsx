@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 import { z } from 'zod'
@@ -67,6 +67,20 @@ function LoginPage() {
           )}
         </CardContent>
       </Card>
+      {/* Signing in with Google or GitHub is the consent the privacy policy relies on. */}
+      {providers.length > 0 && (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          By continuing, you agree to the{' '}
+          <Link to="/terms" className="font-medium underline underline-offset-4 hover:text-foreground">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy" className="font-medium underline underline-offset-4 hover:text-foreground">
+            Privacy policy
+          </Link>
+          .
+        </p>
+      )}
     </main>
   )
 }

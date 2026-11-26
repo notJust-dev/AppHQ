@@ -49,6 +49,13 @@ function TermsPage() {
         </li>
       </ul>
 
+      <h2>YouTube</h2>
+      <p>
+        AppHQ uses YouTube API Services to show the numbers of the YouTube channels you connect. By
+        using AppHQ to connect or view a YouTube channel, you agree to be bound by the{' '}
+        <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>.
+      </p>
+
       <h2>Acceptable use</h2>
       <p>
         Don't try to break into, overload or disrupt the site, access other people's data, or use AppHQ

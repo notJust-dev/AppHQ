@@ -14,7 +14,7 @@ const COMPANY = {
   registry: 'Registro Mercantil de Barcelona, Tomo/I.R.U.S. 1000468212670, Folio 1, Hoja B 652038, Inscripción 1',
 }
 /** When the legal pages last changed. Update it with any change to their text. */
-export const LEGAL_UPDATED = '25 November 2026'
+export const LEGAL_UPDATED = '26 November 2026'
 
 /** Head tags for a legal page: unlike the dashboard, these are meant to be found. */
 export function legalMeta(title: string, description: string) {

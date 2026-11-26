@@ -112,11 +112,21 @@ function PrivacyPage() {
           your numbers, it will be off until you turn it on, and we'll update this page first.
         </li>
         <li>
-          You can revoke AppHQ's access at any time from the provider's own settings, for example{' '}
-          <a href="https://myaccount.google.com/permissions">your Google account</a>. To have the stored
-          credentials and data deleted too, email us.
+          You can revoke AppHQ's access at any time from the provider's own settings. For YouTube, and
+          for signing in with Google, that is the{' '}
+          <a href="https://security.google.com/settings/security/permissions">
+            Google security settings page
+          </a>
+          . To have the stored credentials and data deleted too, email us.
         </li>
       </ul>
+      <p>
+        AppHQ uses YouTube API Services to read the YouTube channels you connect: the channel's name,
+        handle and subscriber count, its videos with their titles, publish dates, length and view, like
+        and comment counts, and the channel's daily views, likes, comments and shares. Google's own
+        handling of your data is described in the{' '}
+        <a href="https://www.google.com/policies/privacy">Google Privacy Policy</a>.
+      </p>
       <p>
         AppHQ's use and transfer of information received from Google APIs follows the{' '}
         <a href="https://developers.google.com/terms/api-services-user-data-policy">
