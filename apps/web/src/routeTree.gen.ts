@@ -10,10 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RequestAccessRouteImport } from './routes/request-access'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WaitlistRouteImport } from './routes/waitlist'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
@@ -47,6 +50,11 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -65,6 +73,16 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const RequestAccessRoute = RequestAccessRouteImport.update({
   id: '/request-access',
   path: '/request-access',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -211,10 +229,13 @@ const AppAppsAppIdSettingsRoute = AppAppsAppIdSettingsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/request-access': typeof RequestAccessRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/sign-up': typeof SignUpRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/accounts': typeof AppAccountsRouteWithChildren
@@ -244,10 +265,13 @@ export interface FileRoutesByFullPath {
   '/apps/$appId/': typeof AppAppsAppIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/forgot-password': typeof ForgotPasswordRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/request-access': typeof RequestAccessRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/sign-up': typeof SignUpRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/monetisation': typeof AppMonetisationRoute
@@ -278,10 +302,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/request-access': typeof RequestAccessRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/sign-up': typeof SignUpRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/_app/accounts': typeof AppAccountsRouteWithChildren
@@ -315,10 +342,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/health'
     | '/login'
     | '/privacy'
     | '/request-access'
+    | '/reset-password'
+    | '/sign-up'
     | '/terms'
     | '/waitlist'
     | '/accounts'
@@ -348,10 +378,13 @@ export interface FileRouteTypes {
     | '/apps/$appId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/forgot-password'
     | '/health'
     | '/login'
     | '/privacy'
     | '/request-access'
+    | '/reset-password'
+    | '/sign-up'
     | '/terms'
     | '/waitlist'
     | '/monetisation'
@@ -381,10 +414,13 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/forgot-password'
     | '/health'
     | '/login'
     | '/privacy'
     | '/request-access'
+    | '/reset-password'
+    | '/sign-up'
     | '/terms'
     | '/waitlist'
     | '/_app/accounts'
@@ -417,10 +453,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   RequestAccessRoute: typeof RequestAccessRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  SignUpRoute: typeof SignUpRoute
   TermsRoute: typeof TermsRoute
   WaitlistRoute: typeof WaitlistRoute
   IngestSplatRoute: typeof IngestSplatRoute
@@ -437,6 +476,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/health': {
@@ -465,6 +511,20 @@ declare module '@tanstack/react-router' {
       path: '/request-access'
       fullPath: '/request-access'
       preLoaderRoute: typeof RequestAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -738,10 +798,13 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   RequestAccessRoute: RequestAccessRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  SignUpRoute: SignUpRoute,
   TermsRoute: TermsRoute,
   WaitlistRoute: WaitlistRoute,
   IngestSplatRoute: IngestSplatRoute,

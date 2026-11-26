@@ -2,7 +2,7 @@ import { memoryAdapter } from 'better-auth/adapters/memory'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { loadEnv } from '../env.js'
 import { ORIGIN, TOKEN, buildTestApp, cookieFrom, nextAddress } from '../test/auth.js'
-import { authConfigFromEnv, authOptions, CLIENT_ADDRESS_HEADER, createAuth } from './auth.js'
+import { authConfigFromEnv, authOptions, authPaths, CLIENT_ADDRESS_HEADER, createAuth } from './auth.js'
 
 const bearer = { authorization: `Bearer ${TOKEN}` }
 const json = { 'content-type': 'application/json' }
@@ -76,9 +76,17 @@ describe('/api/auth', () => {
 
   it.each([
     '/sign-up/email',
-    '/sign-in/email',
     '/update-user',
     '/change-email',
+    '/change-password',
+    '/set-password',
+    '/verify-email',
+    '/send-verification-email',
+    '/reset-password/some-token',
+    '/sign-in/email-otp',
+    '/sign-in/magic-link',
+    '/email-sign-up',
+    '/email-sign-up/confirm/',
     '/link-social',
     '/list-sessions',
     '/get-session',
@@ -342,7 +350,7 @@ describe('with accounts off', () => {
 
   it('offers no sign-in and has no accounts', async () => {
     const config = await built.app.inject({ method: 'GET', url: '/trpc/account.config', headers: bearer })
-    expect(config.json()).toEqual({ result: { data: { providers: [] } } })
+    expect(config.json()).toEqual({ result: { data: { providers: [], email: false } } })
     const get = await built.app.inject({ method: 'GET', url: '/trpc/account.get', headers: { ...bearer, cookie: 'better-auth.session_token=x.y' } })
     expect(get.statusCode).toBe(401)
   })
@@ -359,8 +367,25 @@ describe('the accounts configuration', () => {
     expect(authConfigFromEnv(loadEnv({ ...base, PUBLIC_URL: ORIGIN }))).toBeNull()
   })
 
-  it('is off without a sign-in provider', () => {
+  it('is off without a way to sign in', () => {
     expect(authConfigFromEnv(loadEnv({ ...base, BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN }))).toBeNull()
+  })
+
+  it('is on with a mail server alone, for signing up with an email address', () => {
+    const config = authConfigFromEnv(
+      loadEnv({ ...base, BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, SMTP_HOST: 'smtp.example.com', MAIL_FROM: 'AppHQ <no-reply@apphq.example.com>' }),
+    )
+    expect(config?.mail).toMatchObject({ host: 'smtp.example.com', port: 465, tls: 'implicit', from: 'AppHQ <no-reply@apphq.example.com>' })
+    expect(config?.google).toBeUndefined()
+    expect([...authPaths(config!)]).toContain('/email-sign-up/confirm')
+  })
+
+  it('serves no email endpoint without a mail server', () => {
+    const config = authConfigFromEnv(
+      loadEnv({ ...base, BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, AUTH_GITHUB_CLIENT_ID: 'id', AUTH_GITHUB_CLIENT_SECRET: 'secret' }),
+    )
+    expect(config?.mail).toBeUndefined()
+    expect([...authPaths(config!)].sort()).toEqual(['/callback/github', '/callback/google', '/sign-in/social', '/sign-out'])
   })
 
   it('is on with a provider', () => {
@@ -379,6 +404,10 @@ describe('the accounts configuration', () => {
     [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: 'ftp://apphq.example.com' }, /PUBLIC_URL/],
     [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, AUTH_GOOGLE_CLIENT_ID: 'id' }, /AUTH_GOOGLE_CLIENT_SECRET/],
     [{ AUTH_GITHUB_CLIENT_ID: 'id', AUTH_GITHUB_CLIENT_SECRET: 'secret' }, /BETTER_AUTH_SECRET/],
+    [{ SMTP_HOST: 'smtp.example.com', MAIL_FROM: 'no-reply@apphq.example.com', PUBLIC_URL: ORIGIN }, /BETTER_AUTH_SECRET/],
+    [{ SMTP_HOST: 'smtp.example.com', MAIL_FROM: 'no-reply@apphq.example.com', BETTER_AUTH_SECRET: secret }, /PUBLIC_URL/],
+    [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, SMTP_HOST: 'smtp.example.com' }, /MAIL_FROM/],
+    [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, MAIL_FROM: 'no-reply@apphq.example.com' }, /SMTP_HOST/],
   ])('rejects a half-set configuration: %j', (vars, message) => {
     expect(() => loadEnv({ ...base, ...vars })).toThrow(message)
   })

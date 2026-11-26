@@ -25,7 +25,7 @@ export interface AppDeps {
   /** Which organization the dashboard password works in; read from the database by default. */
   dashboardOrganization?: () => Promise<string>
   /** Accounts, when they are set up; without them /api/auth does not exist. */
-  accounts?: { auth: Auth; origin: string; accounts: Accounts } | null
+  accounts?: { auth: Auth; origin: string; accounts: Accounts; paths: ReadonlySet<string> } | null
   logLevel?: 'info' | 'silent'
 }
 
@@ -50,7 +50,7 @@ export async function buildApp(deps: AppDeps) {
   await app.register(async (internal) => {
     internal.addHook('onRequest', requireBearerToken(deps.internalApiToken))
 
-    if (deps.accounts) await internal.register(authRoutes(deps.accounts.auth, deps.accounts.origin))
+    if (deps.accounts) await internal.register(authRoutes(deps.accounts.auth, deps.accounts.origin, deps.accounts.paths))
 
     const accounts = deps.accounts?.accounts ?? null
     const organizationOfDashboard = deps.dashboardOrganization ?? dashboardOrganization(deps.db)

@@ -28,6 +28,8 @@ export interface AccountSession {
  */
 export interface Accounts {
   providers: SocialProvider[]
+  /** Whether people can sign up and sign in with an email address and a password. */
+  email: boolean
   /** The session behind these cookies, or null. Reading never changes the session. */
   sessionFor(cookieHeader: string | undefined): Promise<AccountSession | null>
   /** The organizations the user belongs to, oldest membership first. */
@@ -66,6 +68,7 @@ function toUser(user: Record<string, unknown> & { id: string; email: string; nam
 export function createAccounts(auth: Auth, config: AuthConfig): Accounts {
   return {
     providers: providersOf(config),
+    email: config.mail !== undefined,
 
     async sessionFor(cookieHeader) {
       const cookie = authCookies(cookieHeader)

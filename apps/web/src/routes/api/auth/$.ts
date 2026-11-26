@@ -7,9 +7,20 @@ import { serverEnv } from '@/server/env'
  * are forwarded to the API, where Better Auth runs; only the API reaches the database.
  *
  * Only these paths are forwarded, matched exactly, so no crafted path can reach anything else on
- * the API with this server's internal token. The API keeps the same list.
+ * the API with this server's internal token. The API keeps the same list, and serves the email
+ * ones only when it has a mail server.
  */
-const PATHS = new Set(['sign-in/social', 'callback/google', 'callback/github', 'sign-out'])
+const PATHS = new Set([
+  'sign-in/social',
+  'callback/google',
+  'callback/github',
+  'sign-out',
+  'sign-in/email',
+  'email-sign-up/send-code',
+  'email-sign-up/confirm',
+  'request-password-reset',
+  'reset-password',
+])
 
 /** What the browser sent that Better Auth needs; never the dashboard's own session cookie. */
 const FORWARDED = ['content-type', 'origin', 'referer', 'user-agent', 'accept', 'accept-language', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest']

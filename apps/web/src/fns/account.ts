@@ -13,21 +13,20 @@ export interface AccountView {
 }
 
 /**
- * Public: how people can sign in here (none when accounts are off), and the visitor's own account
- * when they are signed in to one. It never says anything about anyone else, and grants nothing:
- * dashboard access is decided in server/access.ts. If the API can't be reached, the visitor is
- * treated as signed out, so the public pages still load.
+ * Public: how people can sign in here (no provider and no email when accounts are off), and the
+ * visitor's own account when they are signed in to one. It never says anything about anyone else,
+ * and grants nothing: dashboard access is decided in server/access.ts. If the API can't be
+ * reached, the visitor is treated as signed out, so the public pages still load.
  */
 export const getAccountFn = createServerFn({ method: 'GET' }).handler(async () => {
-  const providers: SignInProvider[] = await publicApi()
+  const { providers, email }: { providers: SignInProvider[]; email: boolean } = await publicApi()
     .account.config.query()
-    .then((config) => config.providers)
-    .catch(() => [])
-  if (providers.length === 0 || !hasAccountCookie()) return { providers, account: null }
+    .catch(() => ({ providers: [], email: false }))
+  if ((providers.length === 0 && !email) || !hasAccountCookie()) return { providers, email, account: null }
   const account: AccountView | null = await accountApi()
     .account.get.query()
     .catch(() => null)
-  return { providers, account }
+  return { providers, email, account }
 })
 
 /** For a signed-in account only: the API checks its session. Asking again changes nothing. */

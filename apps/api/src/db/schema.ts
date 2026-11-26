@@ -384,8 +384,9 @@ export const waitlist = pgTable('waitlist', {
  * Accounts, kept by Better Auth (see src/auth/auth.ts). The table and column names are Better
  * Auth's defaults, so its plugins can be added later with theirs. Ids are UUIDs made by Postgres.
  *
- * People sign in with Google or GitHub and can ask for access. An approved account opens the
- * dashboard in the organizations it is a member of (src/trpc/init.ts).
+ * People sign in with Google or GitHub, or sign up with an email address and a password, and can
+ * ask for access. An approved account opens the dashboard in the organizations it is a member of
+ * (src/trpc/init.ts).
  */
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -431,7 +432,10 @@ export const session = pgTable(
   (t) => [index('session_userId_idx').on(t.userId)],
 )
 
-/** How a user signs in: one row per Google or GitHub identity. Provider tokens are encrypted. */
+/**
+ * How a user signs in: one row per Google or GitHub identity, or one `credential` row holding
+ * the hashed password. Provider tokens are encrypted.
+ */
 export const account = pgTable(
   'account',
   {

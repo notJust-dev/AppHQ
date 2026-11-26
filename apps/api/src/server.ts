@@ -1,7 +1,7 @@
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { buildApp } from './app.js'
 import { createAccounts } from './auth/accounts.js'
-import { authConfigFromEnv, authOptions, createAuth } from './auth/auth.js'
+import { authConfigFromEnv, authOptions, authPaths, createAuth } from './auth/auth.js'
 import { connectors } from './connectors/registry.js'
 import { createDb } from './db/client.js'
 import { account, invitation, member, organization, session, user, verification } from './db/schema.js'
@@ -43,9 +43,13 @@ const app = await buildApp({
   pingDb: () => sql`select 1`,
   internalApiToken: env.INTERNAL_API_TOKEN,
   allowDashboardPassword: env.ALLOW_DASHBOARD_PASSWORD,
-  accounts: auth && authConfig ? { auth, origin: authConfig.url, accounts: createAccounts(auth, authConfig) } : null,
+  accounts:
+    auth && authConfig
+      ? { auth, origin: authConfig.url, accounts: createAccounts(auth, authConfig), paths: authPaths(authConfig) }
+      : null,
 })
 app.log.info(authConfig ? `accounts are on, signing in at ${authConfig.url}` : 'accounts are off')
+if (authConfig) app.log.info(authConfig.mail ? `signing up with an email address is on, mail goes through ${authConfig.mail.host}` : 'signing up with an email address is off (no SMTP_HOST)')
 app.log.info(env.ALLOW_DASHBOARD_PASSWORD ? 'the dashboard password is accepted' : 'the dashboard password is not accepted (ALLOW_DASHBOARD_PASSWORD=false)')
 if (!env.ALLOW_DASHBOARD_PASSWORD && !authConfig) app.log.warn('neither the dashboard password nor accounts are on: nobody can open the dashboard')
 app.log.info(role ? `organization data: row-level security, as the role ${role}` : 'organization data: row-level security, as the tables\' owner (no role can be made here)')
