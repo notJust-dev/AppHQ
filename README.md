@@ -218,7 +218,7 @@ alongside the internal token.
 Add a domain to each application in Velocity, for example `app.example.com` for `web` and
 `api.example.com` for `api`. Then update `API_URL` on `web`, set `PUBLIC_URL` on `web` to the
 new dashboard address, and update the redirect URIs registered with TikTok, Meta and Google. If
-accounts are on, also set `BETTER_AUTH_URL` on `api` to the new dashboard address and update the
+accounts are on, also set `PUBLIC_URL` on `api` to the same new dashboard address and update the
 sign-in redirect URIs with Google and GitHub.
 
 ### Good to know
@@ -290,20 +290,24 @@ use their own data.
 **1. Create the sign-in apps.** Use the dashboard's address (the `web` app, not the API), shown
 here as `<web address>`; locally it is `http://127.0.0.1:3000`.
 
-- **Google:** in Google Cloud, create an **OAuth client** of type **Web application** and add the
-  authorized redirect URI `<web address>/api/auth/callback/google`. It can be the same project as
-  YouTube's, but use its own client.
+- **Google:** use the same Google Cloud project as YouTube, with a second **OAuth client** of type
+  **Web application** for sign-in. Add the authorized redirect URI
+  `<web address>/api/auth/callback/google`. The two clients share one consent screen, but each
+  asks only for its own permissions: signing in asks for name and email, and YouTube's
+  permissions are asked for only when someone presses **Connect YouTube**, with whichever Google
+  account owns the channel. While the consent screen is in **Testing**, only its test users can
+  sign in, so publish it before you open sign-up (Google reviews the YouTube permissions first).
 - **GitHub:** in **Settings → Developer settings → OAuth Apps**, create an app with the
   authorization callback URL `<web address>/api/auth/callback/github`.
 
 You can set up just one of them.
 
-**2. Set the variables on the `api` app** and redeploy. Nothing changes on `web`.
+**2. Set the variables on the `api` app** and redeploy. Nothing new is needed on `web`.
 
 | Variable | Value |
 |---|---|
 | `BETTER_AUTH_SECRET` | A new `openssl rand -hex 32` value. Changing it signs everyone out |
-| `BETTER_AUTH_URL` | `<web address>`, with no path. Same as `PUBLIC_URL` on `web`, if you set that |
+| `PUBLIC_URL` | `<web address>`, with no path: the dashboard's address, not the API's. The same value as `PUBLIC_URL` on `web` |
 | `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET` | From the Google OAuth client |
 | `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` | From the GitHub OAuth App |
 
@@ -445,7 +449,8 @@ sign in again before the date shown on the page.
 1. In Google Cloud, enable the **YouTube Data API v3** and the **YouTube Analytics API**.
 2. Create an **OAuth client** of type **Web application**. Its consent screen needs the
    `youtube.readonly` and `yt-analytics.readonly` scopes. Add yourself as a test user while
-   the app is in testing.
+   the app is in testing. If you also turn on [accounts](#accounts-and-access-requests-optional),
+   their Google sign-in goes in this same project, as a second client.
 3. Add the redirect URI shown on AppHQ's YouTube page.
 4. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` on the API and redeploy.
 

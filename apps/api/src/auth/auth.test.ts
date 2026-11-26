@@ -131,6 +131,15 @@ describe('/api/auth', () => {
     expect(built.memory.verification).toHaveLength(0)
   })
 
+  it('asks Google for the sign-in scopes only, without earlier grants', async () => {
+    const res = await post('/sign-in/social', {}, { provider: 'google', callbackURL: '/request-access' })
+    const authorize = new URL((res.json() as { url: string }).url)
+    expect(authorize.origin).toBe('https://accounts.google.com')
+    expect(authorize.searchParams.get('scope')?.split(' ').sort()).toEqual(['email', 'openid', 'profile'])
+    expect(authorize.searchParams.get('include_granted_scopes')).toBeNull()
+    expect(authorize.searchParams.get('redirect_uri')).toBe(`${ORIGIN}/api/auth/callback/google`)
+  })
+
   it('ignores the Host header when it writes addresses', async () => {
     const res = await post('/sign-in/social', { host: 'evil.example', 'x-forwarded-host': 'evil.example' }, { provider: 'github' })
     expect(new URL((res.json() as { url: string }).url).searchParams.get('redirect_uri')).toBe(`${ORIGIN}/api/auth/callback/github`)
@@ -345,27 +354,30 @@ describe('the accounts configuration', () => {
 
   it('is off unless it is set, as for every existing install', () => {
     expect(authConfigFromEnv(loadEnv(base))).toBeNull()
-    expect(authConfigFromEnv(loadEnv({ ...base, BETTER_AUTH_SECRET: '', BETTER_AUTH_URL: '' }))).toBeNull()
+    expect(authConfigFromEnv(loadEnv({ ...base, BETTER_AUTH_SECRET: '', PUBLIC_URL: '' }))).toBeNull()
+    // The dashboard's address alone turns nothing on and is not an error.
+    expect(authConfigFromEnv(loadEnv({ ...base, PUBLIC_URL: ORIGIN }))).toBeNull()
   })
 
   it('is off without a sign-in provider', () => {
-    expect(authConfigFromEnv(loadEnv({ ...base, BETTER_AUTH_SECRET: secret, BETTER_AUTH_URL: ORIGIN }))).toBeNull()
+    expect(authConfigFromEnv(loadEnv({ ...base, BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN }))).toBeNull()
   })
 
   it('is on with a provider', () => {
     const config = authConfigFromEnv(
-      loadEnv({ ...base, BETTER_AUTH_SECRET: secret, BETTER_AUTH_URL: ORIGIN, AUTH_GITHUB_CLIENT_ID: 'id', AUTH_GITHUB_CLIENT_SECRET: 'secret' }),
+      loadEnv({ ...base, BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, AUTH_GITHUB_CLIENT_ID: 'id', AUTH_GITHUB_CLIENT_SECRET: 'secret' }),
     )
     expect(config).toMatchObject({ url: ORIGIN, github: { clientId: 'id' } })
     expect(config?.google).toBeUndefined()
   })
 
   it.each([
-    [{ BETTER_AUTH_SECRET: secret }, /BETTER_AUTH_URL/],
-    [{ BETTER_AUTH_SECRET: 'short', BETTER_AUTH_URL: ORIGIN }, /BETTER_AUTH_SECRET/],
-    [{ BETTER_AUTH_SECRET: secret, BETTER_AUTH_URL: `${ORIGIN}/dashboard` }, /BETTER_AUTH_URL/],
-    [{ BETTER_AUTH_SECRET: secret, BETTER_AUTH_URL: 'ftp://apphq.example.com' }, /BETTER_AUTH_URL/],
-    [{ BETTER_AUTH_SECRET: secret, BETTER_AUTH_URL: ORIGIN, AUTH_GOOGLE_CLIENT_ID: 'id' }, /AUTH_GOOGLE_CLIENT_SECRET/],
+    [{ BETTER_AUTH_SECRET: secret }, /PUBLIC_URL/],
+    [{ AUTH_GITHUB_CLIENT_ID: 'id', AUTH_GITHUB_CLIENT_SECRET: 'secret', PUBLIC_URL: ORIGIN }, /BETTER_AUTH_SECRET/],
+    [{ BETTER_AUTH_SECRET: 'short', PUBLIC_URL: ORIGIN }, /BETTER_AUTH_SECRET/],
+    [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: `${ORIGIN}/dashboard` }, /PUBLIC_URL/],
+    [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: 'ftp://apphq.example.com' }, /PUBLIC_URL/],
+    [{ BETTER_AUTH_SECRET: secret, PUBLIC_URL: ORIGIN, AUTH_GOOGLE_CLIENT_ID: 'id' }, /AUTH_GOOGLE_CLIENT_SECRET/],
     [{ AUTH_GITHUB_CLIENT_ID: 'id', AUTH_GITHUB_CLIENT_SECRET: 'secret' }, /BETTER_AUTH_SECRET/],
   ])('rejects a half-set configuration: %j', (vars, message) => {
     expect(() => loadEnv({ ...base, ...vars })).toThrow(message)

@@ -39,12 +39,12 @@ export const AUTH_PATHS: ReadonlySet<string> = new Set([
 
 /** The accounts configuration from the environment, or null when accounts are off. */
 export function authConfigFromEnv(env: Env): AuthConfig | null {
-  if (!env.BETTER_AUTH_SECRET || !env.BETTER_AUTH_URL) return null
+  if (!env.BETTER_AUTH_SECRET || !env.PUBLIC_URL) return null
   const pair = (id?: string, secret?: string) => (id && secret ? { clientId: id, clientSecret: secret } : undefined)
   const google = pair(env.AUTH_GOOGLE_CLIENT_ID, env.AUTH_GOOGLE_CLIENT_SECRET)
   const github = pair(env.AUTH_GITHUB_CLIENT_ID, env.AUTH_GITHUB_CLIENT_SECRET)
   if (!google && !github) return null
-  return { secret: env.BETTER_AUTH_SECRET, url: new URL(env.BETTER_AUTH_URL).origin, google, github }
+  return { secret: env.BETTER_AUTH_SECRET, url: new URL(env.PUBLIC_URL).origin, google, github }
 }
 
 export function providersOf(config: AuthConfig): SocialProvider[] {
@@ -74,6 +74,9 @@ export function authOptions(config: AuthConfig, database: BetterAuthOptions['dat
         google: {
           ...config.google,
           prompt: 'select_account' as const,
+          // Ask for name and email only, never with what the person granted the YouTube
+          // connector before, even when both use the same Google Cloud project.
+          includeGrantedScopes: false,
           // Only the redirect sign-in is used.
           disableIdTokenSignIn: true,
           // An address the provider has not verified gets no session.

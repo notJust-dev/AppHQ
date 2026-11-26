@@ -6,7 +6,6 @@ const optional = <T extends z.ZodType>(type: T) =>
 
 /** Both halves of a pair, or neither: half a configuration is a mistake to report at boot. */
 const pairs = [
-  ['BETTER_AUTH_SECRET', 'BETTER_AUTH_URL'],
   ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET'],
   ['AUTH_GITHUB_CLIENT_ID', 'AUTH_GITHUB_CLIENT_SECRET'],
 ] as const
@@ -43,15 +42,16 @@ const schema = z
     META_APP_ID: z.string().optional(),
     META_APP_SECRET: z.string().optional(),
     META_LOGIN_CONFIG_ID: z.string().optional(),
-    // Accounts, optional (see "Accounts and access requests" in the README). Off unless the
-    // secret, the dashboard's address and at least one sign-in provider are set. An account
-    // never opens the dashboard, which still takes DASHBOARD_PASSWORD on the web app.
-    BETTER_AUTH_SECRET: optional(z.string().min(32, 'must be at least 32 characters')),
-    // The dashboard's public address, e.g. https://apphq.example.com: people sign in there, and
-    // it forwards /api/auth to this API. An origin only, with no path.
-    BETTER_AUTH_URL: optional(
+    // The dashboard's public address (the web app, not this API), e.g. https://apphq.example.com:
+    // the same value as PUBLIC_URL on the web app. Accounts need it: people sign in there, and it
+    // forwards /api/auth to this API. An origin only, with no path.
+    PUBLIC_URL: optional(
       z.url({ protocol: /^https?$/ }).refine((value) => new URL(value).pathname === '/', 'must be an origin, with no path'),
     ),
+    // Accounts, optional (see "Accounts and access requests" in the README). Off unless the
+    // secret, PUBLIC_URL and at least one sign-in provider are set. An account never opens the
+    // dashboard, which still takes DASHBOARD_PASSWORD on the web app.
+    BETTER_AUTH_SECRET: optional(z.string().min(32, 'must be at least 32 characters')),
     AUTH_GOOGLE_CLIENT_ID: optional(z.string()),
     AUTH_GOOGLE_CLIENT_SECRET: optional(z.string()),
     AUTH_GITHUB_CLIENT_ID: optional(z.string()),
@@ -67,9 +67,13 @@ const schema = z
         ctx.addIssue({ code: 'custom', path: [env[a] === undefined ? a : b], message: `set together with ${env[a] === undefined ? b : a}` })
       }
     }
+    // PUBLIC_URL alone is fine; the secret or a provider without the rest is half an accounts setup.
     const provider = env.AUTH_GOOGLE_CLIENT_ID || env.AUTH_GITHUB_CLIENT_ID
-    if (provider && !env.BETTER_AUTH_SECRET && !env.BETTER_AUTH_URL) {
-      ctx.addIssue({ code: 'custom', path: ['BETTER_AUTH_SECRET'], message: 'a sign-in provider is set, so set BETTER_AUTH_SECRET and BETTER_AUTH_URL too' })
+    if ((provider || env.BETTER_AUTH_SECRET) && !env.PUBLIC_URL) {
+      ctx.addIssue({ code: 'custom', path: ['PUBLIC_URL'], message: 'accounts need the dashboard\'s public address here too' })
+    }
+    if (provider && !env.BETTER_AUTH_SECRET) {
+      ctx.addIssue({ code: 'custom', path: ['BETTER_AUTH_SECRET'], message: 'a sign-in provider is set, so set BETTER_AUTH_SECRET too' })
     }
   })
 
