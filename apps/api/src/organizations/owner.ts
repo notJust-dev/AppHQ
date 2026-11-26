@@ -2,19 +2,22 @@ import { and, count, eq, ne, sql } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
 import { apps, assets, connections, member, metricDaily, organization, posts, reviews, syncRuns, user } from '../db/schema.js'
 import { autoOrganizationSlug } from './auto.js'
+import { scopeFor, type Scope } from './scope.js'
 
 /** Every table whose rows belong to an organization. */
 const DATA_TABLES = [apps, connections, assets, metricDaily, posts, reviews, syncRuns] as const
 
 export class OwnerError extends Error {}
 
-/** Whether an organization holds any data at all. */
-export async function holdsData(db: Db, organizationId: string): Promise<boolean> {
-  for (const table of DATA_TABLES) {
-    const [row] = await db.select({ n: count() }).from(table).where(eq(table.organizationId, organizationId))
-    if ((row?.n ?? 0) > 0) return true
-  }
-  return false
+/** Whether an organization holds any data at all, read inside it like everything else. */
+export async function holdsData(scope: Scope): Promise<boolean> {
+  return scope.run(async (db) => {
+    for (const table of DATA_TABLES) {
+      const [row] = await db.select({ n: count() }).from(table).where(eq(table.organizationId, scope.organizationId))
+      if ((row?.n ?? 0) > 0) return true
+    }
+    return false
+  })
 }
 
 /**
@@ -54,7 +57,8 @@ export async function addOwner(
         .select({ n: count() })
         .from(member)
         .where(and(eq(member.organizationId, own.id), ne(member.userId, account.id)))
-      if ((others?.n ?? 0) === 0 && !(await holdsData(tx as unknown as Db, own.id))) {
+      // Organizations and members have no row-level security; the data check runs inside `own`.
+      if ((others?.n ?? 0) === 0 && !(await holdsData(scopeFor(db, own.id)))) {
         // Its member row goes with it. An organization with data could not be deleted anyway.
         await tx.delete(organization).where(eq(organization.id, own.id))
         removedEmpty = true

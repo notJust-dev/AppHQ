@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { autoLink, linkedAssets, upsertAssets } from '../../assets/store.js'
 import { z } from 'zod'
-import type { Scope } from '../../organizations/scope.js'
+import type { Scope, Tx } from '../../organizations/scope.js'
 import { apps, assets, connections, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
 import { mapLimit } from '../../lib/pool.js'
@@ -38,12 +38,15 @@ export type PlayCredentials = z.infer<typeof credentialsSchema>
 
 
 /** The organization's Google Play developer account: a connection that belongs to no particular app. */
-export const findPlayConnection = ({ db, organizationId }: Scope) =>
-  db
-    .select()
-    .from(connections)
-    .where(and(eq(connections.organizationId, organizationId), eq(connections.provider, GOOGLE_PLAY)))
-    .limit(1)
+export const findPlayConnection = (scope: Scope) =>
+  scope
+    .run((db) =>
+      db
+        .select()
+        .from(connections)
+        .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.provider, GOOGLE_PLAY)))
+        .limit(1),
+    )
     .then((rows) => rows[0])
 
 export const readPlayCredentials = (secrets: Secrets, encrypted: string): PlayCredentials =>
@@ -102,7 +105,12 @@ export const packagesIn = (files: { installs: ReportFile[]; store: ReportFile[] 
  * RevenueCat project). The rest wait for a decision in the dashboard.
  */
 export async function savePackages(scope: Scope, connectionId: string, packageNames: string[], titles: Map<string, string>) {
-  const { db, organizationId } = scope
+  // No call to Google in here: one unit of work.
+  return scope.run((db) => savePackagesIn(db, scope, connectionId, packageNames, titles))
+}
+
+async function savePackagesIn(db: Tx, scope: Scope, connectionId: string, packageNames: string[], titles: Map<string, string>) {
+  const { organizationId } = scope
   const known = new Map(
     (await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'android_app')))).map((asset) => [asset.externalId, asset]),
   )
@@ -152,8 +160,8 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
       return (await findPlayConnection(scope)) !== undefined
     },
 
-    async sync({ db, organizationId, range, secrets, log }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { organizationId, range, secrets, log } = scope
       const connection = await findPlayConnection(scope)
       if (!connection?.accessTokenEnc) throw new Error('No Google Play service account is stored')
       const client = createPlayClient(readPlayCredentials(secrets, connection.accessTokenEnc), options)
@@ -162,7 +170,11 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
         const files = await client.files()
         const packageNames = packagesIn(files)
         const titled = new Set(
-          (await db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'android_app'))))
+          (
+            await scope.run((db) =>
+              db.select().from(assets).where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'android_app'))),
+            )
+          )
             .filter((asset) => (asset.details as { title?: string } | null)?.title)
             .map((asset) => asset.externalId),
         )
@@ -171,10 +183,12 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
 
         const active = new Set(
           (
-            await db
-              .select({ id: apps.id })
-              .from(apps)
-              .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+            await scope.run((db) =>
+              db
+                .select({ id: apps.id })
+                .from(apps)
+                .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true))),
+            )
           ).map((app) => app.id),
         )
         const tracked = (await linkedAssets(scope, 'android_app'))
@@ -232,10 +246,12 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
         } catch (err) {
           log.warn(`google_play: reviews not read: ${err instanceof Error ? err.message : String(err)}`)
         }
-        await db
-          .update(connections)
-          .set({ status: 'ok', lastSyncedAt: new Date(), updatedAt: new Date() })
-          .where(eq(connections.id, connection.id))
+        await scope.run((db) =>
+          db
+            .update(connections)
+            .set({ status: 'ok', lastSyncedAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(connections.organizationId, organizationId), eq(connections.id, connection.id))),
+        )
         if (tracked.length < packageNames.length) {
           log.info(`google_play: ${packageNames.length - tracked.length} packages have no app yet`)
         }
@@ -244,10 +260,12 @@ export function createGooglePlayConnector(options: PlayClientOptions = {}): Acco
         const lostAccess =
           (err instanceof GoogleAuthError && err.code === 'invalid_grant') ||
           (err instanceof StorageError && err.isAccessProblem)
-        await db
-          .update(connections)
-          .set({ status: lostAccess ? 'needs_reauth' : 'error', updatedAt: new Date() })
-          .where(eq(connections.id, connection.id))
+        await scope.run((db) =>
+          db
+            .update(connections)
+            .set({ status: lostAccess ? 'needs_reauth' : 'error', updatedAt: new Date() })
+            .where(and(eq(connections.organizationId, organizationId), eq(connections.id, connection.id))),
+        )
         throw err
       }
     },

@@ -25,49 +25,52 @@ export const listAccounts = defineQuery({
     'start analytics reports, say), and how many assets the source found, how many belong to an ' +
     'app, and how many wait for a decision.',
   input: z.void(),
-  async handler({ db, organizationId }) {
-    // Never the token columns: credentials do not leave the API.
-    const [rows, assetRows] = await Promise.all([
-      db
-        .select({
-          id: connections.id,
-          provider: connections.provider,
-          externalAccountId: connections.externalAccountId,
-          displayName: connections.displayName,
-          status: connections.status,
-          lastSyncedAt: connections.lastSyncedAt,
-          expiresAt: connections.expiresAt,
-          scopes: connections.scopes,
-          details: connections.details,
-        })
-        .from(connections)
-        .where(eq(connections.organizationId, organizationId))
-        .orderBy(asc(connections.provider), asc(connections.displayName)),
-      db.select({ connectionId: assets.connectionId, appId: assets.appId, ignored: assets.ignored }).from(assets)
-        .where(eq(assets.organizationId, organizationId)),
-    ])
+  async handler(scope) {
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      // Never the token columns: credentials do not leave the API.
+      const [rows, assetRows] = await Promise.all([
+        db
+          .select({
+            id: connections.id,
+            provider: connections.provider,
+            externalAccountId: connections.externalAccountId,
+            displayName: connections.displayName,
+            status: connections.status,
+            lastSyncedAt: connections.lastSyncedAt,
+            expiresAt: connections.expiresAt,
+            scopes: connections.scopes,
+            details: connections.details,
+          })
+          .from(connections)
+          .where(eq(connections.organizationId, organizationId))
+          .orderBy(asc(connections.provider), asc(connections.displayName)),
+        db.select({ connectionId: assets.connectionId, appId: assets.appId, ignored: assets.ignored }).from(assets)
+          .where(eq(assets.organizationId, organizationId)),
+      ])
 
-    return ACCOUNT_FAMILIES.map((family) => {
-      const accounts = rows.filter((row) => familyOf(row.provider) === family)
-      const ids = new Set(accounts.map((account) => account.id))
-      const found = assetRows.filter((asset) => asset.connectionId !== null && ids.has(asset.connectionId))
-      return {
-        family,
-        accounts: accounts.map(({ details, ...account }) => ({
-          ...account,
-          /** Something about the account the person should act on, in their words. */
-          note: noteFor(account.provider, details),
-          scopes: account.scopes ? account.scopes.split(',') : null,
-          lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null,
-          expiresAt: account.expiresAt?.toISOString() ?? null,
-        })),
-        assets: {
-          total: found.length,
-          linked: found.filter((asset) => asset.appId !== null).length,
-          waiting: found.filter((asset) => asset.appId === null && !asset.ignored).length,
-          ignored: found.filter((asset) => asset.ignored).length,
-        },
-      }
+      return ACCOUNT_FAMILIES.map((family) => {
+        const accounts = rows.filter((row) => familyOf(row.provider) === family)
+        const ids = new Set(accounts.map((account) => account.id))
+        const found = assetRows.filter((asset) => asset.connectionId !== null && ids.has(asset.connectionId))
+        return {
+          family,
+          accounts: accounts.map(({ details, ...account }) => ({
+            ...account,
+            /** Something about the account the person should act on, in their words. */
+            note: noteFor(account.provider, details),
+            scopes: account.scopes ? account.scopes.split(',') : null,
+            lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null,
+            expiresAt: account.expiresAt?.toISOString() ?? null,
+          })),
+          assets: {
+            total: found.length,
+            linked: found.filter((asset) => asset.appId !== null).length,
+            waiting: found.filter((asset) => asset.appId === null && !asset.ignored).length,
+            ignored: found.filter((asset) => asset.ignored).length,
+          },
+        }
+      })
     })
   },
 })

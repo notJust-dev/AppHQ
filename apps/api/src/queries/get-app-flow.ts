@@ -25,11 +25,13 @@ export const getAppFlow = defineQuery({
     'stages are counted over the same days, not followed person by person: a download is not ' +
     'traced back to a view.',
   input,
-  async handler({ db, organizationId }, input) {
-    const [app] = await db.select({ id: apps.id }).from(apps).where(and(eq(apps.organizationId, organizationId), eq(apps.id, input.appId))).limit(1)
-    if (!app) return null
+  async handler(scope, input) {
+    const { organizationId } = scope
+    const rows = await scope.run(async (db) => {
+      const [app] = await db.select({ id: apps.id }).from(apps).where(and(eq(apps.organizationId, organizationId), eq(apps.id, input.appId))).limit(1)
+      if (!app) return null
 
-    const rows = await db
+      return db
       .select({
         source: metricDaily.source,
         metric: metricDaily.metric,
@@ -47,6 +49,8 @@ export const getAppFlow = defineQuery({
         ),
       )
       .groupBy(metricDaily.source, metricDaily.metric)
+    })
+    if (!rows) return null
 
     /** A metric's total and its parts by source, over the sources that report it. */
     const split = (metric: string, sources: readonly string[]) => {

@@ -10,6 +10,8 @@ import { consoleLogger as log } from './lib/logger.js'
 import { organization } from './db/schema.js'
 import { dashboardOrganization } from './organizations/dashboard.js'
 import { addOwner } from './organizations/owner.js'
+import { scopeFor } from './organizations/scope.js'
+import { assertRowLevelSecurity } from './organizations/tenancy.js'
 import { seedDemo } from './seed/demo.js'
 import { recordRun, runSync } from './sync/runner.js'
 
@@ -72,9 +74,11 @@ async function chosenOrganization(): Promise<string> {
 }
 
 try {
+  // Like the server: nothing touches organization data unless row-level security protects it.
+  if (command === 'ping' || command === 'sync' || command === 'seed') await assertRowLevelSecurity(db)
   switch (command) {
     case 'ping': {
-      await recordRun({ db, organizationId: await chosenOrganization() }, { source: 'heartbeat' }, async () => ({ rowsWritten: 0 }))
+      await recordRun(scopeFor(db, await chosenOrganization()), { source: 'heartbeat' }, async () => ({ rowsWritten: 0 }))
       log.info('heartbeat recorded')
       break
     }
@@ -84,7 +88,8 @@ try {
       }
       const organizationIds =
         values.organization === undefined
-          ? (await db.select({ id: organization.id }).from(organization)).map((row) => row.id)
+          ? // The list of organizations has no row-level security; each sync then runs under it.
+            (await db.select({ id: organization.id }).from(organization)).map((row) => row.id)
           : [await chosenOrganization()]
       const range = trailingRange(parseDays(7))
       // One organization after the other; one's failure does not stop the next.
@@ -107,7 +112,7 @@ try {
       if (env.NODE_ENV === 'production' && !values['allow-production']) {
         throw new Error('Refusing to seed demo data in production without --allow-production')
       }
-      const written = await seedDemo({ db, organizationId: await chosenOrganization() }, { days: parseDays(200) })
+      const written = await seedDemo(scopeFor(db, await chosenOrganization()), { days: parseDays(200) })
       log.info(`seeded ${written.apps} demo apps and ${written.metrics} metric rows`)
       break
     }

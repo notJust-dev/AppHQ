@@ -3,9 +3,9 @@ import { createAppStoreClient } from '../connectors/app-store/client.js'
 import { APP_STORE } from '../connectors/app-store/connector.js'
 import { saveAppStoreApps } from '../connectors/app-store/link-apps.js'
 import { isPrivateKey, type AppStoreCredentials } from '../connectors/app-store/token.js'
-import type { Db } from '../db/client.js'
 import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import type { Scope } from '../organizations/scope.js'
 import { addDays, todayUtc } from '../lib/dates.js'
 import { ConnectInputError } from './errors.js'
 
@@ -24,7 +24,7 @@ export interface AppStoreConnectResult {
  * reports are asked for later, by the sync, for the apps that are tracked.
  */
 export async function connectAppStore(
-  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch },
+  deps: Scope & { secrets: Secrets; fetch?: typeof fetch },
   input: AppStoreCredentials,
 ): Promise<AppStoreConnectResult> {
   const credentials: AppStoreCredentials = {
@@ -56,7 +56,8 @@ export async function connectAppStore(
     details: null,
     updatedAt: new Date(),
   }
-  const saved = await deps.db.transaction(async (tx) => {
+  // Apple has answered; the database work is one unit of its own.
+  const saved = await deps.run(async (tx) => {
     // One App Store account per organization: a different vendor replaces the previous one.
     await tx
       .delete(connections)
@@ -73,8 +74,7 @@ export async function connectAppStore(
   })
   if (!saved) throw new Error('could not save the App Store connection')
 
-  const scope = { db: deps.db, organizationId: deps.organizationId }
-  const { linked } = await saveAppStoreApps(scope, saved.id, storeApps)
+  const { linked } = await saveAppStoreApps(deps, saved.id, storeApps)
 
   return { apps: storeApps.length, linked }
 }

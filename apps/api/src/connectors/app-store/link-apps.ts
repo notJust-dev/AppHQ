@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { iconOf } from '../../assets/icons.js'
 import { autoLink, upsertAssets } from '../../assets/store.js'
-import type { Scope } from '../../organizations/scope.js'
+import type { Scope, Tx } from '../../organizations/scope.js'
 import { assets } from '../../db/schema.js'
 import type { AppStoreApp } from './client.js'
 
@@ -17,7 +17,18 @@ export async function saveAppStoreApps(
   storeApps: AppStoreApp[],
   icons: ReadonlyMap<string, string> = new Map(),
 ) {
-  const { db, organizationId } = scope
+  // No call to Apple in here: one unit of work.
+  return scope.run((db) => saveIn(db, scope, connectionId, storeApps, icons))
+}
+
+async function saveIn(
+  db: Tx,
+  scope: Scope,
+  connectionId: string,
+  storeApps: AppStoreApp[],
+  icons: ReadonlyMap<string, string>,
+) {
+  const { organizationId } = scope
   const appleIds = storeApps.map((app) => app.appleId)
   // An icon Apple did not give this time (a refusal, an outage) stays as it was.
   const known =

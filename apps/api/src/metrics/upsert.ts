@@ -9,24 +9,28 @@ const CHUNK = 1000
  * dimension. This is what makes every connector safe to re-run over the same date range.
  */
 export async function upsertMetrics(
-  { db, organizationId }: Scope,
+  scope: Scope,
   rows: NewMetric[],
 ): Promise<number> {
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    await db
-      .insert(metricDaily)
-      .values(rows.slice(i, i + CHUNK).map((row) => ({ ...row, organizationId })))
-      .onConflictDoUpdate({
-        target: [
-          metricDaily.organizationId,
-          metricDaily.appId,
-          metricDaily.date,
-          metricDaily.source,
-          metricDaily.metric,
-          metricDaily.dimension,
-        ],
-        set: { value: sql`excluded.value`, updatedAt: sql`now()` },
-      })
-  }
+  const { organizationId } = scope
+  if (rows.length === 0) return 0
+  await scope.run(async (db) => {
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      await db
+        .insert(metricDaily)
+        .values(rows.slice(i, i + CHUNK).map((row) => ({ ...row, organizationId })))
+        .onConflictDoUpdate({
+          target: [
+            metricDaily.organizationId,
+            metricDaily.appId,
+            metricDaily.date,
+            metricDaily.source,
+            metricDaily.metric,
+            metricDaily.dimension,
+          ],
+          set: { value: sql`excluded.value`, updatedAt: sql`now()` },
+        })
+    }
+  })
   return rows.length
 }

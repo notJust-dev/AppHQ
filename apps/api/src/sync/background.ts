@@ -19,6 +19,7 @@ export function startSync(
   const retryMs = timing.retryMs ?? RETRY_MS
   const maxTries = timing.maxTries ?? MAX_TRIES
 
+  // Each attempt opens its own units of work: it runs after the request that asked for it ended.
   const attempt = (tries: number) => {
     runSync(deps, options)
       .then((summary) => {

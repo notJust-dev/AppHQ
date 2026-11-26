@@ -2,7 +2,7 @@ import { and, asc, desc, eq } from 'drizzle-orm'
 import type { Connector } from '../connectors/types.js'
 import { organization, syncRuns } from '../db/schema.js'
 import { trailingRange } from '../lib/dates.js'
-import type { Scope } from '../organizations/scope.js'
+import { scopeFor, type Scope } from '../organizations/scope.js'
 import { recordRun, runSync, type SyncDeps } from './runner.js'
 
 /** The `sync_runs` source of a scheduled sync; the Accounts page calls it "Scheduled sync". */
@@ -21,13 +21,15 @@ export function isDue(lastStartedAt: Date | null, now: Date, intervalMs: number)
 }
 
 /** When the organization's last scheduled sync that finished started, or null if none has. */
-async function lastScheduledSync({ db, organizationId }: Scope): Promise<Date | null> {
-  const [last] = await db
-    .select({ startedAt: syncRuns.startedAt })
-    .from(syncRuns)
-    .where(and(eq(syncRuns.organizationId, organizationId), eq(syncRuns.source, SCHEDULED), eq(syncRuns.status, 'ok')))
-    .orderBy(desc(syncRuns.startedAt))
-    .limit(1)
+async function lastScheduledSync(scope: Scope): Promise<Date | null> {
+  const [last] = await scope.run((db) =>
+    db
+      .select({ startedAt: syncRuns.startedAt })
+      .from(syncRuns)
+      .where(and(eq(syncRuns.organizationId, scope.organizationId), eq(syncRuns.source, SCHEDULED), eq(syncRuns.status, 'ok')))
+      .orderBy(desc(syncRuns.startedAt))
+      .limit(1),
+  )
   return last?.startedAt ?? null
 }
 
@@ -43,7 +45,7 @@ export async function syncIfDue(
   options: { organizationId: string; connectors: Connector[]; intervalMs: number; now?: Date },
 ): Promise<'ran' | 'not-due'> {
   const now = options.now ?? new Date()
-  const scope: Scope = { db: deps.db, organizationId: options.organizationId }
+  const scope = scopeFor(deps.db, options.organizationId)
   if (!isDue(await lastScheduledSync(scope), now, options.intervalMs)) return 'not-due'
 
   await recordRun(scope, { source: SCHEDULED }, async () => {
@@ -69,6 +71,7 @@ export async function syncDueOrganizations(
   deps: SyncDeps,
   options: { connectors: Connector[]; intervalMs: number; now?: Date },
 ): Promise<{ ran: number; failed: number }> {
+  // The list of organizations is not organization data: it has no row-level security.
   const all = await deps.db.select({ id: organization.id }).from(organization).orderBy(asc(organization.createdAt))
   let ran = 0
   let failed = 0

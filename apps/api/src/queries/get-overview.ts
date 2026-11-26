@@ -47,128 +47,130 @@ export const getOverview = defineQuery({
     'false means no source reported that metric in the range (no data), not zero.',
   input: overviewInput,
   async handler(scope, input) {
-    const { db, organizationId } = scope
-    const range: DateRange = { from: input.from, to: input.to }
-    const previousRange = previousPeriod(range)
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      const range: DateRange = { from: input.from, to: input.to }
+      const previousRange = previousPeriod(range)
 
-    const [appRows, firstDays, rows, icons] = await Promise.all([
-      db
-        .select()
-        .from(apps)
-        .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
-        .orderBy(asc(apps.name)),
-      db
-        .select({ appId: metricDaily.appId, firstDay: min(metricDaily.date) })
-        .from(metricDaily)
-        .where(eq(metricDaily.organizationId, organizationId))
-        .groupBy(metricDaily.appId),
-      db
-        .select({
-          appId: metricDaily.appId,
-          date: metricDaily.date,
-          downloads: headlineSum('downloads'),
-          revenue: headlineSum('revenue'),
-          socialViews: headlineSum('socialViews'),
-          downloadsRows: headlineRows('downloads'),
-          revenueRows: headlineRows('revenue'),
-          socialViewsRows: headlineRows('socialViews'),
+      const [appRows, firstDays, rows, icons] = await Promise.all([
+        db
+          .select()
+          .from(apps)
+          .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+          .orderBy(asc(apps.name)),
+        db
+          .select({ appId: metricDaily.appId, firstDay: min(metricDaily.date) })
+          .from(metricDaily)
+          .where(eq(metricDaily.organizationId, organizationId))
+          .groupBy(metricDaily.appId),
+        db
+          .select({
+            appId: metricDaily.appId,
+            date: metricDaily.date,
+            downloads: headlineSum('downloads'),
+            revenue: headlineSum('revenue'),
+            socialViews: headlineSum('socialViews'),
+            downloadsRows: headlineRows('downloads'),
+            revenueRows: headlineRows('revenue'),
+            socialViewsRows: headlineRows('socialViews'),
+          })
+          .from(metricDaily)
+          .where(
+            and(
+              eq(metricDaily.organizationId, organizationId),
+              gte(metricDaily.date, previousRange.from),
+              lte(metricDaily.date, range.to),
+            ),
+          )
+          .groupBy(metricDaily.appId, metricDaily.date),
+        appIcons(scope),
+      ])
+
+      const byAppAndDay = new Map<string, HeadlineTotals>()
+      const reportedOn = new Map<string, HeadlineReporting>()
+      for (const { appId, date, downloadsRows, revenueRows, socialViewsRows, ...totals } of rows) {
+        byAppAndDay.set(`${appId}|${date}`, totals)
+        reportedOn.set(`${appId}|${date}`, {
+          downloads: downloadsRows > 0,
+          revenue: revenueRows > 0,
+          socialViews: socialViewsRows > 0,
         })
-        .from(metricDaily)
-        .where(
-          and(
-            eq(metricDaily.organizationId, organizationId),
-            gte(metricDaily.date, previousRange.from),
-            lte(metricDaily.date, range.to),
-          ),
-        )
-        .groupBy(metricDaily.appId, metricDaily.date),
-      appIcons(scope),
-    ])
+      }
 
-    const byAppAndDay = new Map<string, HeadlineTotals>()
-    const reportedOn = new Map<string, HeadlineReporting>()
-    for (const { appId, date, downloadsRows, revenueRows, socialViewsRows, ...totals } of rows) {
-      byAppAndDay.set(`${appId}|${date}`, totals)
-      reportedOn.set(`${appId}|${date}`, {
-        downloads: downloadsRows > 0,
-        revenue: revenueRows > 0,
-        socialViews: socialViewsRows > 0,
+      /** Which headline metrics any source reported for an app on any of these days. */
+      const reportedOver = (appId: string, days: string[]): HeadlineReporting => {
+        const reporting = noReporting()
+        for (const day of days) {
+          const on = reportedOn.get(`${appId}|${day}`)
+          if (!on) continue
+          reporting.downloads ||= on.downloads
+          reporting.revenue ||= on.revenue
+          reporting.socialViews ||= on.socialViews
+        }
+        return reporting
+      }
+
+      const sumOver = (appId: string, days: string[]): HeadlineTotals => {
+        const total = zeroTotals()
+        for (const day of days) {
+          const row = byAppAndDay.get(`${appId}|${day}`)
+          if (!row) continue
+          total.downloads += row.downloads
+          total.revenue += row.revenue
+          total.socialViews += row.socialViews
+        }
+        total.revenue = toCents(total.revenue)
+        return total
+      }
+
+      const days = eachDay(range)
+      const previousDays = eachDay(previousRange)
+
+      // History starts at the first sync, so a new app has nothing to compare against at first.
+      const firstDayByApp = new Map(firstDays.map((row) => [row.appId, row.firstDay]))
+      const isComparable = (appId: string) => {
+        const firstDay = firstDayByApp.get(appId)
+        return firstDay != null && firstDay <= previousRange.from
+      }
+
+      // Shared accounts count toward the totals, but only show as a row once they have numbers.
+      const shown = appRows.filter((app) => app.kind !== 'portfolio' || firstDayByApp.has(app.id))
+      const perApp = shown.map((app) => ({
+        app: { id: app.id, name: app.name, kind: app.kind, iconUrl: app.iconUrl ?? icons.get(app.id) ?? null },
+        totals: sumOver(app.id, days),
+        previous: sumOver(app.id, previousDays),
+        /** Which totals rest on reported numbers; false means no data, not zero. */
+        reporting: reportedOver(app.id, days),
+        comparable: isComparable(app.id),
+        daily: days.map((date) => ({
+          date,
+          ...(byAppAndDay.get(`${app.id}|${date}`) ?? zeroTotals()),
+        })),
+      }))
+
+      const add = (a: HeadlineTotals, b: HeadlineTotals): HeadlineTotals => ({
+        downloads: a.downloads + b.downloads,
+        revenue: toCents(a.revenue + b.revenue),
+        socialViews: a.socialViews + b.socialViews,
       })
-    }
 
-    /** Which headline metrics any source reported for an app on any of these days. */
-    const reportedOver = (appId: string, days: string[]): HeadlineReporting => {
-      const reporting = noReporting()
-      for (const day of days) {
-        const on = reportedOn.get(`${appId}|${day}`)
-        if (!on) continue
-        reporting.downloads ||= on.downloads
-        reporting.revenue ||= on.revenue
-        reporting.socialViews ||= on.socialViews
+      return {
+        range,
+        previousRange,
+        totals: perApp.map((a) => a.totals).reduce(add, zeroTotals()),
+        reporting: perApp.reduce(
+          (all, a): HeadlineReporting => ({
+            downloads: all.downloads || a.reporting.downloads,
+            revenue: all.revenue || a.reporting.revenue,
+            socialViews: all.socialViews || a.reporting.socialViews,
+          }),
+          noReporting(),
+        ),
+        previousTotals: perApp.map((a) => a.previous).reduce(add, zeroTotals()),
+        // The portfolio totals are only comparable when every app that has data is.
+        comparable: perApp.filter((a) => firstDayByApp.has(a.app.id)).every((a) => a.comparable),
+        apps: perApp,
       }
-      return reporting
-    }
-
-    const sumOver = (appId: string, days: string[]): HeadlineTotals => {
-      const total = zeroTotals()
-      for (const day of days) {
-        const row = byAppAndDay.get(`${appId}|${day}`)
-        if (!row) continue
-        total.downloads += row.downloads
-        total.revenue += row.revenue
-        total.socialViews += row.socialViews
-      }
-      total.revenue = toCents(total.revenue)
-      return total
-    }
-
-    const days = eachDay(range)
-    const previousDays = eachDay(previousRange)
-
-    // History starts at the first sync, so a new app has nothing to compare against at first.
-    const firstDayByApp = new Map(firstDays.map((row) => [row.appId, row.firstDay]))
-    const isComparable = (appId: string) => {
-      const firstDay = firstDayByApp.get(appId)
-      return firstDay != null && firstDay <= previousRange.from
-    }
-
-    // Shared accounts count toward the totals, but only show as a row once they have numbers.
-    const shown = appRows.filter((app) => app.kind !== 'portfolio' || firstDayByApp.has(app.id))
-    const perApp = shown.map((app) => ({
-      app: { id: app.id, name: app.name, kind: app.kind, iconUrl: app.iconUrl ?? icons.get(app.id) ?? null },
-      totals: sumOver(app.id, days),
-      previous: sumOver(app.id, previousDays),
-      /** Which totals rest on reported numbers; false means no data, not zero. */
-      reporting: reportedOver(app.id, days),
-      comparable: isComparable(app.id),
-      daily: days.map((date) => ({
-        date,
-        ...(byAppAndDay.get(`${app.id}|${date}`) ?? zeroTotals()),
-      })),
-    }))
-
-    const add = (a: HeadlineTotals, b: HeadlineTotals): HeadlineTotals => ({
-      downloads: a.downloads + b.downloads,
-      revenue: toCents(a.revenue + b.revenue),
-      socialViews: a.socialViews + b.socialViews,
     })
-
-    return {
-      range,
-      previousRange,
-      totals: perApp.map((a) => a.totals).reduce(add, zeroTotals()),
-      reporting: perApp.reduce(
-        (all, a): HeadlineReporting => ({
-          downloads: all.downloads || a.reporting.downloads,
-          revenue: all.revenue || a.reporting.revenue,
-          socialViews: all.socialViews || a.reporting.socialViews,
-        }),
-        noReporting(),
-      ),
-      previousTotals: perApp.map((a) => a.previous).reduce(add, zeroTotals()),
-      // The portfolio totals are only comparable when every app that has data is.
-      comparable: perApp.filter((a) => firstDayByApp.has(a.app.id)).every((a) => a.comparable),
-      apps: perApp,
-    }
   },
 })

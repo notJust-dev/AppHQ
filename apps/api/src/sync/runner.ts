@@ -5,7 +5,7 @@ import { apps, syncRuns } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import type { DateRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
-import type { Scope } from '../organizations/scope.js'
+import { scopeFor, type Scope } from '../organizations/scope.js'
 
 /**
  * Arbitrary but fixed: with the organization, the Postgres advisory lock that keeps two syncs of
@@ -21,39 +21,46 @@ interface RunRecord {
 
 /**
  * Wraps a piece of work in a `sync_runs` row of the organization: 'running' when it starts, then
- * 'ok' with the row count or 'error' with the message. Errors are recorded and rethrown.
+ * 'ok' with the row count or 'error' with the message. Errors are recorded and rethrown. The row
+ * is written in units of work of its own, so the work in between holds no transaction open.
  */
 export async function recordRun(
-  { db, organizationId }: Scope,
+  scope: Scope,
   record: RunRecord,
   work: () => Promise<{ rowsWritten: number }>,
 ): Promise<{ rowsWritten: number }> {
-  const [run] = await db
-    .insert(syncRuns)
-    .values({
-      organizationId,
-      source: record.source,
-      appId: record.appId ?? null,
-      status: 'running',
-      rangeFrom: record.range?.from,
-      rangeTo: record.range?.to,
-    })
-    .returning({ id: syncRuns.id })
+  const [run] = await scope.run((db) =>
+    db
+      .insert(syncRuns)
+      .values({
+        organizationId: scope.organizationId,
+        source: record.source,
+        appId: record.appId ?? null,
+        status: 'running',
+        rangeFrom: record.range?.from,
+        rangeTo: record.range?.to,
+      })
+      .returning({ id: syncRuns.id }),
+  )
   if (!run) throw new Error('could not create sync_runs row')
 
   try {
     const result = await work()
-    await db
-      .update(syncRuns)
-      .set({ status: 'ok', rowsWritten: result.rowsWritten, finishedAt: new Date() })
-      .where(eq(syncRuns.id, run.id))
+    await scope.run((db) =>
+      db
+        .update(syncRuns)
+        .set({ status: 'ok', rowsWritten: result.rowsWritten, finishedAt: new Date() })
+        .where(and(eq(syncRuns.organizationId, scope.organizationId), eq(syncRuns.id, run.id))),
+    )
     return result
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await db
-      .update(syncRuns)
-      .set({ status: 'error', error: message.slice(0, 2000), finishedAt: new Date() })
-      .where(eq(syncRuns.id, run.id))
+    await scope.run((db) =>
+      db
+        .update(syncRuns)
+        .set({ status: 'error', error: message.slice(0, 2000), finishedAt: new Date() })
+        .where(and(eq(syncRuns.organizationId, scope.organizationId), eq(syncRuns.id, run.id))),
+    )
     throw err
   }
 }
@@ -95,7 +102,8 @@ export async function runSync(
 ): Promise<SyncSummary> {
   const { db, sql, log, secrets } = deps
   const { organizationId } = options
-  const scope: Scope = { db, organizationId }
+  // Row-level security holds the whole sync to this organization; see organizations/scope.ts.
+  const scope = scopeFor(db, organizationId)
   const summary: SyncSummary = { skipped: false, ok: 0, failed: 0 }
 
   // Advisory locks belong to a session, so the lock and unlock must use the same connection.
@@ -113,16 +121,18 @@ export async function runSync(
       const selected = options.connectors.filter(
         (c) => !options.sources || options.sources.includes(c.source),
       )
-      const activeApps = await db
-        .select()
-        .from(apps)
-        .where(
-          and(
-            eq(apps.organizationId, organizationId),
-            eq(apps.isActive, true),
-            options.appIds ? inArray(apps.id, options.appIds) : undefined,
+      const activeApps = await scope.run((db) =>
+        db
+          .select()
+          .from(apps)
+          .where(
+            and(
+              eq(apps.organizationId, organizationId),
+              eq(apps.isActive, true),
+              options.appIds ? inArray(apps.id, options.appIds) : undefined,
+            ),
           ),
-        )
+      )
 
       const run = async (label: string, record: RunRecord, work: () => Promise<{ rowsWritten: number }>) => {
         try {
@@ -136,7 +146,7 @@ export async function runSync(
       }
 
       for (const connector of selected) {
-        const context = { db, organizationId, range: options.range, log, secrets }
+        const context = { ...scope, range: options.range, log, secrets }
 
         if (connector.scope === 'account') {
           if (!(await connector.isConfigured(scope))) continue

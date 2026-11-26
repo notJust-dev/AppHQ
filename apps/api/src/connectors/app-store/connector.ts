@@ -30,12 +30,15 @@ const credentialsSchema = z.object({
 })
 
 /** The organization's App Store Connect account: a connection that belongs to no particular app. */
-export const findAppStoreConnection = ({ db, organizationId }: Scope) =>
-  db
-    .select()
-    .from(connections)
-    .where(and(eq(connections.organizationId, organizationId), eq(connections.provider, APP_STORE)))
-    .limit(1)
+export const findAppStoreConnection = (scope: Scope) =>
+  scope
+    .run((db) =>
+      db
+        .select()
+        .from(connections)
+        .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.provider, APP_STORE)))
+        .limit(1),
+    )
     .then((rows) => rows[0])
 
 export const readAppStoreCredentials = (secrets: Secrets, encrypted: string): AppStoreCredentials =>
@@ -56,8 +59,8 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
       return (await findAppStoreConnection(scope)) !== undefined
     },
 
-    async sync({ db, organizationId, range, secrets }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { organizationId, range, secrets } = scope
       const connection = await findAppStoreConnection(scope)
       if (!connection?.accessTokenEnc) throw new Error('No App Store Connect key is stored')
       const client = createAppStoreClient({
@@ -88,10 +91,12 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
         const owned = new Set(storeApps.map((app) => app.appleId))
         const active = new Set(
           (
-            await db
-              .select({ id: apps.id })
-              .from(apps)
-              .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true)))
+            await scope.run((db) =>
+              db
+                .select({ id: apps.id })
+                .from(apps)
+                .where(and(eq(apps.organizationId, organizationId), eq(apps.isActive, true))),
+            )
           ).map((app) => app.id),
         )
         const tracked = (await linkedAssets(scope, 'ios_app'))
@@ -150,23 +155,25 @@ export function createAppStoreConnector(options: { fetch?: typeof fetch } = {}):
       }
 
       const rowsWritten = await upsertMetrics(scope, rows)
-      await db
-        .update(connections)
-        .set({
-          status: keyRejected ? 'needs_reauth' : failures.length > 0 ? 'error' : 'ok',
-          lastSyncedAt: new Date(),
-          ...(analyticsState || reviewsState
-            ? {
-                details: {
-                  ...((connection.details as Record<string, unknown> | null) ?? {}),
-                  ...(analyticsState ? { analytics: analyticsState } : {}),
-                  ...(reviewsState ? { reviews: reviewsState } : {}),
-                },
-              }
-            : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(connections.id, connection.id))
+      await scope.run((db) =>
+        db
+          .update(connections)
+          .set({
+            status: keyRejected ? 'needs_reauth' : failures.length > 0 ? 'error' : 'ok',
+            lastSyncedAt: new Date(),
+            ...(analyticsState || reviewsState
+              ? {
+                  details: {
+                    ...((connection.details as Record<string, unknown> | null) ?? {}),
+                    ...(analyticsState ? { analytics: analyticsState } : {}),
+                    ...(reviewsState ? { reviews: reviewsState } : {}),
+                  },
+                }
+              : {}),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(connections.organizationId, organizationId), eq(connections.id, connection.id))),
+      )
 
       if (failures.length > 0) {
         const shown = failures.slice(0, 3).join('; ')

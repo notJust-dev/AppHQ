@@ -34,8 +34,12 @@ import { testDatabaseUrl } from '../test/database.js'
 import { testOrganization } from '../test/organizations.js'
 import { ACCESS_HEADER, DASHBOARD_ACCESS } from '../trpc/init.js'
 import type { Scope } from './scope.js'
+import { TENANT_ROLE } from './tenancy.js'
 
 /**
+ * Everything under test runs the way the API runs it: through `scope.run`, as the tenant role,
+ * under row-level security. The test's own setup and snapshots use the test database's login.
+ *
  * Two organizations holding the same data: the same app slugs (the portfolio row included), the
  * same store, social and RevenueCat ids, the same post and review ids. Whatever one of them reads
  * or writes, through a query, a helper, a procedure or a sync, the other's rows stay exactly as
@@ -165,6 +169,15 @@ describe.skipIf(!url)('two organizations with the same data', () => {
   })
 
   const bIsUntouched = async () => expect(await snapshot(b)).toEqual(bBefore)
+
+  it('the code under test runs as the tenant role, in its organization', async () => {
+    const [unit] = await a.run((tx) =>
+      tx.execute<{ who: string; organization: string }>(
+        raw`select current_user as who, current_setting('app.organization_id') as organization`,
+      ),
+    )
+    expect(unit).toEqual({ who: TENANT_ROLE, organization: a.organizationId })
+  })
 
   it('the two organizations really hold the same keys', async () => {
     const keys = async (scope: Scope) => ({

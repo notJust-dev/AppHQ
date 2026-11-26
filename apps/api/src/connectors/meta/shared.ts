@@ -1,6 +1,5 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
 import type { Scope } from '../../organizations/scope.js'
 import { connections, type NewMetric } from '../../db/schema.js'
 import type { IsoDate } from '../../lib/dates.js'
@@ -44,25 +43,30 @@ export const isPartial = (err: unknown) =>
 export const describe = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
 export async function markAccount(
-  db: Db,
+  scope: Scope,
   connectionId: string,
   outcome: { ok: true; displayName?: string; now: Date } | { ok: false; err: unknown; now: Date },
 ) {
+  const thisAccount = and(eq(connections.organizationId, scope.organizationId), eq(connections.id, connectionId))
   if (outcome.ok) {
-    await db
-      .update(connections)
-      .set({
-        status: 'ok',
-        lastSyncedAt: outcome.now,
-        updatedAt: outcome.now,
-        ...(outcome.displayName ? { displayName: outcome.displayName } : {}),
-      })
-      .where(eq(connections.id, connectionId))
+    await scope.run((db) =>
+      db
+        .update(connections)
+        .set({
+          status: 'ok',
+          lastSyncedAt: outcome.now,
+          updatedAt: outcome.now,
+          ...(outcome.displayName ? { displayName: outcome.displayName } : {}),
+        })
+        .where(thisAccount),
+    )
     return
   }
   const authProblem = outcome.err instanceof MetaError && outcome.err.isAuthProblem
-  await db
-    .update(connections)
-    .set({ status: authProblem ? 'needs_reauth' : 'error', updatedAt: outcome.now })
-    .where(eq(connections.id, connectionId))
+  await scope.run((db) =>
+    db
+      .update(connections)
+      .set({ status: authProblem ? 'needs_reauth' : 'error', updatedAt: outcome.now })
+      .where(thisAccount),
+  )
 }

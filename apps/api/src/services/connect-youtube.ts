@@ -1,9 +1,9 @@
 import { autoLink, upsertAssets } from '../assets/store.js'
 import { createYouTubeClient } from '../connectors/youtube/client.js'
 import { YOUTUBE, requireYouTubeConfig } from '../connectors/youtube/config.js'
-import type { Db } from '../db/client.js'
 import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 
 export interface YouTubeConnectResult {
@@ -18,7 +18,7 @@ export interface YouTubeConnectResult {
  * with several channels picks one at sign-in; sign in again for each of the others.
  */
 export async function connectYouTube(
-  deps: { db: Db; organizationId: string; secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
+  deps: Scope & { secrets: Secrets; fetch?: typeof fetch; env?: NodeJS.ProcessEnv },
   input: { code: string; redirectUri: string },
 ): Promise<YouTubeConnectResult> {
   const config = requireYouTubeConfig(deps.env)
@@ -48,23 +48,25 @@ export async function connectYouTube(
     status: 'ok',
     updatedAt: new Date(),
   }
-  const [connection] = await deps.db
-    .insert(connections)
-    .values({ organizationId: deps.organizationId, provider: YOUTUBE, externalAccountId: channel.id, ...values })
-    .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
-    .returning()
-  if (!connection) throw new Error('could not save the YouTube connection')
+  // Google has answered; saving the channel is one unit of work.
+  await deps.run(async (db) => {
+    const [connection] = await db
+      .insert(connections)
+      .values({ organizationId: deps.organizationId, provider: YOUTUBE, externalAccountId: channel.id, ...values })
+      .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
+      .returning()
+    if (!connection) throw new Error('could not save the YouTube connection')
 
-  const scope = { db: deps.db, organizationId: deps.organizationId }
-  await upsertAssets(scope, [
-    {
-      kind: 'youtube_channel',
-      externalId: channel.id,
-      name: channel.handle ?? channel.title,
-      connectionId: connection.id,
-      details: { title: channel.title },
-    },
-  ])
-  await autoLink(scope)
+    await upsertAssets(deps, [
+      {
+        kind: 'youtube_channel',
+        externalId: channel.id,
+        name: channel.handle ?? channel.title,
+        connectionId: connection.id,
+        details: { title: channel.title },
+      },
+    ])
+    await autoLink(deps)
+  })
   return { channel: channel.handle ?? channel.title, channelId: channel.id }
 }

@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm'
 import { createSearchConsoleClient } from '../connectors/search-console/client.js'
 import { findSearchConsoleConnection, readSearchConsoleCredentials, type SearchConsoleOptions } from '../connectors/search-console/connector.js'
-import type { Db } from '../db/client.js'
 import { apps, assets } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import type { Scope } from '../organizations/scope.js'
 import { mapLimit } from '../lib/pool.js'
 
 const PER_SITE = 200
@@ -22,27 +22,29 @@ export interface TopEntry {
  * sites' queries are merged, with position weighted by impressions.
  */
 export async function searchTop(
-  deps: { db: Db; organizationId: string; secrets: Secrets } & SearchConsoleOptions,
+  deps: Scope & { secrets: Secrets } & SearchConsoleOptions,
   input: { appId?: string; from: string; to: string; dimension: 'query' | 'page'; limit: number },
 ): Promise<{ connected: boolean; rows: TopEntry[] }> {
-  const scope = { db: deps.db, organizationId: deps.organizationId }
-  const connection = await findSearchConsoleConnection(scope)
+  const connection = await findSearchConsoleConnection(deps)
   if (!connection?.accessTokenEnc) return { connected: false, rows: [] }
   const { serviceAccount } = readSearchConsoleCredentials(deps.secrets, connection.accessTokenEnc)
   const client = createSearchConsoleClient({ serviceAccount, fetch: deps.fetch, baseUrl: deps.baseUrl })
 
-  const sites = await deps.db
-    .select({ siteUrl: assets.externalId })
-    .from(assets)
-    .innerJoin(apps, and(eq(apps.organizationId, assets.organizationId), eq(apps.id, assets.appId)))
-    .where(
-      and(
-        eq(assets.organizationId, deps.organizationId),
-        eq(assets.kind, 'search_console_site'),
-        eq(assets.connectionId, connection.id),
-        input.appId ? eq(assets.appId, input.appId) : undefined,
+  const sites = await deps.run((db) =>
+    db
+      .select({ siteUrl: assets.externalId })
+      .from(assets)
+      .innerJoin(apps, and(eq(apps.organizationId, assets.organizationId), eq(apps.id, assets.appId)))
+      .where(
+        and(
+          eq(assets.organizationId, deps.organizationId),
+          eq(assets.kind, 'search_console_site'),
+          eq(assets.connectionId, connection.id),
+          input.appId ? eq(assets.appId, input.appId) : undefined,
+        ),
       ),
-    )
+  )
+  // Search Console is asked outside any unit of work.
 
   const merged = new Map<string, { clicks: number; impressions: number; positionSum: number }>()
   await mapLimit(sites, 3, async ({ siteUrl }) => {

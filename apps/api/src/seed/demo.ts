@@ -1,7 +1,6 @@
 import { and, eq, inArray, isNull, or } from 'drizzle-orm'
-import type { Db } from '../db/client.js'
 import { apps, assets, posts, type NewApp, type NewMetric, type NewPost } from '../db/schema.js'
-import type { Scope } from '../organizations/scope.js'
+import type { Scope, Tx } from '../organizations/scope.js'
 import { addDays, parseIsoDate, todayUtc, type IsoDate } from '../lib/dates.js'
 import type { Source } from '../metrics/catalog.js'
 import { upsertMetrics } from '../metrics/upsert.js'
@@ -356,23 +355,26 @@ function demoAssetsOf() {
  * Demo assets have no account behind them; anything with an account is real and stays. That
  * includes a demo asset someone took off its app on the Apps page.
  */
-async function deleteDemoAssets({ db, organizationId }: Scope) {
-  await db
-    .delete(assets)
-    .where(
-      and(
-        eq(assets.organizationId, organizationId),
-        isNull(assets.connectionId),
-        or(
-          inArray(assets.appId, demoAppIds({ db, organizationId })),
-          ...demoAssetsOf().map((asset) => and(eq(assets.kind, asset.kind), eq(assets.externalId, asset.externalId))),
+async function deleteDemoAssets(scope: Scope) {
+  const { organizationId } = scope
+  await scope.run((db) =>
+    db
+      .delete(assets)
+      .where(
+        and(
+          eq(assets.organizationId, organizationId),
+          isNull(assets.connectionId),
+          or(
+            inArray(assets.appId, demoAppIds(db, organizationId)),
+            ...demoAssetsOf().map((asset) => and(eq(assets.kind, asset.kind), eq(assets.externalId, asset.externalId))),
+          ),
         ),
       ),
-    )
+  )
 }
 
 /** The organization's demo apps, as a subquery. */
-const demoAppIds = ({ db, organizationId }: Scope) =>
+const demoAppIds = (db: Tx, organizationId: string) =>
   db
     .select({ id: apps.id })
     .from(apps)
@@ -384,23 +386,26 @@ const demoAppIds = ({ db, organizationId }: Scope) =>
  * apps, demo or not, are untouched.
  */
 export async function clearDemo(scope: Scope) {
-  const { db, organizationId } = scope
-  await deleteDemoAssets(scope)
-  const removed = await db
-    .delete(apps)
-    .where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
-    .returning({ id: apps.id })
-  return { apps: removed.length }
+  const { organizationId } = scope
+  return scope.run(async (db) => {
+    await deleteDemoAssets(scope)
+    const removed = await db
+      .delete(apps)
+      .where(and(eq(apps.organizationId, organizationId), eq(apps.demo, true)))
+      .returning({ id: apps.id })
+    return { apps: removed.length }
+  })
 }
 
 /**
  * Replaces the organization's demo apps with their assets, metrics, posts and reviews. Real apps
- * and other organizations are untouched.
+ * and other organizations are untouched. One unit of work: the old demo goes only if the new one
+ * is in place.
  */
-export async function seedDemo({ db, organizationId }: Scope, options: DemoOptions) {
+export async function seedDemo(scope: Scope, options: DemoOptions) {
+  const { organizationId } = scope
   const data = generateDemoData(options)
-  await db.transaction(async (tx) => {
-    const scope: Scope = { db: tx as unknown as Db, organizationId }
+  await scope.run(async (tx) => {
     // Metrics and posts go with the apps through ON DELETE CASCADE; demo assets first, since
     // removing an app only unlinks its assets.
     await deleteDemoAssets(scope)

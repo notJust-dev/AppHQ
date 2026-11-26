@@ -38,8 +38,8 @@ export function createInstagramConnector(
       return (await metaConnections(scope, INSTAGRAM, app.id)).length > 0
     },
 
-    async sync({ db, organizationId, app, range, log, secrets }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { organizationId, app, range, log, secrets } = scope
       const client = createMetaClient({ config: requireMetaConfig(options.env), fetch: options.fetch })
       const today = todayUtc(now())
       const from = range.from > addDays(today, -(VIEWS_HISTORY_DAYS - 1))
@@ -89,14 +89,14 @@ export function createInstagramConnector(
 
           const readings = await readMedia({ call, client, igId, today, appId: app.id, connectionId: account.id, scope, warnings, name })
           rowsWritten += await savePosts(scope, readings, today)
-          await markAccount(db, account.id, {
+          await markAccount(scope, account.id, {
             ok: true,
             now: now(),
             ...(profile.username ? { displayName: `@${profile.username}` } : {}),
           })
         } catch (err) {
           followersComplete = false
-          await markAccount(db, account.id, { ok: false, err, now: now() })
+          await markAccount(scope, account.id, { ok: false, err, now: now() })
           failures.push(`${name}: ${describe(err)}`)
         }
       }

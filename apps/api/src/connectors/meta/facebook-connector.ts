@@ -44,8 +44,8 @@ export function createFacebookConnector(
       return (await metaConnections(scope, FACEBOOK, app.id)).length > 0
     },
 
-    async sync({ db, organizationId, app, range, log, secrets }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { organizationId, app, range, log, secrets } = scope
       const client = createMetaClient({ config: requireMetaConfig(options.env), fetch: options.fetch })
       const today = todayUtc(now())
       const from = maxDay(range.from, addDays(today, -INSIGHTS_HISTORY_DAYS))
@@ -87,19 +87,21 @@ export function createFacebookConnector(
           rowsWritten += await savePosts(scope, readings, today)
           // Reels saved on their own before they were recognised as posts too.
           if (duplicateReels.length > 0) {
-            await db
-              .delete(postsTable)
-              .where(
-                and(
-                  eq(postsTable.organizationId, organizationId),
-                  eq(postsTable.platform, FACEBOOK),
-                  inArray(postsTable.externalId, duplicateReels),
+            await scope.run((db) =>
+              db
+                .delete(postsTable)
+                .where(
+                  and(
+                    eq(postsTable.organizationId, organizationId),
+                    eq(postsTable.platform, FACEBOOK),
+                    inArray(postsTable.externalId, duplicateReels),
+                  ),
                 ),
-              )
+            )
           }
-          await markAccount(db, account.id, { ok: true, now: now() })
+          await markAccount(scope, account.id, { ok: true, now: now() })
         } catch (err) {
-          await markAccount(db, account.id, { ok: false, err, now: now() })
+          await markAccount(scope, account.id, { ok: false, err, now: now() })
           failures.push(`${name}: ${describe(err)}`)
         }
       }

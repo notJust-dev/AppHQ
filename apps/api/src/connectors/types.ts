@@ -1,4 +1,3 @@
-import type { Db } from '../db/client.js'
 import type { Scope } from '../organizations/scope.js'
 import type { App } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
@@ -6,10 +5,11 @@ import type { DateRange } from '../lib/dates.js'
 import type { Logger } from '../lib/logger.js'
 import type { Source } from '../metrics/catalog.js'
 
+/**
+ * What a connector gets. Its scope is the organization being synced: every read and write goes
+ * through `run`, one short unit of work at a time, and never around a call to the source.
+ */
 interface SyncContext extends Scope {
-  db: Db
-  /** The organization being synced; a connector reads and writes only its rows. */
-  organizationId: string
   /** Inclusive UTC days to fetch. Connectors must be safe to re-run over the same range. */
   range: DateRange
   log: Logger

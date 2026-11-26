@@ -49,93 +49,95 @@ function sumOverApps(rows: (MetricRow & { appId: string })[]): MetricRow[] {
  * apps, with each app's summaries for the comparison table.
  */
 async function loadSection<D extends SeriesDefinition>(scope: Scope, definitions: readonly D[], range: Input) {
-  const { db, organizationId } = scope
-  const previous = previousPeriod(range)
-  const appFilter: SQL | undefined = range.appId ? eq(metricDaily.appId, range.appId) : undefined
+  return scope.run(async (db) => {
+    const { organizationId } = scope
+    const previous = previousPeriod(range)
+    const appFilter: SQL | undefined = range.appId ? eq(metricDaily.appId, range.appId) : undefined
 
-  const [rows, appRows, icons] = await Promise.all([
-    db
-      .select({
-        appId: metricDaily.appId,
-        date: metricDaily.date,
-        source: metricDaily.source,
-        metric: metricDaily.metric,
-        value: metricDaily.value,
-      })
-      .from(metricDaily)
-      .where(
-        and(
-          eq(metricDaily.organizationId, organizationId),
-          appFilter,
-          gte(metricDaily.date, previous.from),
-          lte(metricDaily.date, range.to),
-          eq(metricDaily.dimension, ''),
-          inArray(metricDaily.metric, [...new Set(definitions.map((definition) => definition.metric))]),
+    const [rows, appRows, icons] = await Promise.all([
+      db
+        .select({
+          appId: metricDaily.appId,
+          date: metricDaily.date,
+          source: metricDaily.source,
+          metric: metricDaily.metric,
+          value: metricDaily.value,
+        })
+        .from(metricDaily)
+        .where(
+          and(
+            eq(metricDaily.organizationId, organizationId),
+            appFilter,
+            gte(metricDaily.date, previous.from),
+            lte(metricDaily.date, range.to),
+            eq(metricDaily.dimension, ''),
+            inArray(metricDaily.metric, [...new Set(definitions.map((definition) => definition.metric))]),
+          ),
         ),
-      ),
-    db
-      .select({ id: apps.id, name: apps.name, kind: apps.kind, iconUrl: apps.iconUrl })
-      .from(apps)
-      .where(and(eq(apps.organizationId, organizationId), range.appId ? eq(apps.id, range.appId) : undefined))
-      .orderBy(apps.name),
-    appIcons(scope),
-  ])
+      db
+        .select({ id: apps.id, name: apps.name, kind: apps.kind, iconUrl: apps.iconUrl })
+        .from(apps)
+        .where(and(eq(apps.organizationId, organizationId), range.appId ? eq(apps.id, range.appId) : undefined))
+        .orderBy(apps.name),
+      appIcons(scope),
+    ])
 
-  const inRange = (row: { date: IsoDate }, { from, to }: DateRange) => row.date >= from && row.date <= to
-  const days = eachDay(range)
-  const current = buildSeries(definitions, sumOverApps(rows.filter((row) => inRange(row, range))), days)
-  const before = buildSeries(definitions, sumOverApps(rows.filter((row) => inRange(row, previous))), eachDay(previous))
+    const inRange = (row: { date: IsoDate }, { from, to }: DateRange) => row.date >= from && row.date <= to
+    const days = eachDay(range)
+    const current = buildSeries(definitions, sumOverApps(rows.filter((row) => inRange(row, range))), days)
+    const before = buildSeries(definitions, sumOverApps(rows.filter((row) => inRange(row, previous))), eachDay(previous))
 
-  const series = current.map((entry, index) => {
-    const earlier = before[index]
-    return {
-      ...entry,
-      previous: earlier?.summary ?? null,
-      sources: entry.sources.map((part) => ({
-        ...part,
-        previous: earlier?.sources.find((other) => other.source === part.source)?.summary ?? null,
-      })),
-    }
-  })
-
-  type Key = D['key']
-  /** Each series' summary, overall and by source, for one app's rows over one period. */
-  const summarise = (own: MetricRow[], period: IsoDate[]) => {
-    const built = buildSeries(definitions, own, period)
-    return {
-      totals: Object.fromEntries(built.map((entry) => [entry.key, entry.summary])) as Record<Key, number | null>,
-      bySource: Object.fromEntries(
-        built.map((entry) => [entry.key, Object.fromEntries(entry.sources.map((part) => [part.source, part.summary]))]),
-      ) as Record<Key, Record<string, number | null>>,
-    }
-  }
-  const previousDays = eachDay(previous)
-  const perApp = appRows
-    .map((app) => {
-      const own = rows.filter((row) => row.appId === app.id)
-      const now = summarise(own.filter((row) => inRange(row, range)), days)
-      const then = summarise(own.filter((row) => inRange(row, previous)), previousDays)
+    const series = current.map((entry, index) => {
+      const earlier = before[index]
       return {
-        app: { ...app, iconUrl: app.iconUrl ?? icons.get(app.id) ?? null },
-        totals: now.totals,
-        bySource: now.bySource,
-        previous: then.totals,
-        previousBySource: then.bySource,
+        ...entry,
+        previous: earlier?.summary ?? null,
+        sources: entry.sources.map((part) => ({
+          ...part,
+          previous: earlier?.sources.find((other) => other.source === part.source)?.summary ?? null,
+        })),
       }
     })
-    .filter((entry) => Object.values(entry.totals).some((value) => value !== null))
 
-  return {
-    result: {
-      range: { from: range.from, to: range.to },
-      previousRange: previous,
-      days,
-      series,
-      apps: perApp,
-    },
-    /** Every row read, for figures a page works out beyond the series. */
-    rows: rows.filter((row) => inRange(row, range)),
-  }
+    type Key = D['key']
+    /** Each series' summary, overall and by source, for one app's rows over one period. */
+    const summarise = (own: MetricRow[], period: IsoDate[]) => {
+      const built = buildSeries(definitions, own, period)
+      return {
+        totals: Object.fromEntries(built.map((entry) => [entry.key, entry.summary])) as Record<Key, number | null>,
+        bySource: Object.fromEntries(
+          built.map((entry) => [entry.key, Object.fromEntries(entry.sources.map((part) => [part.source, part.summary]))]),
+        ) as Record<Key, Record<string, number | null>>,
+      }
+    }
+    const previousDays = eachDay(previous)
+    const perApp = appRows
+      .map((app) => {
+        const own = rows.filter((row) => row.appId === app.id)
+        const now = summarise(own.filter((row) => inRange(row, range)), days)
+        const then = summarise(own.filter((row) => inRange(row, previous)), previousDays)
+        return {
+          app: { ...app, iconUrl: app.iconUrl ?? icons.get(app.id) ?? null },
+          totals: now.totals,
+          bySource: now.bySource,
+          previous: then.totals,
+          previousBySource: then.bySource,
+        }
+      })
+      .filter((entry) => Object.values(entry.totals).some((value) => value !== null))
+
+    return {
+      result: {
+        range: { from: range.from, to: range.to },
+        previousRange: previous,
+        days,
+        series,
+        apps: perApp,
+      },
+      /** Every row read, for figures a page works out beyond the series. */
+      rows: rows.filter((row) => inRange(row, range)),
+    }
+  })
 }
 
 /**
@@ -197,85 +199,87 @@ export const getSocialPerformance = defineQuery({
     SERIES_NOTE,
   input,
   async handler(scope, range) {
-    const { db, organizationId } = scope
-    const { result: section } = await loadSection(scope, PERFORMANCE.social, range)
-    const postRows = await db
-      .select({
-        id: posts.id,
-        appId: posts.appId,
-        platform: posts.platform,
-        url: posts.url,
-        caption: posts.caption,
-        publishedAt: posts.publishedAt,
-        views: posts.views,
-        likes: posts.likes,
-        comments: posts.comments,
-        shares: posts.shares,
+    return scope.run(async (db) => {
+      const { organizationId } = scope
+      const { result: section } = await loadSection(scope, PERFORMANCE.social, range)
+      const postRows = await db
+        .select({
+          id: posts.id,
+          appId: posts.appId,
+          platform: posts.platform,
+          url: posts.url,
+          caption: posts.caption,
+          publishedAt: posts.publishedAt,
+          views: posts.views,
+          likes: posts.likes,
+          comments: posts.comments,
+          shares: posts.shares,
+        })
+        .from(posts)
+        .where(
+          and(
+            eq(posts.organizationId, organizationId),
+            range.appId ? eq(posts.appId, range.appId) : undefined,
+            gte(posts.publishedAt, new Date(`${range.from}T00:00:00Z`)),
+            lt(posts.publishedAt, new Date(`${addDays(range.to, 1)}T00:00:00Z`)),
+          ),
+        )
+        .orderBy(desc(posts.views))
+
+      const platforms = new Map<string, { platform: string; posts: number; views: number; likes: number; comments: number; shares: number }>()
+      for (const post of postRows) {
+        const entry = platforms.get(post.platform) ?? { platform: post.platform, posts: 0, views: 0, likes: 0, comments: 0, shares: 0 }
+        entry.posts += 1
+        entry.views += post.views
+        entry.likes += post.likes
+        entry.comments += post.comments
+        entry.shares += post.shares
+        platforms.set(post.platform, entry)
+      }
+
+      // The rows come most viewed first, so the first of each platform are its top. The top ten of
+      // all platforms together is the first ten of this list.
+      const shown = new Map<string, number>()
+      const top = postRows.filter((post) => {
+        const count = shown.get(post.platform) ?? 0
+        shown.set(post.platform, count + 1)
+        return count < TOP_POSTS_PER_PLATFORM
       })
-      .from(posts)
-      .where(
-        and(
-          eq(posts.organizationId, organizationId),
-          range.appId ? eq(posts.appId, range.appId) : undefined,
-          gte(posts.publishedAt, new Date(`${range.from}T00:00:00Z`)),
-          lt(posts.publishedAt, new Date(`${addDays(range.to, 1)}T00:00:00Z`)),
+      const lifts = new Map(
+        await Promise.all(
+          [...new Set(top.map((post) => post.appId))].map(
+            async (appId) => [appId, await downloadLifts(scope, appId, range)] as const,
+          ),
         ),
       )
-      .orderBy(desc(posts.views))
+      const appNames = new Map(section.apps.map((entry) => [entry.app.id, entry.app.name]))
+      const appName = async (appId: string) => {
+        const known = appNames.get(appId)
+        if (known) return known
+        const [row] = await db.select({ name: apps.name }).from(apps)
+          .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
+          .limit(1)
+        return row?.name ?? appId
+      }
 
-    const platforms = new Map<string, { platform: string; posts: number; views: number; likes: number; comments: number; shares: number }>()
-    for (const post of postRows) {
-      const entry = platforms.get(post.platform) ?? { platform: post.platform, posts: 0, views: 0, likes: 0, comments: 0, shares: 0 }
-      entry.posts += 1
-      entry.views += post.views
-      entry.likes += post.likes
-      entry.comments += post.comments
-      entry.shares += post.shares
-      platforms.set(post.platform, entry)
-    }
-
-    // The rows come most viewed first, so the first of each platform are its top. The top ten of
-    // all platforms together is the first ten of this list.
-    const shown = new Map<string, number>()
-    const top = postRows.filter((post) => {
-      const count = shown.get(post.platform) ?? 0
-      shown.set(post.platform, count + 1)
-      return count < TOP_POSTS_PER_PLATFORM
+      return {
+        ...section,
+        /** The first day TikTok views are daily; before it they sit on each video's post day. */
+        tiktokDailyFrom: await tiktokDailyFrom(scope, range.appId),
+        posts: {
+          byPlatform: [...platforms.values()].sort((a, b) => b.views - a.views),
+          perDay: postsPerDay(postRows, section.days),
+          top: await Promise.all(
+            top.map(async (post) => ({
+              ...post,
+              appName: await appName(post.appId),
+              publishedAt: post.publishedAt.toISOString(),
+              downloadLift: lifts.get(post.appId)?.(post.publishedAt) ?? { status: 'no_downloads' as const },
+            })),
+          ),
+        },
+      }
     })
-    const lifts = new Map(
-      await Promise.all(
-        [...new Set(top.map((post) => post.appId))].map(
-          async (appId) => [appId, await downloadLifts(scope, appId, range)] as const,
-        ),
-      ),
-    )
-    const appNames = new Map(section.apps.map((entry) => [entry.app.id, entry.app.name]))
-    const appName = async (appId: string) => {
-      const known = appNames.get(appId)
-      if (known) return known
-      const [row] = await db.select({ name: apps.name }).from(apps)
-        .where(and(eq(apps.organizationId, organizationId), eq(apps.id, appId)))
-        .limit(1)
-      return row?.name ?? appId
-    }
-
-    return {
-      ...section,
-      /** The first day TikTok views are daily; before it they sit on each video's post day. */
-      tiktokDailyFrom: await tiktokDailyFrom(scope, range.appId),
-      posts: {
-        byPlatform: [...platforms.values()].sort((a, b) => b.views - a.views),
-        perDay: postsPerDay(postRows, section.days),
-        top: await Promise.all(
-          top.map(async (post) => ({
-            ...post,
-            appName: await appName(post.appId),
-            publishedAt: post.publishedAt.toISOString(),
-            downloadLift: lifts.get(post.appId)?.(post.publishedAt) ?? { status: 'no_downloads' as const },
-          })),
-        ),
-      },
-    }
   },
 })
 

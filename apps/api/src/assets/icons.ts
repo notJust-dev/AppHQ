@@ -13,11 +13,13 @@ export function iconOf(details: unknown): string | null {
  * Each app's icon by app id: the icon of the iOS app linked to it, which the App Store sync
  * keeps current. Read whenever apps are listed, so linking or unlinking an iOS app shows at once.
  */
-export async function appIcons({ db, organizationId }: Scope): Promise<Map<string, string>> {
-  const rows = await db
-    .select({ appId: assets.appId, details: assets.details })
-    .from(assets)
-    .where(and(eq(assets.organizationId, organizationId), eq(assets.kind, 'ios_app'), isNotNull(assets.appId)))
+export async function appIcons(scope: Scope): Promise<Map<string, string>> {
+  const rows = await scope.run((db) =>
+    db
+      .select({ appId: assets.appId, details: assets.details })
+      .from(assets)
+      .where(and(eq(assets.organizationId, scope.organizationId), eq(assets.kind, 'ios_app'), isNotNull(assets.appId))),
+  )
   const icons = new Map<string, string>()
   for (const row of rows) {
     const icon = iconOf(row.details)

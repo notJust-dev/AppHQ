@@ -16,46 +16,50 @@ export type ReviewReading = Omit<NewReview, 'id' | 'organizationId' | 'readAt' |
  * text changed becomes unread again; a new developer reply does not.
  */
 export async function saveReviews(
-  { db, organizationId }: Scope,
+  scope: Scope,
   readings: ReviewReading[],
   now: Date = new Date(),
 ): Promise<number> {
+  const { organizationId } = scope
   const cutoff = new Date(now.getTime() - UNREAD_DAYS * 86_400_000)
-  for (let i = 0; i < readings.length; i += CHUNK) {
-    await db
-      .insert(reviews)
-      .values(
-        readings.slice(i, i + CHUNK).map((reading) => ({
-          ...reading,
-          organizationId,
-          readAt: reading.createdAt < cutoff ? now : null,
-          fetchedAt: now,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [reviews.organizationId, reviews.store, reviews.externalId],
-        set: {
-          appId: sql`excluded.app_id`,
-          rating: sql`excluded.rating`,
-          title: sql`excluded.title`,
-          body: sql`excluded.body`,
-          author: sql`excluded.author`,
-          territory: sql`excluded.territory`,
-          language: sql`excluded.language`,
-          appVersion: sql`excluded.app_version`,
-          device: sql`excluded.device`,
-          url: sql`excluded.url`,
-          reply: sql`excluded.reply`,
-          repliedAt: sql`excluded.replied_at`,
-          editedAt: sql`excluded.edited_at`,
-          fetchedAt: sql`excluded.fetched_at`,
-          readAt: sql`case when ${reviews.rating} <> excluded.rating
-            or ${reviews.title} is distinct from excluded.title
-            or ${reviews.body} is distinct from excluded.body
-            then null else ${reviews.readAt} end`,
-        },
-      })
-  }
+  if (readings.length === 0) return 0
+  await scope.run(async (db) => {
+    for (let i = 0; i < readings.length; i += CHUNK) {
+      await db
+        .insert(reviews)
+        .values(
+          readings.slice(i, i + CHUNK).map((reading) => ({
+            ...reading,
+            organizationId,
+            readAt: reading.createdAt < cutoff ? now : null,
+            fetchedAt: now,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [reviews.organizationId, reviews.store, reviews.externalId],
+          set: {
+            appId: sql`excluded.app_id`,
+            rating: sql`excluded.rating`,
+            title: sql`excluded.title`,
+            body: sql`excluded.body`,
+            author: sql`excluded.author`,
+            territory: sql`excluded.territory`,
+            language: sql`excluded.language`,
+            appVersion: sql`excluded.app_version`,
+            device: sql`excluded.device`,
+            url: sql`excluded.url`,
+            reply: sql`excluded.reply`,
+            repliedAt: sql`excluded.replied_at`,
+            editedAt: sql`excluded.edited_at`,
+            fetchedAt: sql`excluded.fetched_at`,
+            readAt: sql`case when ${reviews.rating} <> excluded.rating
+              or ${reviews.title} is distinct from excluded.title
+              or ${reviews.body} is distinct from excluded.body
+              then null else ${reviews.readAt} end`,
+          },
+        })
+    }
+  })
   return readings.length
 }
 
@@ -64,12 +68,13 @@ export async function saveReviews(
  * "mark all read" over the inbox's filters). Returns how many changed.
  */
 export async function markReviews(
-  { db, organizationId }: Scope,
+  scope: Scope,
   where: SQL | undefined,
   read: boolean,
   ids?: string[],
 ): Promise<number> {
-  const changed = await db
+  const { organizationId } = scope
+  const changed = await scope.run((db) => db
     .update(reviews)
     .set({ readAt: read ? new Date() : null })
     .where(
@@ -80,6 +85,6 @@ export async function markReviews(
         read ? isNull(reviews.readAt) : isNotNull(reviews.readAt),
       ),
     )
-    .returning({ id: reviews.id })
+    .returning({ id: reviews.id }))
   return changed.length
 }

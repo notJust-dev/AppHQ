@@ -1,6 +1,5 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { linkedAssets } from '../../assets/store.js'
-import type { Db } from '../../db/client.js'
 import type { Scope } from '../../organizations/scope.js'
 import { connections, type Connection, type NewMetric } from '../../db/schema.js'
 import type { Secrets } from '../../lib/crypto.js'
@@ -19,22 +18,25 @@ const channelConnections = (scope: Scope, appId: string) =>
   linkedAssets(scope, 'youtube_channel', appId).then((rows) => rows.flatMap((row) => (row.connection ? [row.connection] : [])))
 
 /**
- * A working access token: the stored one while it lasts, a refreshed one (saved) after that.
+ * A working access token: the stored one while it lasts, a refreshed one after that, saved in a
+ * unit of work of its own as soon as Google returns it.
  * Google access tokens last an hour; the refresh token lasts until access is withdrawn.
  */
-async function accessToken(db: Db, secrets: Secrets, client: YouTubeClient, connection: Connection, now: Date) {
+async function accessToken(scope: Scope, secrets: Secrets, client: YouTubeClient, connection: Connection, now: Date) {
   const fresh = connection.expiresAt && connection.expiresAt.getTime() - 60_000 > now.getTime()
   if (fresh && connection.accessTokenEnc) return secrets.decrypt(connection.accessTokenEnc)
   if (!connection.refreshTokenEnc) throw new YouTubeError(401, 'invalid_grant', 'No refresh token is stored')
   const tokens = await client.refresh(secrets.decrypt(connection.refreshTokenEnc))
-  await db
-    .update(connections)
-    .set({
-      accessTokenEnc: secrets.encrypt(tokens.access_token),
-      expiresAt: new Date(now.getTime() + (tokens.expires_in ?? 3600) * 1000),
-      updatedAt: now,
-    })
-    .where(eq(connections.id, connection.id))
+  await scope.run((db) =>
+    db
+      .update(connections)
+      .set({
+        accessTokenEnc: secrets.encrypt(tokens.access_token),
+        expiresAt: new Date(now.getTime() + (tokens.expires_in ?? 3600) * 1000),
+        updatedAt: now,
+      })
+      .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, connection.id))),
+  )
   return tokens.access_token
 }
 
@@ -57,8 +59,8 @@ export function createYouTubeConnector(
       return (await channelConnections(scope, app.id)).length > 0
     },
 
-    async sync({ db, organizationId, app, range, secrets }) {
-      const scope = { db, organizationId }
+    async sync(scope) {
+      const { app, range, secrets } = scope
       const client = createYouTubeClient({ config: requireYouTubeConfig(options.env), fetch: options.fetch })
       const today = todayUtc(now())
       const totals = new Map<string, number>()
@@ -77,7 +79,7 @@ export function createYouTubeConnector(
           continue
         }
         try {
-          const token = await accessToken(db, secrets, client, connection, now())
+          const token = await accessToken(scope, secrets, client, connection, now())
           const channel = await client.myChannel(token)
           if (channel?.subscribers !== null && channel?.subscribers !== undefined) add('followers', today, channel.subscribers)
           else followersComplete = false
@@ -111,17 +113,21 @@ export function createYouTubeConnector(
             rowsWritten += await savePosts(scope, readings, today)
           }
 
-          await db
-            .update(connections)
-            .set({ status: 'ok', lastSyncedAt: now(), updatedAt: now() })
-            .where(eq(connections.id, connection.id))
+          await scope.run((db) =>
+            db
+              .update(connections)
+              .set({ status: 'ok', lastSyncedAt: now(), updatedAt: now() })
+              .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, connection.id))),
+          )
         } catch (err) {
           followersComplete = false
           const lost = err instanceof YouTubeError && err.isAuthProblem
-          await db
-            .update(connections)
-            .set({ status: lost ? 'needs_reauth' : 'error', updatedAt: now() })
-            .where(eq(connections.id, connection.id))
+          await scope.run((db) =>
+            db
+              .update(connections)
+              .set({ status: lost ? 'needs_reauth' : 'error', updatedAt: now() })
+              .where(and(eq(connections.organizationId, scope.organizationId), eq(connections.id, connection.id))),
+          )
           failures.push(`${name}: ${err instanceof Error ? err.message : String(err)}`)
         }
       }

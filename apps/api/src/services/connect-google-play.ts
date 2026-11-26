@@ -9,9 +9,9 @@ import {
   type PlayClientOptions,
 } from '../connectors/google-play/connector.js'
 import { StorageError } from '../connectors/google-play/storage.js'
-import type { Db } from '../db/client.js'
 import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 
 /**
@@ -37,7 +37,7 @@ export interface GooglePlayConnectResult {
  * read the account's report files, stores the key encrypted, and lists the packages found.
  */
 export async function connectGooglePlay(
-  deps: { db: Db; organizationId: string; secrets: Secrets } & PlayClientOptions,
+  deps: Scope & { secrets: Secrets } & PlayClientOptions,
   input: { serviceAccountJson: string; storageUri: string },
 ): Promise<GooglePlayConnectResult> {
   let parsedJson: unknown
@@ -98,20 +98,24 @@ export async function connectGooglePlay(
     updatedAt: new Date(),
   }
   // One Play account: a new bucket replaces the old connection rather than adding a second.
-  const scope = { db: deps.db, organizationId: deps.organizationId }
-  const existing = await findPlayConnection(scope)
-  if (existing && existing.externalAccountId !== bucket) {
-    await deps.db
-      .delete(connections)
-      .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.id, existing.id)))
-  }
-  const [connection] = await deps.db
-    .insert(connections)
-    .values({ organizationId: deps.organizationId, provider: GOOGLE_PLAY, externalAccountId: bucket, ...values })
-    .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
-    .returning()
+  const connection = await deps.run(async (db) => {
+    const existing = await findPlayConnection(deps)
+    if (existing && existing.externalAccountId !== bucket) {
+      await db
+        .delete(connections)
+        .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.id, existing.id)))
+    }
+    const [row] = await db
+      .insert(connections)
+      .values({ organizationId: deps.organizationId, provider: GOOGLE_PLAY, externalAccountId: bucket, ...values })
+      .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
+      .returning()
+    return row
+  })
   if (!connection) throw new Error('could not save the Google Play connection')
 
-  const matched = await savePackages(scope, connection.id, packageNames, await client.titles())
+  // The app titles come from Google, outside any unit of work; savePackages then writes in its own.
+  const titles = await client.titles()
+  const matched = await savePackages(deps, connection.id, packageNames, titles)
   return { serviceAccount: email, packages: packageNames.length, matched }
 }

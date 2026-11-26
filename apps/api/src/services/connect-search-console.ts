@@ -3,9 +3,9 @@ import { GoogleAuthError, serviceAccountSchema, type ServiceAccount } from '../c
 import { findPlayConnection, readPlayCredentials } from '../connectors/google-play/connector.js'
 import { SEARCH_CONSOLE, SearchConsoleError, createSearchConsoleClient } from '../connectors/search-console/client.js'
 import { findSearchConsoleConnection, saveSites, type SearchConsoleOptions } from '../connectors/search-console/connector.js'
-import type { Db } from '../db/client.js'
 import { connections } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
+import type { Scope } from '../organizations/scope.js'
 import { ConnectInputError } from './connect-app-store.js'
 
 export interface SearchConsoleConnectResult {
@@ -17,11 +17,11 @@ export interface SearchConsoleConnectResult {
 
 /** The service account key pasted or dropped, or the one Google Play already uses. */
 function serviceAccountFrom(
-  deps: { db: Db; organizationId: string; secrets: Secrets },
+  deps: Scope & { secrets: Secrets },
   input: { serviceAccountJson?: string; usePlayKey?: boolean },
 ): Promise<ServiceAccount> | ServiceAccount {
   if (input.usePlayKey) {
-    return findPlayConnection({ db: deps.db, organizationId: deps.organizationId }).then((play) => {
+    return findPlayConnection(deps).then((play) => {
       if (!play?.accessTokenEnc) throw new ConnectInputError('Google Play is not connected, so there is no key to reuse.')
       return readPlayCredentials(deps.secrets, play.accessTokenEnc).serviceAccount
     })
@@ -45,7 +45,7 @@ function serviceAccountFrom(
  * properties as websites waiting to be linked to apps.
  */
 export async function connectSearchConsole(
-  deps: { db: Db; organizationId: string; secrets: Secrets } & SearchConsoleOptions,
+  deps: Scope & { secrets: Secrets } & SearchConsoleOptions,
   input: { serviceAccountJson?: string; usePlayKey?: boolean },
 ): Promise<SearchConsoleConnectResult> {
   const serviceAccount = await serviceAccountFrom(deps, input)
@@ -78,20 +78,20 @@ export async function connectSearchConsole(
     updatedAt: new Date(),
   }
   // One Search Console connection: another service account replaces it.
-  const scope = { db: deps.db, organizationId: deps.organizationId }
-  const existing = await findSearchConsoleConnection(scope)
-  if (existing && existing.externalAccountId !== email) {
-    await deps.db
-      .delete(connections)
-      .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.id, existing.id)))
-  }
-  const [connection] = await deps.db
-    .insert(connections)
-    .values({ organizationId: deps.organizationId, provider: SEARCH_CONSOLE, externalAccountId: email, ...values })
-    .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
-    .returning()
-  if (!connection) throw new Error('could not save the Search Console connection')
-
-  const linked = await saveSites(scope, connection.id, sites)
+  const linked = await deps.run(async (db) => {
+    const existing = await findSearchConsoleConnection(deps)
+    if (existing && existing.externalAccountId !== email) {
+      await db
+        .delete(connections)
+        .where(and(eq(connections.organizationId, deps.organizationId), eq(connections.id, existing.id)))
+    }
+    const [row] = await db
+      .insert(connections)
+      .values({ organizationId: deps.organizationId, provider: SEARCH_CONSOLE, externalAccountId: email, ...values })
+      .onConflictDoUpdate({ target: [connections.organizationId, connections.provider, connections.externalAccountId], set: values })
+      .returning()
+    if (!row) throw new Error('could not save the Search Console connection')
+    return saveSites(deps, row.id, sites)
+  })
   return { serviceAccount: email, sites: sites.length, linked }
 }
