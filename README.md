@@ -218,7 +218,7 @@ alongside the internal token.
 Add a domain to each application in Velocity, for example `app.example.com` for `web` and
 `api.example.com` for `api`. Then update `API_URL` on `web`, set `PUBLIC_URL` on `web` to the
 new dashboard address, and update the redirect URIs registered with TikTok, Meta and Google. If
-accounts are on, also set `BETTER_AUTH_URL` on `api` to the new dashboard address and update the
+accounts are on, also set `PUBLIC_URL` on `api` to the same new dashboard address and update the
 sign-in redirect URIs with Google and GitHub.
 
 ### Good to know
@@ -302,12 +302,12 @@ here as `<web address>`; locally it is `http://127.0.0.1:3000`.
 
 You can set up just one of them.
 
-**2. Set the variables on the `api` app** and redeploy. Nothing changes on `web`.
+**2. Set the variables on the `api` app** and redeploy. Nothing new is needed on `web`.
 
 | Variable | Value |
 |---|---|
 | `BETTER_AUTH_SECRET` | A new `openssl rand -hex 32` value. Changing it signs everyone out |
-| `BETTER_AUTH_URL` | `<web address>`, with no path. Same as `PUBLIC_URL` on `web`, if you set that |
+| `PUBLIC_URL` | `<web address>`, with no path: the dashboard's address, not the API's. The same value as `PUBLIC_URL` on `web` |
 | `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET` | From the Google OAuth client |
 | `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` | From the GitHub OAuth App |
 
