@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 
-export type Crumb = { label: string; to: '/' | '/apps' | '/accounts' }
+export type Crumb = { label: string; to: '/' | '/apps' | '/accounts' | '/social' }
 
 const WIDTH = { wide: 'max-w-6xl', narrow: 'max-w-4xl' } as const
 

@@ -39,6 +39,9 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   SidebarSeparator,
   useSidebar,
@@ -56,13 +59,32 @@ const ACTIVE =
  * The pages that follow the app chosen in the top bar, roughly in the funnel's order: people
  * see you, visit the store, pay, then review. Reviews comes in its own item, for its badge.
  */
-const ANALYTICS = [
+const ANALYTICS: Section[] = [
   { to: '/', label: 'Overview', Icon: LayoutDashboard },
-  { to: '/social', label: 'Social', Icon: Megaphone },
+  {
+    to: '/social',
+    label: 'Social',
+    Icon: Megaphone,
+    pages: [
+      { to: '/social', label: 'Performance' },
+      { to: '/social/posts', label: 'Posts' },
+    ],
+  },
   { to: '/seo', label: 'SEO', Icon: Search },
   { to: '/store', label: 'Store', Icon: Store },
   { to: '/monetisation', label: 'Monetisation', Icon: Wallet },
-] as const
+]
+
+/**
+ * A sidebar item. A section with `pages` lists them under it while one of them is open; its own
+ * link opens the first.
+ */
+interface Section {
+  to: '/' | '/social' | '/seo' | '/store' | '/monetisation'
+  label: string
+  Icon: typeof Search
+  pages?: { to: '/social' | '/social/posts'; label: string }[]
+}
 
 /** What feeds the dashboard: the apps and the accounts they come from. */
 const SETUP = [
@@ -109,17 +131,34 @@ export function AppSidebar({ organization }: { organization: string | null }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu aria-label="Sections">
-              {ANALYTICS.map(({ to, label, Icon }) => (
-                <SidebarMenuItem key={to}>
-                  <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
-                    {/* The app and range in the address come along; see lib/range.ts. */}
-                    <Link to={to} activeOptions={{ exact: to === '/', includeSearch: false }}>
-                      <Icon />
-                      <span>{label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {ANALYTICS.map(({ to, label, Icon, pages }) => {
+                const open = pages !== undefined && (pathname === to || pathname.startsWith(`${to}/`))
+                return (
+                  <SidebarMenuItem key={to}>
+                    {/* With its pages open, the page is marked below, not the section. */}
+                    <SidebarMenuButton asChild tooltip={label} className={pages ? undefined : ACTIVE}>
+                      {/* The app and range in the address come along; see lib/range.ts. */}
+                      <Link to={to} activeOptions={{ exact: to === '/', includeSearch: false }}>
+                        <Icon />
+                        <span>{label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {open && (
+                      <SidebarMenuSub aria-label={label}>
+                        {pages.map((page) => (
+                          <SidebarMenuSubItem key={page.to}>
+                            <SidebarMenuSubButton asChild className={ACTIVE} data-active={undefined}>
+                              <Link to={page.to} activeOptions={{ exact: true, includeSearch: false }}>
+                                <span>{page.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
+                  </SidebarMenuItem>
+                )
+              })}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Reviews" className={ACTIVE}>
                   <Link to="/reviews" activeOptions={{ includeSearch: false }}>

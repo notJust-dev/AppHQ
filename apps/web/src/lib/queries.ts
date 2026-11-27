@@ -27,9 +27,10 @@ export const flowQuery = (appId: string, dates: { from: string; to: string }) =>
     queryFn: () => getAppFlowFn({ data: { appId, ...dates } }),
   })
 
-export const postsQuery = (appId: string, dates: { from: string; to: string }) =>
+/** The posts published in the range: one app's, or every app's without one. */
+export const postsQuery = (appId: string | undefined, dates: { from: string; to: string }) =>
   queryOptions({
-    queryKey: ['posts', appId, dates.from, dates.to],
+    queryKey: ['posts', appId ?? 'all', dates.from, dates.to],
     queryFn: () => listPostsFn({ data: { appId, ...dates } }),
   })
 

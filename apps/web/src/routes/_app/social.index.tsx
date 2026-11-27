@@ -22,7 +22,8 @@ import { socialPerformanceQuery, type SocialPerformance } from '@/lib/queries'
 import { rangeToDates } from '@/lib/range'
 import { sourceLabel } from '@/lib/sources'
 
-export const Route = createFileRoute('/_app/social')({
+/** Social › Performance: how much is posted, how it does, and whether it turns into downloads. */
+export const Route = createFileRoute('/_app/social/')({
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(socialPerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),
@@ -63,7 +64,8 @@ function SocialPage() {
   return (
     <>
       <PerformanceHeader
-        title="Social"
+        title="Performance"
+        crumbs={[{ label: 'Social', to: '/social' }]}
         description="How much you post, how the posts do, and whether the views turn into downloads."
         range={range}
 

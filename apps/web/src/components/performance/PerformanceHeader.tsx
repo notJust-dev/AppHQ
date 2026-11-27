@@ -1,4 +1,4 @@
-import { PageHeader } from '@/components/PageHeader'
+import { PageHeader, type Crumb } from '@/components/PageHeader'
 import { RangeSwitch } from '@/components/RangeSwitch'
 import { formatDay } from '@/lib/format'
 import { RANGE_DAYS, type RangeKey } from '@/lib/range'
@@ -9,19 +9,26 @@ import { RANGE_DAYS, type RangeKey } from '@/lib/range'
  */
 export function PerformanceHeader(props: {
   title: string
+  /** The section a subpage sits in, such as Social for Social › Posts. */
+  crumbs?: Crumb[]
   description: string
   range: RangeKey
   dates: { from: string; to: string }
+  /** Whether the page sets its numbers against the days before; a plain list doesn't. */
+  compared?: boolean
 }) {
+  const compared = props.compared ?? true
   return (
     <PageHeader
       title={props.title}
+      crumbs={props.crumbs}
       scoped
       description={
         <>
           {props.description}{' '}
           <span className="whitespace-nowrap">
-            {formatDay(props.dates.from)} to {formatDay(props.dates.to)}, against the {RANGE_DAYS[props.range]} days before.
+            {formatDay(props.dates.from)} to {formatDay(props.dates.to)}
+            {compared ? `, against the ${RANGE_DAYS[props.range]} days before.` : '.'}
           </span>
         </>
       }
