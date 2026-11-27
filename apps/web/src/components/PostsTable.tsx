@@ -8,7 +8,6 @@ import { Private } from '@/components/Private'
 import { SourceLogo } from '@/components/SourceLogo'
 import { formatCount, formatDay } from '@/lib/format'
 import { liftSentence, liftShort, type Lift } from '@/lib/lift'
-import type { RangeKey } from '@/lib/range'
 import { cn } from '@/lib/utils'
 
 /** What a posts table shows of a post; lists across apps also name the post's app. */
@@ -58,8 +57,8 @@ export function PostsPanel(props: {
    * most viewed first, so this is the top of the platform.
    */
   limit?: number
-  /** Names each post's app under its caption, linked to the app's page over this range. */
-  appRange?: RangeKey
+  /** Names each post's app under its caption; choosing it limits the page to that app. */
+  showApp?: boolean
   footer?: ReactNode
 }) {
   const filter = usePlatformFilter(props.posts)
@@ -81,15 +80,15 @@ export function PostsPanel(props: {
       {props.posts.length === 0 ? (
         props.empty
       ) : (
-        <PostsTable posts={shown} sortBy={props.sortBy} label={props.label} appRange={props.appRange} />
+        <PostsTable posts={shown} sortBy={props.sortBy} label={props.label} showApp={props.showApp} />
       )}
     </Panel>
   )
 }
 
 /** The posts, sorted by any column but the caption. */
-function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label: string; appRange?: RangeKey }) {
-  const { appRange } = props
+function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label: string; showApp?: boolean }) {
+  const { showApp } = props
   const columns = useMemo(
     () =>
       helper.columns([
@@ -110,7 +109,7 @@ function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label
           id: 'post',
           header: 'Post',
           meta: { cellClassName: 'max-w-[22rem] font-normal' },
-          cell: (info) => <Caption post={info.row.original} appRange={appRange} />,
+          cell: (info) => <Caption post={info.row.original} showApp={showApp} />,
         }),
         totalColumn('views', 'Views'),
         totalColumn('likes', 'Likes'),
@@ -136,7 +135,7 @@ function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label
           },
         }),
       ]),
-    [appRange],
+    [showApp],
   )
 
   const table = useTable({
@@ -152,7 +151,7 @@ function PostsTable(props: { posts: PostRow[]; sortBy: 'posted' | 'views'; label
   return <DataTable table={table} minWidth={760} label={props.label} rowHeader="post" rowClassName="*:align-top" />
 }
 
-function Caption({ post, appRange }: { post: PostRow; appRange?: RangeKey }) {
+function Caption({ post, showApp }: { post: PostRow; showApp?: boolean }) {
   const text = post.caption || 'Untitled post'
   return (
     <>
@@ -172,11 +171,10 @@ function Caption({ post, appRange }: { post: PostRow; appRange?: RangeKey }) {
           {text}
         </span>
       )}
-      {appRange && post.appId && (
+      {showApp && post.appId && (
         <Link
-          to="/apps/$appId"
-          params={{ appId: post.appId }}
-          search={{ range: appRange }}
+          to="."
+          search={(previous: Record<string, unknown>) => ({ ...previous, app: post.appId })}
           className="mt-0.5 block w-fit text-xs text-muted-foreground hover:text-foreground"
         >
           <Private>{post.appName ?? post.appId}</Private>

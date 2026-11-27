@@ -8,6 +8,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { AppSwitcher } from '@/components/AppSwitcher'
 import { Private } from '@/components/Private'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -33,6 +34,8 @@ export function PageHeader(props: {
   tabs?: ReactNode
   /** For settings and forms: a narrower column, matched by the page body. */
   narrow?: boolean
+  /** The page follows the chosen app: the bar starts with the switcher for it. */
+  scoped?: boolean
 }) {
   const title = props.privateTitle ? <Private>{props.title}</Private> : props.title
   return (
@@ -42,6 +45,14 @@ export function PageHeader(props: {
         <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-center" />
         <Breadcrumb className="min-w-0">
           <BreadcrumbList className="flex-nowrap">
+            {props.scoped && (
+              <>
+                <BreadcrumbItem className="min-w-0 sm:max-w-72 sm:shrink-0">
+                  <AppSwitcher />
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            )}
             {props.crumbs?.map((crumb) => (
               <Fragment key={crumb.to}>
                 <BreadcrumbItem>
@@ -52,7 +63,8 @@ export function PageHeader(props: {
                 <BreadcrumbSeparator />
               </Fragment>
             ))}
-            <BreadcrumbItem className="min-w-0">
+            {/* Beside the switcher, the page's short name stays whole and the app's name gives way. */}
+            <BreadcrumbItem className={props.scoped ? 'shrink-0' : 'min-w-0'}>
               <BreadcrumbPage className="truncate">{title}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>

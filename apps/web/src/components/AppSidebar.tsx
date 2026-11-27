@@ -12,14 +12,12 @@ import {
   Monitor,
   Moon,
   Plug,
-  Plus,
   Search,
   Store,
   Sun,
   Wallet,
 } from 'lucide-react'
 import { useEffect } from 'react'
-import { AppIcon } from '@/components/AppIcon'
 import { BrandMark, BrandName } from '@/components/Brand'
 import { Private } from '@/components/Private'
 import {
@@ -47,7 +45,7 @@ import {
 } from '@/components/ui/sidebar'
 import { signOutFn } from '@/fns/auth'
 import { setPrivacy, usePrivacy } from '@/lib/privacy'
-import { appsQuery, unreadReviewsQuery } from '@/lib/queries'
+import { unreadReviewsQuery } from '@/lib/queries'
 import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
 
 /** TanStack marks the link to the current page with aria-current; that is the active item. */
@@ -62,18 +60,14 @@ const PERFORMANCE = [
   { to: '/seo', label: 'SEO', Icon: Search },
 ] as const
 
-/** How many apps the sidebar lists before pointing to the Apps page for the rest. */
-const APPS_SHOWN = 12
-
 /**
- * The navigation: the three sections, the apps for switching between them, and the theme and
- * sign-out at the bottom. Collapsed, each item keeps its icon and names itself in a tooltip.
+ * The navigation: the sections, and the theme and sign-out at the bottom. The app the
+ * dashboard shows is chosen in each page's top bar. Collapsed, each item keeps its icon and
+ * names itself in a tooltip.
+ * `organization`: the name of the organization the dashboard works in, when the API said.
  */
-/** `organization`: the name of the organization the dashboard works in, when the API said. */
 export function AppSidebar({ organization }: { organization: string | null }) {
-  const { data: apps = [] } = useQuery(appsQuery())
   const { data: unread } = useQuery(unreadReviewsQuery())
-  const own = apps.filter((app) => app.kind !== 'portfolio')
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
 
@@ -106,10 +100,10 @@ export function AppSidebar({ organization }: { organization: string | null }) {
           <SidebarGroupContent>
             <SidebarMenu aria-label="Sections">
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Portfolio" className={ACTIVE}>
+                <SidebarMenuButton asChild tooltip="Overview" className={ACTIVE}>
                   <Link to="/" activeOptions={{ exact: true, includeSearch: false }}>
                     <LayoutDashboard />
-                    <span>Portfolio</span>
+                    <span>Overview</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -163,42 +157,6 @@ export function AppSidebar({ organization }: { organization: string | null }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Your apps</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu aria-label="Your apps">
-              {own.slice(0, APPS_SHOWN).map((app) => (
-                <SidebarMenuItem key={app.id}>
-                  <SidebarMenuButton asChild tooltip={{ children: <Private>{app.name}</Private> }} className={ACTIVE}>
-                    <Link
-                      to="/apps/$appId"
-                      params={{ appId: app.id }}
-                      activeOptions={{ includeSearch: false }}
-                    >
-                      <AppIcon app={app} className="size-4 text-[10px]" />
-                      <Private className="truncate">{app.name}</Private>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {own.length > APPS_SHOWN && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className="text-muted-foreground">
-                    <Link to="/apps">All {own.length} apps</Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Add app" className={`text-muted-foreground ${ACTIVE}`}>
-                  <Link to="/apps/new">
-                    <Plus />
-                    <span>Add app</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>

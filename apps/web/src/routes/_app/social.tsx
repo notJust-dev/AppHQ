@@ -66,7 +66,7 @@ function SocialPage() {
         title="Social"
         description="How much you post, how the posts do, and whether the views turn into downloads."
         range={range}
-        app={app}
+
         dates={dates}
       />
       <PageBody>
@@ -142,7 +142,7 @@ function SocialPage() {
               sortBy="views"
               limit={TOP_POSTS}
               // Across apps, each post names its app.
-              appRange={app ? undefined : range}
+              showApp={!app}
               label="This range's most viewed posts, with their lifetime totals and download lift"
               empty={<p className="px-5 py-6 text-muted-foreground">No posts were published in this range.</p>}
             />
@@ -150,7 +150,6 @@ function SocialPage() {
             {!app && data.apps.length > 1 && (
               <Panel title="By app" description="Each app's social numbers over the same days. Select a column heading to sort by it." bodyClassName="">
                 <AppComparison
-                  range={range}
                   sortBy="views"
                   rows={data.apps.map((entry) => ({
                     app: entry.app,

@@ -47,7 +47,7 @@ function SeoPage() {
       title="SEO"
       description="How your apps' websites do in Google search, from Search Console."
       range={range}
-      app={app}
+
       dates={dates}
     />
   )
@@ -119,7 +119,6 @@ function SeoPage() {
         {!app && data.apps.length > 1 && (
           <Panel title="By app" description="Each app's website over the same days. Select a column heading to sort by it." bodyClassName="">
             <AppComparison
-              range={range}
               sortBy="clicks"
               rows={data.apps.map((entry) => ({
                 app: entry.app,

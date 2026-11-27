@@ -5,8 +5,8 @@ import { PageBody, PageHeader, TAB_CLASS } from '@/components/PageHeader'
 import { appsQuery } from '@/lib/queries'
 
 /**
- * One app: its name and two tabs, Overview (`apps.$appId.index.tsx`, the numbers) and Settings
- * (`apps.$appId.settings.tsx`, what feeds it). The range stays in the address across both.
+ * One app: its name and two tabs, Overview (the Overview page with this app chosen) and Settings
+ * (`apps.$appId.settings.tsx`, what feeds it).
  */
 export const Route = createFileRoute('/_app/apps/$appId')({
   loader: async ({ context, params }) => {
@@ -36,16 +36,10 @@ function AppLayout() {
         icon={app.kind === 'portfolio' ? undefined : <AppIcon app={app} className="size-9 text-sm" />}
         tabs={
           <nav aria-label="App sections" className="flex gap-5">
-            <Link
-              to="/apps/$appId"
-              params={{ appId }}
-              search={(previous) => previous}
-              activeOptions={{ exact: true, includeSearch: false }}
-              className={TAB_CLASS}
-            >
+            <Link to="/" search={(previous) => ({ ...previous, app: appId })} className={TAB_CLASS}>
               Overview
             </Link>
-            <Link to="/apps/$appId/settings" params={{ appId }} search={(previous) => previous} className={TAB_CLASS}>
+            <Link to="/apps/$appId/settings" params={{ appId }} className={TAB_CLASS}>
               Settings
             </Link>
           </nav>

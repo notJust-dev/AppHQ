@@ -3,7 +3,6 @@ import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { useMemo, type ReactNode } from 'react'
 import { change, formatCount, formatMoney, formatRatio, per } from '@/lib/format'
 import { reportingOf, type Overview } from '@/lib/queries'
-import type { RangeKey } from '@/lib/range'
 import { AppIcon } from './AppIcon'
 import { Private } from './Private'
 import { Delta } from './Delta'
@@ -20,7 +19,7 @@ const helper = createColumnHelper<SortableFeatures, AppRow>()
  * Each app's funnel over the range. Any column sorts it; apps with no data for a column stay at
  * the bottom whichever way it is sorted, since no data is not the smallest number.
  */
-export function AppsTable({ apps, range }: { apps: Overview['apps']; range: RangeKey }) {
+export function AppsTable({ apps }: { apps: Overview['apps'] }) {
   const columns = useMemo(
     () =>
       helper.columns([
@@ -28,7 +27,7 @@ export function AppsTable({ apps, range }: { apps: Overview['apps']; range: Rang
           id: 'app',
           header: 'App',
           sortFn: 'alphanumeric',
-          cell: (info) => <AppName app={info.row.original.app} range={range} />,
+          cell: (info) => <AppName app={info.row.original.app} />,
         }),
         stageColumn('socialViews', 'Social views', 'bg-views', formatCount),
         stageColumn('downloads', 'Downloads', 'bg-downloads', formatCount),
@@ -53,7 +52,7 @@ export function AppsTable({ apps, range }: { apps: Overview['apps']; range: Rang
           formatMoney,
         ),
       ]),
-    [range],
+    [],
   )
 
   const table = useTable({
@@ -116,14 +115,14 @@ function ratioColumn(
   })
 }
 
-function AppName({ app, range }: { app: AppRow['app']; range: RangeKey }) {
+/** The app's name, choosing it: Overview then shows that app's numbers. */
+function AppName({ app }: { app: AppRow['app'] }) {
   return (
     <span className="flex items-center gap-3">
       <AppIcon app={app} className="size-7 text-xs" />
       <Link
-        to="/apps/$appId"
-        params={{ appId: app.id }}
-        search={{ range }}
+        to="/"
+        search={(previous) => ({ ...previous, app: app.id })}
         className="hover:underline hover:underline-offset-4"
       >
         {app.kind === 'portfolio' ? app.name : <Private>{app.name}</Private>}

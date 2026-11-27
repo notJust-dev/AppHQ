@@ -40,7 +40,7 @@ function MonetisationPage() {
       title="Monetisation"
       description="What the apps earn, and the subscriptions and trials behind it, from RevenueCat."
       range={range}
-      app={app}
+
       dates={dates}
     />
   )
@@ -120,7 +120,6 @@ function MonetisationPage() {
         {!app && data.apps.length > 1 && (
           <Panel title="By app" description="Each app's money over the same days. Select a column heading to sort by it." bodyClassName="">
             <AppComparison
-              range={range}
               sortBy="revenue"
               rows={data.apps.map((entry) => ({
                 app: entry.app,

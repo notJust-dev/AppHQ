@@ -14,7 +14,8 @@ export function RangeSwitch({ current }: { current: RangeKey }) {
           // The current page, with only the range changed.
           to="."
           search={(previous) => ({ ...previous, range: key })}
-          // TanStack marks the link to the address in view with aria-current="page".
+          // Exact, so the default range's link, which names none, isn't current on 7 or 90 days.
+          activeOptions={{ exact: true }}
           data-active={key === current}
           className="inline-flex h-full items-center rounded-md px-2.5 text-sm font-medium transition-colors hover:text-foreground data-[active=true]:bg-card data-[active=true]:text-foreground data-[active=true]:shadow-sm dark:data-[active=true]:bg-input"
         >
