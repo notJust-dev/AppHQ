@@ -13,7 +13,9 @@ import { ErrorPage } from '@/components/ErrorPage'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { getAnalyticsConfigFn } from '@/fns/analytics'
+import { getErrorReportingConfigFn } from '@/fns/errors'
 import { startAnalytics } from '@/lib/analytics'
+import { startErrorReporting } from '@/lib/errors'
 import { PRIVACY_SCRIPT } from '@/lib/privacy'
 import { THEME_SCRIPT } from '@/lib/theme'
 import appCss from '../styles.css?url'
@@ -32,8 +34,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
     ],
   }),
-  // Whether analytics are on is the server's setting; read once, on the first page load.
-  loader: () => getAnalyticsConfigFn(),
+  // Whether analytics and error reporting are on is the server's setting; read once, on the
+  // first page load.
+  loader: async () => {
+    const [analytics, errors] = await Promise.all([getAnalyticsConfigFn(), getErrorReportingConfigFn()])
+    return { analytics, errors }
+  },
   staleTime: Infinity,
   shouldReload: false,
   component: RootComponent,
@@ -57,7 +63,10 @@ function NotFound() {
 }
 
 function RootComponent() {
-  const analytics = Route.useLoaderData()
+  const { analytics, errors } = Route.useLoaderData()
+  useEffect(() => {
+    if (errors) startErrorReporting(errors)
+  }, [errors])
   useEffect(() => {
     if (analytics) startAnalytics(analytics)
   }, [analytics])

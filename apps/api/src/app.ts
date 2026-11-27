@@ -6,6 +6,7 @@ import { requireBearerToken } from './auth/bearer.js'
 import { authRoutes } from './auth/routes.js'
 import type { Db, Sql } from './db/client.js'
 import type { Secrets } from './lib/crypto.js'
+import { reportError } from './lib/errors.js'
 import { dashboardOrganization } from './organizations/dashboard.js'
 import { ACCESS_HEADER, DASHBOARD_ACCESS, type ApiContext } from './trpc/init.js'
 import { appRouter, type AppRouter } from './trpc/router.js'
@@ -34,6 +35,11 @@ export async function buildApp(deps: AppDeps) {
     logger: { level: deps.logLevel ?? 'info' },
     // tRPC batches several procedure names into one path segment.
     routerOptions: { maxParamLength: 5000 },
+  })
+
+  // Server errors go to error reporting, when it is on; refusals and bad requests do not.
+  app.addHook('onError', async (request, _reply, error) => {
+    if ((error.statusCode ?? 500) >= 500) reportError(error, { route: request.routeOptions.url ?? 'unknown' })
   })
 
   // Public and unauthenticated: Velocity, uptime checks and the deploy smoke test use it.
@@ -84,6 +90,7 @@ export async function buildApp(deps: AppDeps) {
           // Refusals are expected; they say nothing about the API's health.
           if (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN') return
           app.log.error({ path, code: error.code }, error.message)
+          if (error.code === 'INTERNAL_SERVER_ERROR') reportError(error.cause ?? error, { trpc: path ?? 'unknown' })
         },
       } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],
     })

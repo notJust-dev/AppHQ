@@ -90,6 +90,11 @@ const schema = z
     MAIL_FROM: optional(z.string().regex(SENDER, 'must be an address, or "Name <address>"')),
     // Optional: where replies go, when that is not the sender.
     MAIL_REPLY_TO: optional(z.email('must be an email address')),
+    // Error reporting, optional: a Sentry DSN, or one from anything that speaks Sentry's protocol
+    // (GlitchTip, a self-hosted Sentry). Off unless set; see lib/errors.ts for what is sent.
+    SENTRY_DSN: optional(z.url({ protocol: /^https?$/ })),
+    // The environment errors are filed under. Default: NODE_ENV.
+    SENTRY_ENVIRONMENT: optional(z.string()),
   })
   .refine((env) => env.DATABASE_URL || (env.PGHOST && env.PGDATABASE && env.PGUSER), {
     path: ['DATABASE_URL'],

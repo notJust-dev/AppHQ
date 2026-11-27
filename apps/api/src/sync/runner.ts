@@ -4,6 +4,7 @@ import type { Db, Sql } from '../db/client.js'
 import { apps, syncRuns } from '../db/schema.js'
 import type { Secrets } from '../lib/crypto.js'
 import type { DateRange } from '../lib/dates.js'
+import { reportError } from '../lib/errors.js'
 import type { Logger } from '../lib/logger.js'
 import { scopeFor, type Scope } from '../organizations/scope.js'
 
@@ -142,6 +143,7 @@ export async function runSync(
         } catch (err) {
           summary.failed++
           log.error(`${label}: ${err instanceof Error ? err.message : err}`)
+          reportError(err, { sync: record.source })
         }
       }
 

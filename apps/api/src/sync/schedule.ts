@@ -2,6 +2,7 @@ import { and, asc, desc, eq } from 'drizzle-orm'
 import type { Connector } from '../connectors/types.js'
 import { organization, syncRuns } from '../db/schema.js'
 import { trailingRange } from '../lib/dates.js'
+import { reportError } from '../lib/errors.js'
 import { scopeFor, type Scope } from '../organizations/scope.js'
 import { recordRun, runSync, type SyncDeps } from './runner.js'
 
@@ -81,6 +82,7 @@ export async function syncDueOrganizations(
     } catch (err) {
       failed++
       deps.log.error(`scheduled sync of an organization failed: ${err instanceof Error ? err.message : String(err)}`)
+      reportError(err, { sync: 'schedule' })
     }
   }
   return { ran, failed }
@@ -107,6 +109,7 @@ export function startSyncSchedule(
       await syncDueOrganizations(deps, { connectors: options.connectors, intervalMs })
     } catch (err) {
       deps.log.error(`scheduled sync failed: ${err instanceof Error ? err.message : String(err)}`)
+      reportError(err, { sync: 'schedule' })
     } finally {
       busy = false
       timer = setTimeout(check, CHECK_EVERY_MS)

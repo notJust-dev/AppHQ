@@ -1,10 +1,14 @@
 import type { ErrorComponentProps } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { reportError } from '@/lib/errors'
 
 /**
  * Shown for any error a route does not handle itself. The detail can describe the server, so it
  * appears in development only; in production it is in the server log.
  */
 export function ErrorPage({ error }: ErrorComponentProps) {
+  // The router catches the error, so the browser's global handlers never see it.
+  useEffect(() => reportError(error), [error])
   return (
     <main className="mx-auto max-w-md px-6 py-24">
       <h1 className="text-xl font-semibold tracking-tight">The dashboard could not load</h1>
