@@ -2,7 +2,7 @@ import type { Logger } from '../lib/logger.js'
 import type { Mailer, MailMessage } from './mailer.js'
 
 /** What a message is, for the log. The log never holds an address or a message's text. */
-export type MailKind = 'sign-up code' | 'existing account notice' | 'password reset link' | 'no password notice' | 'password changed notice'
+export type MailKind = 'sign-up code' | 'existing account notice' | 'password reset link' | 'no password notice' | 'password changed notice' | 'invitation'
 
 export interface Outbox {
   /**

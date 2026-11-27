@@ -89,6 +89,22 @@ export function passwordChangedMessage(input: { forgotUrl: string }): MailConten
   })
 }
 
+/**
+ * An invitation to an organization. It names neither the organization nor who sent it: both are words
+ * someone typed, and this goes to whatever address they entered.
+ */
+export function invitationMessage(input: { loginUrl: string; days: number }): MailContent {
+  return compose({
+    subject: `You are invited to an organization on ${APP}`,
+    blocks: [
+      { text: `Someone invited this address to their organization on ${APP}, an app analytics dashboard.` },
+      { text: `To join, sign in or sign up with this address here:` },
+      { link: input.loginUrl },
+      { text: `The invitation works for ${input.days} days. If you don't know who sent it, ignore this email. Nothing happens unless you sign in.` },
+    ],
+  })
+}
+
 type Block = { text: string } | { code: string } | { link: string }
 
 /** The same blocks as plain text and as the least HTML that shows them well. */

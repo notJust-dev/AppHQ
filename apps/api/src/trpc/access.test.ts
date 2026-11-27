@@ -48,6 +48,11 @@ const EXPECTED: Record<string, Access> = {
   'demo.seed': 'dashboard',
   'demo.clear': 'dashboard',
   'organization.current': 'dashboard',
+  'members.list': 'dashboard',
+  'members.invite': 'dashboard',
+  'members.cancelInvitation': 'dashboard',
+  'members.remove': 'dashboard',
+  'members.setRole': 'dashboard',
   // The landing page's waitlist form, for anyone.
   'waitlist.join': 'public',
   'waitlist.answer': 'public',

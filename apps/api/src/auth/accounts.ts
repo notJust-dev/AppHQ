@@ -1,5 +1,5 @@
 import { AUTO_ORGANIZATION_NAME, autoOrganizationSlug } from '../organizations/auto.js'
-import { providersOf, type Auth, type AuthConfig, type SocialProvider } from './auth.js'
+import { MEMBER_ROLES, providersOf, type Auth, type AuthConfig, type MemberRole, type SocialProvider } from './auth.js'
 import { authCookies } from './routes.js'
 
 export type AccessStatus = 'requested' | 'approved'
@@ -47,6 +47,68 @@ export interface Accounts {
    * then opens the dashboard in that organization.
    */
   ensureOrganization(userId: string): Promise<{ organizationId: string; created: boolean }>
+  /**
+   * Who belongs to the organization and the invitations to it that still work. Reads only; the
+   * `members` procedures decide who may see it.
+   */
+  membersOf(organizationId: string): Promise<{ members: MemberView[]; invitations: InvitationView[] }>
+  /**
+   * The member changes, each made by the plugin's own endpoint as the account behind `cookie`,
+   * so its rules decide who may do what (see `organizationPlugin`). Each is held to
+   * `organizationId`, the organization the request works in; an id from another one is not found.
+   * They throw Better Auth's `APIError` when the plugin refuses.
+   */
+  invite(cookie: string | undefined, organizationId: string, input: { email: string; role: MemberRole }): Promise<InvitationView>
+  cancelInvitation(cookie: string | undefined, organizationId: string, invitationId: string): Promise<boolean>
+  removeMember(cookie: string | undefined, organizationId: string, memberId: string): Promise<void>
+  setRole(cookie: string | undefined, organizationId: string, memberId: string, role: MemberRole): Promise<void>
+  /**
+   * Accepts every invitation that still works to the session's address, verified, as the
+   * plugin does for one; returns how many. The session then works in the last one joined.
+   */
+  joinInvitedOrganizations(cookie: string | undefined, user: AccountUser): Promise<number>
+}
+
+/** A member as the Members page shows them. */
+export interface MemberView {
+  id: string
+  userId: string
+  name: string
+  email: string
+  role: MemberRole
+  joinedAt: Date
+}
+
+/** An invitation that still works. */
+export interface InvitationView {
+  id: string
+  email: string
+  role: MemberRole
+  invitedAt: Date
+  expiresAt: Date
+}
+
+/**
+ * The plugin keeps roles as a list in one string ("admin,owner"); a member here has one, the
+ * highest named. Anything else counts as a member, the least.
+ */
+export function roleOf(value: unknown): MemberRole {
+  const named = String(value ?? '')
+    .split(',')
+    .map((role) => role.trim())
+  return MEMBER_ROLES.find((role) => named.includes(role)) ?? 'member'
+}
+
+const toDate = (value: unknown) => (value instanceof Date ? value : new Date(String(value)))
+
+function toInvitation(row: Record<string, unknown>): InvitationView {
+  return {
+    id: String(row.id),
+    email: String(row.email),
+    role: roleOf(row.role),
+    invitedAt: toDate(row.createdAt),
+    expiresAt: toDate(row.expiresAt),
+  }
 }
 
 function toAccessStatus(value: unknown): AccessStatus | null {
@@ -66,6 +128,20 @@ function toUser(user: Record<string, unknown> & { id: string; email: string; nam
 }
 
 export function createAccounts(auth: Auth, config: AuthConfig): Accounts {
+  /** What the plugin's endpoints read the session from: Better Auth's cookies and nothing else. */
+  const as = (cookie: string | undefined) => new Headers({ cookie: authCookies(cookie) ?? '' })
+
+  const pendingInvitations = async (where: { field: string; value: string }[]) => {
+    const { adapter } = await auth.$context
+    const rows = await adapter.findMany<Record<string, unknown>>({
+      model: 'invitation',
+      where: [...where, { field: 'status', value: 'pending' }],
+      sortBy: { field: 'createdAt', direction: 'asc' },
+    })
+    const now = Date.now()
+    return rows.map(toInvitation).filter((row) => row.expiresAt.getTime() > now)
+  }
+
   return {
     providers: providersOf(config),
     email: config.mail !== undefined,
@@ -154,6 +230,82 @@ export function createAccounts(auth: Auth, config: AuthConfig): Accounts {
         if ((await membershipOf()).length === 0) throw err
       }
       return { organizationId: organization.id, created: true }
+    },
+
+    async membersOf(organizationId) {
+      const { adapter } = await auth.$context
+      const rows = await adapter.findMany<Record<string, unknown>>({
+        model: 'member',
+        where: [{ field: 'organizationId', value: organizationId }],
+        sortBy: { field: 'createdAt', direction: 'asc' },
+      })
+      const userIds = [...new Set(rows.map((row) => String(row.userId)))]
+      const users =
+        userIds.length === 0
+          ? []
+          : await adapter.findMany<{ id: string; name: string; email: string }>({
+              model: 'user',
+              where: [{ field: 'id', value: userIds, operator: 'in' }],
+            })
+      const byId = new Map(users.map((found) => [found.id, found]))
+      const members = rows.flatMap((row): MemberView[] => {
+        const found = byId.get(String(row.userId))
+        if (!found) return []
+        return [
+          {
+            id: String(row.id),
+            userId: found.id,
+            name: found.name,
+            email: found.email,
+            role: roleOf(row.role),
+            joinedAt: toDate(row.createdAt),
+          },
+        ]
+      })
+      return { members, invitations: await pendingInvitations([{ field: 'organizationId', value: organizationId }]) }
+    },
+
+    async invite(cookie, organizationId, input) {
+      const created = await auth.api.createInvitation({
+        headers: as(cookie),
+        body: { email: input.email, role: input.role, organizationId },
+      })
+      return toInvitation(created as unknown as Record<string, unknown>)
+    },
+
+    async cancelInvitation(cookie, organizationId, invitationId) {
+      // The plugin cancels an invitation in whichever organization it belongs to, so it is
+      // looked up here first: one of another organization is not found from this one.
+      const [open] = (await pendingInvitations([
+        { field: 'id', value: invitationId },
+        { field: 'organizationId', value: organizationId },
+      ]))
+      if (!open) return false
+      await auth.api.cancelInvitation({ headers: as(cookie), body: { invitationId } })
+      return true
+    },
+
+    async removeMember(cookie, organizationId, memberId) {
+      await auth.api.removeMember({ headers: as(cookie), body: { memberIdOrEmail: memberId, organizationId } })
+    },
+
+    async setRole(cookie, organizationId, memberId, role) {
+      await auth.api.updateMemberRole({ headers: as(cookie), body: { memberId, role, organizationId } })
+    },
+
+    async joinInvitedOrganizations(cookie, user) {
+      if (!user.emailVerified) return 0
+      const invitations = await pendingInvitations([{ field: 'email', value: user.email.toLowerCase() }])
+      let joined = 0
+      for (const invitation of invitations) {
+        try {
+          await auth.api.acceptInvitation({ headers: as(cookie), body: { invitationId: invitation.id } })
+          joined += 1
+        } catch {
+          // Already a member, or the invitation ended a moment ago: nothing to join.
+        }
+      }
+      return joined
     },
   }
 }
