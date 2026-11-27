@@ -31,6 +31,7 @@ import { Route as AppAccountsNameRouteImport } from './routes/_app/accounts.$nam
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
 import { Route as AppAppsNewRouteImport } from './routes/_app/apps.new'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings.index'
+import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings.members'
 import { Route as AppSocialIndexRouteImport } from './routes/_app/social.index'
 import { Route as AppSocialPostsRouteImport } from './routes/_app/social.posts'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -160,6 +161,11 @@ const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSocialIndexRoute = AppSocialIndexRouteImport.update({
   id: '/social/',
   path: '/social/',
@@ -283,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/ingest/$': typeof IngestSplatRoute
   '/accounts/$name': typeof AppAccountsNameRoute
   '/apps/new': typeof AppAppsNewRoute
+  '/settings/members': typeof AppSettingsMembersRoute
   '/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
@@ -324,6 +331,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/accounts/$name': typeof AppAccountsNameRoute
   '/apps/new': typeof AppAppsNewRoute
+  '/settings/members': typeof AppSettingsMembersRoute
   '/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
@@ -368,6 +376,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/accounts/$name': typeof AppAccountsNameRoute
   '/_app/apps/new': typeof AppAppsNewRoute
+  '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
@@ -412,6 +421,7 @@ export interface FileRouteTypes {
     | '/ingest/$'
     | '/accounts/$name'
     | '/apps/new'
+    | '/settings/members'
     | '/social/posts'
     | '/api/auth/$'
     | '/connect/meta/callback'
@@ -453,6 +463,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts/$name'
     | '/apps/new'
+    | '/settings/members'
     | '/social/posts'
     | '/api/auth/$'
     | '/connect/meta/callback'
@@ -496,6 +507,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/accounts/$name'
     | '/_app/apps/new'
+    | '/_app/settings/members'
     | '/_app/social/posts'
     | '/api/auth/$'
     | '/connect/meta/callback'
@@ -694,6 +706,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/members': {
+      id: '/_app/settings/members'
+      path: '/members'
+      fullPath: '/settings/members'
+      preLoaderRoute: typeof AppSettingsMembersRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/social/': {
       id: '/_app/social/'
       path: '/social'
@@ -831,6 +850,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppSettingsRouteChildren {
+  AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppSettingsAppsAppIdRoute: typeof AppSettingsAppsAppIdRoute
   AppSettingsAppsNewRoute: typeof AppSettingsAppsNewRoute
@@ -846,6 +866,7 @@ interface AppSettingsRouteChildren {
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppSettingsAppsAppIdRoute: AppSettingsAppsAppIdRoute,
   AppSettingsAppsNewRoute: AppSettingsAppsNewRoute,

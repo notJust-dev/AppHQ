@@ -25,7 +25,7 @@ export function SettingsPage(
   )
 }
 
-/** Apps and Integrations, each with how much in it needs the person. */
+/** Apps, Integrations and Members; the first two with how much in them needs the person. */
 function SettingsNav() {
   const { waiting, broken } = useAttention()
   return (
@@ -38,6 +38,9 @@ function SettingsNav() {
       <Link to="/settings/integrations" activeOptions={{ includeSearch: false }} className={TAB_CLASS}>
         Integrations
         <Count value={broken.length} label="need attention" />
+      </Link>
+      <Link to="/settings/members" activeOptions={{ includeSearch: false }} className={TAB_CLASS}>
+        Members
       </Link>
     </nav>
   )
