@@ -6,7 +6,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { getAccountFn } from '@/fns/account'
 import { getSessionFn } from '@/fns/auth'
 import { setSignedIn } from '@/lib/analytics'
-import { appsQuery } from '@/lib/queries'
+import { accountsQuery, appsQuery, assetsQuery } from '@/lib/queries'
 import { dashboardSearchMiddlewares, dashboardSearchSchema } from '@/lib/range'
 
 /**
@@ -33,9 +33,17 @@ export const Route = createFileRoute('/_app')({
     if (location.pathname !== '/') throw redirect({ to: '/login' })
     return { dashboardAccess, organization, sidebarOpen }
   },
-  // The sidebar lists the apps; loading them here keeps it from appearing empty.
+  // The top bar lists the apps, and the sidebar counts what waits in Settings from the sources
+  // and the integrations; loading them here gives the first page its full count. A count that
+  // cannot load leaves the page as it is: the sidebar asks again by itself.
   loader: async ({ context }) => {
-    if (context.dashboardAccess) await context.queryClient.ensureQueryData(appsQuery())
+    if (context.dashboardAccess) {
+      await Promise.all([
+        context.queryClient.ensureQueryData(appsQuery()),
+        context.queryClient.ensureQueryData(assetsQuery()).catch(() => undefined),
+        context.queryClient.ensureQueryData(accountsQuery()).catch(() => undefined),
+      ])
+    }
     return { dashboardAccess: context.dashboardAccess }
   },
   head: ({ loaderData }) => (loaderData?.dashboardAccess === false ? { meta: LANDING_META } : {}),

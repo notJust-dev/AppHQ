@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import type { ComponentProps, ReactNode } from 'react'
 import { PageBody, PageHeader, TAB_CLASS, type Crumb } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
-import { useAttention } from '@/lib/attention'
+import { useAttention } from '@/hooks/use-attention'
 
 /**
  * The frame of every Settings page: the top bar from Settings down, the Settings tabs, then the

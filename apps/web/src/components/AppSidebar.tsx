@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
-  AppWindow,
   Eye,
   EyeOff,
   LayoutDashboard,
@@ -11,8 +10,8 @@ import {
   MessageSquareText,
   Monitor,
   Moon,
-  Plug,
   Search,
+  Settings,
   Store,
   Sun,
   Wallet,
@@ -47,6 +46,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { signOutFn } from '@/fns/auth'
+import { useAttention } from '@/hooks/use-attention'
 import { setPrivacy, usePrivacy } from '@/lib/privacy'
 import { unreadReviewsQuery } from '@/lib/queries'
 import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
@@ -86,20 +86,15 @@ interface Section {
   pages?: { to: '/social' | '/social/posts'; label: string }[]
 }
 
-/** What feeds the dashboard: the apps and the accounts they come from. */
-const SETUP = [
-  { to: '/settings/apps', label: 'Apps', Icon: AppWindow },
-  { to: '/settings/integrations', label: 'Accounts', Icon: Plug },
-] as const
-
 /**
- * The navigation: the pages that follow the chosen app, then the setup and the theme and
+ * The navigation: the pages that follow the chosen app, then Settings and the theme and
  * sign-out at the bottom. The app the dashboard shows is chosen in each page's top bar.
  * Collapsed, each item keeps its icon and names itself in a tooltip.
  * `organization`: the name of the organization the dashboard works in, when the API said.
  */
 export function AppSidebar({ organization }: { organization: string | null }) {
   const { data: unread } = useQuery(unreadReviewsQuery())
+  const attention = useAttention()
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
 
@@ -174,23 +169,31 @@ export function AppSidebar({ organization }: { organization: string | null }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Setup, at the bottom above the settings: visited less than the pages above. The line
-            is as wide as the items, inset the same on both sides; w-full would push it off. */}
+        {/* Settings, at the bottom: what feeds the dashboard, visited less than the pages above.
+            The line is as wide as the items, inset the same on both sides; w-full would push it
+            off. */}
         <SidebarSeparator className="mx-2 mt-auto opacity-50 data-horizontal:w-auto" />
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu aria-label="Setup">
-              {SETUP.map(({ to, label, Icon }) => (
-                <SidebarMenuItem key={to}>
-                  <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
-                    {/* Active on the pages under it too, such as an app's settings. */}
-                    <Link to={to} activeOptions={{ includeSearch: false }}>
-                      <Icon />
-                      <span>{label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Settings" className={ACTIVE}>
+                  {/* Active on every page under it: Apps, Integrations and what is in them. */}
+                  <Link to="/settings" activeOptions={{ includeSearch: false }}>
+                    <Settings />
+                    <span>Settings</span>
+                  </Link>
+                </SidebarMenuButton>
+                {/* Sources waiting for a decision, and integrations that stopped working. */}
+                {attention.total > 0 && (
+                  <SidebarMenuBadge
+                    aria-label={`${attention.total} ${attention.total === 1 ? 'needs' : 'need'} attention`}
+                    className="bg-warning-soft text-warning peer-hover/menu-button:text-warning peer-data-active/menu-button:text-warning"
+                  >
+                    {attention.total > 99 ? '99+' : attention.total}
+                  </SidebarMenuBadge>
+                )}
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

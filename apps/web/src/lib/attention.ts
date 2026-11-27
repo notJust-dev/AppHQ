@@ -1,11 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
-import { formatCount } from '@/lib/format'
-import { accountsQuery, assetsQuery, type AccountFamily, type Asset } from '@/lib/queries'
+import { formatCount } from './format'
+import type { AccountFamily, Asset } from './queries'
 
 /**
  * What in Settings needs the person: sources an integration found that wait for a decision, and
  * integrations whose connection stopped working. The sidebar's Settings item, the Settings tabs
- * and the Overview banner all count from here, so they agree with each other and with the pages.
+ * and the Overview banner all count from here (through `useAttention`), so they agree with each
+ * other and with the pages.
  */
 
 /** Found by an integration, in no app, and not ignored: the Apps page's "Needs a decision". */
@@ -30,7 +30,7 @@ export function isBroken(connection: Connection, now = Date.now()): boolean {
  * connection: one Facebook sign-in brings many Pages, and is mended once.
  */
 export const brokenIntegrations = (
-  families: Pick<AccountFamily, 'family' | 'accounts'>[],
+  families: { family: AccountFamily['family']; accounts: Connection[] }[],
   now = Date.now(),
 ): AccountFamily['family'][] =>
   families.filter((family) => family.accounts.some((account) => isBroken(account, now))).map((family) => family.family)
@@ -46,16 +46,4 @@ export function foundLine(waiting: Pick<Asset, 'kind' | 'social'>[]): string {
       ? ['social account', 'social accounts']
       : ['source', 'sources']
   return `${formatCount(count)} new ${count === 1 ? one : many} found`
-}
-
-/**
- * The live counts. Both lists are shared with the Settings pages, which refresh them after a
- * change, so the counts follow without a reload.
- */
-export function useAttention() {
-  const { data: assets = [] } = useQuery(assetsQuery())
-  const { data: families = [] } = useQuery(accountsQuery())
-  const waiting = waitingAssets(assets)
-  const broken = brokenIntegrations(families)
-  return { waiting, broken, total: waiting.length + broken.length }
 }
