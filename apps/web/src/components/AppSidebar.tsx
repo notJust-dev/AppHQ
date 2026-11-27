@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { BrandMark, BrandName } from '@/components/Brand'
+import { FeedbackButton } from '@/components/FeedbackButton'
 import { Private } from '@/components/Private'
 import {
   DropdownMenu,
@@ -198,6 +199,7 @@ export function AppSidebar({ organization }: { organization: string | null }) {
 
       <SidebarFooter>
         <SidebarMenu>
+          <FeedbackButton />
           <SidebarMenuItem>
             <PrivacyToggle />
           </SidebarMenuItem>
