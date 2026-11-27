@@ -1,6 +1,6 @@
-import type { ErrorEvent } from '@sentry/react'
+import type { ErrorEvent, Event } from '@sentry/react'
 import { describe, expect, it } from 'vitest'
-import { scrubBreadcrumb, scrubEvent, withoutQuery } from './errors'
+import { scrubBreadcrumb, scrubEvent, scrubFeedback, withoutQuery } from './errors'
 
 describe('withoutQuery', () => {
   it('drops the query string and the fragment', () => {
@@ -41,5 +41,32 @@ describe('scrubBreadcrumb', () => {
     expect(
       scrubBreadcrumb({ category: 'fetch', data: { method: 'POST', url: '/_serverFn/x?payload=secret', status_code: 500, request_body_size: 10 } }),
     ).toEqual({ category: 'fetch', data: { method: 'POST', url: '/_serverFn/x', status_code: 500 } })
+  })
+})
+
+describe('scrubFeedback', () => {
+  const feedback = (): Event => ({
+    type: 'feedback',
+    contexts: { feedback: { message: 'The chart is empty', url: 'https://apphq.example.com/store?app=demo-app#top' } },
+    request: { url: 'https://apphq.example.com/store?app=demo-app', headers: { 'User-Agent': 'test' } },
+    user: { ip_address: '{{auto}}' },
+    breadcrumbs: [
+      { category: 'console', message: 'Example App' },
+      { category: 'ui.click', message: 'button[aria-label="Open Example App"]' },
+    ],
+  })
+
+  it('strips the query from both addresses and keeps the message', () => {
+    const scrubbed = scrubFeedback(feedback(), false)
+    expect(scrubbed.contexts?.feedback).toEqual({ message: 'The chart is empty', url: 'https://apphq.example.com/store' })
+    expect(scrubbed.request).toEqual({ url: 'https://apphq.example.com/store' })
+    expect(scrubbed.user).toBeUndefined()
+    expect(scrubbed.breadcrumbs).toEqual([{ category: 'ui.click', message: 'button[aria-label="Open Example App"]' }])
+  })
+
+  it('sends no breadcrumbs while privacy mode is on, and says it was on', () => {
+    const scrubbed = scrubFeedback(feedback(), true)
+    expect(scrubbed.breadcrumbs).toBeUndefined()
+    expect(scrubbed.tags).toEqual({ privacy_mode: 'on' })
   })
 })
