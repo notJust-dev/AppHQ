@@ -19,11 +19,10 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { formatCompact, formatCount, formatDay, formatRatio } from '@/lib/format'
 import { pairedRatio } from '@/lib/performance'
 import { socialPerformanceQuery, type SocialPerformance } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates } from '@/lib/range'
+import { rangeToDates } from '@/lib/range'
 import { sourceLabel } from '@/lib/sources'
 
 export const Route = createFileRoute('/_app/social')({
-  validateSearch: performanceSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(socialPerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),

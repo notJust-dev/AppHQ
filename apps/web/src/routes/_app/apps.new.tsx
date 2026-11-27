@@ -31,7 +31,7 @@ function NewAppPage() {
     onSuccess: async (result) => {
       if (!result.ok) return
       await queryClient.invalidateQueries()
-      await navigate({ to: '/apps/$appId/settings', params: { appId: result.appId }, search: { range: '28d' } })
+      await navigate({ to: '/apps/$appId/settings', params: { appId: result.appId } })
     },
   })
   const result = mutation.data

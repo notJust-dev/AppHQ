@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, stripSearchParams } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { LayoutDashboard } from 'lucide-react'
 import { AppsTable } from '@/components/AppsTable'
 import { FunnelBand } from '@/components/FunnelBand'
@@ -10,12 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { formatDay } from '@/lib/format'
 import { overviewQuery, reportingOf } from '@/lib/queries'
-import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '@/lib/range'
+import { RANGE_DAYS, rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/')({
-  validateSearch: rangeSearchSchema,
-  // Keep the default range out of the address, so the bare `/` stays bare for the landing page.
-  search: { middlewares: [stripSearchParams({ range: '28d' })] },
   loaderDeps: ({ search }) => ({ range: search.range }),
   // Without dashboard access, `_app` shows the landing page instead, so there is nothing to load.
   loader: async ({ context, deps }) => {

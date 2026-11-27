@@ -71,7 +71,6 @@ function RevenueCatPage() {
                     <Link
                       to="/apps/$appId/settings"
                       params={{ appId: app.id }}
-                      search={{ range: '28d' }}
                       aria-label={`${project ? 'Settings' : 'Connect a project'} for ${app.name}`}
                     >
                       {project ? 'Settings' : 'Connect'}

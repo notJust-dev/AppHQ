@@ -13,7 +13,8 @@ const ALL = 'all'
 
 /**
  * The top of a performance page: its name and what it shows, and the two choices every such
- * page has: which app (or all of them) and which range. Both live in the address.
+ * page has: which app (or all of them) and which range. Both live in the address, and stay
+ * chosen on the next page.
  */
 export function PerformanceHeader(props: {
   title: string

@@ -17,10 +17,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCompact, formatCount, formatDay } from '@/lib/format'
 import { usePrivacy } from '@/lib/privacy'
 import { searchPerformanceQuery, searchTopQuery, type PerformanceSeries } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates } from '@/lib/range'
+import { rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/seo')({
-  validateSearch: performanceSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(searchPerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),

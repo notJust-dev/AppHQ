@@ -151,7 +151,7 @@ export function AppSidebar({ organization }: { organization: string | null }) {
               {PERFORMANCE.map(({ to, label, Icon }) => (
                 <SidebarMenuItem key={to}>
                   <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
-                    {/* The page keeps the range and app it was last opened with in the address. */}
+                    {/* The app and range in the address come along; see lib/range.ts. */}
                     <Link to={to} activeOptions={{ includeSearch: false }}>
                       <Icon />
                       <span>{label}</span>
@@ -173,7 +173,6 @@ export function AppSidebar({ organization }: { organization: string | null }) {
                     <Link
                       to="/apps/$appId"
                       params={{ appId: app.id }}
-                      search={{ range: '28d' }}
                       activeOptions={{ includeSearch: false }}
                     >
                       <AppIcon app={app} className="size-4 text-[10px]" />

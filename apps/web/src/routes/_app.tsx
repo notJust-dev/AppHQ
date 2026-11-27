@@ -7,6 +7,7 @@ import { getAccountFn } from '@/fns/account'
 import { getSessionFn } from '@/fns/auth'
 import { setSignedIn } from '@/lib/analytics'
 import { appsQuery } from '@/lib/queries'
+import { dashboardSearchMiddlewares, dashboardSearchSchema } from '@/lib/range'
 
 /**
  * Everything behind sign-in. This guard is for navigation; the data is guarded separately, by
@@ -20,6 +21,9 @@ import { appsQuery } from '@/lib/queries'
  *   other address goes to /login.
  */
 export const Route = createFileRoute('/_app')({
+  // The app and range every page here reads, kept from one page to the next.
+  validateSearch: dashboardSearchSchema,
+  search: { middlewares: dashboardSearchMiddlewares },
   beforeLoad: async ({ location }) => {
     const { dashboardAccess, organization, sidebarOpen } = await getSessionFn()
     if (dashboardAccess) return { dashboardAccess, organization, sidebarOpen }

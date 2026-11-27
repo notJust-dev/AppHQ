@@ -3,14 +3,12 @@ import { Link, Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { AppIcon } from '@/components/AppIcon'
 import { PageBody, PageHeader, TAB_CLASS } from '@/components/PageHeader'
 import { appsQuery } from '@/lib/queries'
-import { rangeSearchSchema } from '@/lib/range'
 
 /**
  * One app: its name and two tabs, Overview (`apps.$appId.index.tsx`, the numbers) and Settings
  * (`apps.$appId.settings.tsx`, what feeds it). The range stays in the address across both.
  */
 export const Route = createFileRoute('/_app/apps/$appId')({
-  validateSearch: rangeSearchSchema,
   loader: async ({ context, params }) => {
     const known = (list: { id: string }[]) => list.some((app) => app.id === params.appId)
     // The list may be cached from before the app was added, so ask again before giving up.

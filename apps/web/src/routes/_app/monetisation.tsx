@@ -13,10 +13,9 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { formatCount, formatMoney } from '@/lib/format'
 import { pairedRatio } from '@/lib/performance'
 import { monetisationPerformanceQuery } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates } from '@/lib/range'
+import { rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/monetisation')({
-  validateSearch: performanceSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(monetisationPerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),

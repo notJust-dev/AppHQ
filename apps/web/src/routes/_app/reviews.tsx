@@ -28,14 +28,14 @@ import {
 import { sourceLabel } from '@/lib/sources'
 import { cn } from '@/lib/utils'
 
+/** The inbox's own filters. The app is the dashboard's `?app=`, the same one as on every page. */
 const searchSchema = z.object({
-  app: z.uuid().optional().catch(undefined),
   store: z.enum(['app_store', 'google_play']).optional().catch(undefined),
   rating: z.coerce.number().int().min(1).max(5).optional().catch(undefined),
   unread: z.boolean().optional().catch(undefined),
 })
 
-type Search = z.infer<typeof searchSchema>
+type Search = z.infer<typeof searchSchema> & { app?: string }
 
 const filtersOf = (search: Search): ReviewFilters => ({
   appId: search.app,
@@ -271,7 +271,7 @@ function ReviewCard(props: {
           app={{ name: review.appName, iconUrl: props.iconUrl }}
           className="mr-1.5 inline-grid size-4 align-[-0.25rem] text-[9px]"
         />
-        <Link to="/apps/$appId" params={{ appId: review.appId }} search={{ range: '28d' }} className="font-medium text-foreground hover:underline">
+        <Link to="/apps/$appId" params={{ appId: review.appId }} className="font-medium text-foreground hover:underline">
           <Private>{review.appName}</Private>
         </Link>
         {' · '}
