@@ -84,7 +84,7 @@ export function AppSwitcher() {
         <DropdownMenuSeparator />
         {chosen && (
           <DropdownMenuItem asChild>
-            <Link to="/apps/$appId/settings" params={{ appId: chosen.id }}>
+            <Link to="/settings/apps/$appId" params={{ appId: chosen.id }}>
               <Settings />
               <span className="truncate">
                 <AppName app={chosen} /> settings
@@ -93,7 +93,7 @@ export function AppSwitcher() {
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
-          <Link to="/apps/new">
+          <Link to="/settings/apps/new">
             <Plus />
             Add app
           </Link>

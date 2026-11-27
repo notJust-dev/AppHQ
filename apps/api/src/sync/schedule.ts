@@ -6,7 +6,7 @@ import { reportError } from '../lib/errors.js'
 import { scopeFor, type Scope } from '../organizations/scope.js'
 import { recordRun, runSync, type SyncDeps } from './runner.js'
 
-/** The `sync_runs` source of a scheduled sync; the Accounts page calls it "Scheduled sync". */
+/** The `sync_runs` source of a scheduled sync; the Integrations page calls it "Scheduled sync". */
 export const SCHEDULED = 'scheduled'
 
 /** How many days each scheduled sync re-reads: Google Play posts 3 to 7 days late. */

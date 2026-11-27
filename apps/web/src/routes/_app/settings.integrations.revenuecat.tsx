@@ -2,12 +2,12 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Private } from '@/components/Private'
 import { Button } from '@/components/ui/button'
-import { Section, SourcePage } from '@/components/accounts/shared'
+import { Section, SourcePage } from '@/components/integrations/shared'
 import { ATTENTION } from '@/lib/assets'
 import { formatMoment } from '@/lib/format'
 import { appsQuery, assetsQuery } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/revenuecat')({
+export const Route = createFileRoute('/_app/settings/integrations/revenuecat')({
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(appsQuery()),
@@ -18,7 +18,7 @@ export const Route = createFileRoute('/_app/accounts/revenuecat')({
 
 /**
  * A RevenueCat key belongs to one project, which belongs to one app, so keys are connected from
- * each app's Settings. This page only shows where every app stands.
+ * each app's settings page. This page only shows where every app stands.
  */
 function RevenueCatPage() {
   const { data: apps } = useSuspenseQuery(appsQuery())
@@ -30,16 +30,16 @@ function RevenueCatPage() {
     <SourcePage
       family="revenuecat"
       title="RevenueCat"
-      intro="Revenue, MRR, trials and subscribers. A RevenueCat key belongs to one project, and a project to one app, so each app connects its own key in its Settings. About a year of history is fetched when it does."
+      intro="Revenue, MRR, trials and subscribers. A RevenueCat key belongs to one project, and a project to one app, so each app connects its own key on its settings page. About a year of history is fetched when it does."
     >
       <Section title="Projects by app" flush>
         {ownApps.length === 0 ? (
           <p className="px-5 py-4 text-muted-foreground">
             No apps yet.{' '}
-            <Link to="/apps/new" className="font-medium text-foreground underline underline-offset-4">
+            <Link to="/settings/apps/new" className="font-medium text-foreground underline underline-offset-4">
               Add an app
             </Link>
-            , then connect its RevenueCat project in its Settings.
+            , then connect its RevenueCat project on its settings page.
           </p>
         ) : (
           <ul className="divide-y">
@@ -69,7 +69,7 @@ function RevenueCatPage() {
                   </span>
                   <Button asChild variant={project ? 'outline' : 'default'} size="sm">
                     <Link
-                      to="/apps/$appId/settings"
+                      to="/settings/apps/$appId"
                       params={{ appId: app.id }}
                       aria-label={`${project ? 'Settings' : 'Connect a project'} for ${app.name}`}
                     >
@@ -88,7 +88,7 @@ function RevenueCatPage() {
           <p className="text-sm">
             <Private>{waiting.map((asset) => asset.name).join(', ')}</Private> {waiting.length === 1 ? 'is' : 'are'} connected
             but not part of an app.{' '}
-            <Link to="/apps" className="font-medium underline underline-offset-4">
+            <Link to="/settings/apps" className="font-medium underline underline-offset-4">
               Link {waiting.length === 1 ? 'it' : 'them'} on the Apps page
             </Link>
             .

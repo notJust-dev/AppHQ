@@ -17,13 +17,13 @@ import {
   emptyFamily,
   useWatch,
   type ConnectedAccount,
-} from '@/components/accounts/shared'
+} from '@/components/integrations/shared'
 import { startMetaConnectFn } from '@/fns/meta'
 import { formatDay } from '@/lib/format'
 import { metaHealth } from '@/lib/meta'
 import { accountsQuery, metaSetupQuery, type MetaSetup } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/meta')({
+export const Route = createFileRoute('/_app/settings/integrations/meta')({
   // Set by the Facebook sign-in when it sends the browser back here.
   validateSearch: z.object({ connected: z.literal('meta').optional().catch(undefined) }),
   loader: ({ context }) =>
@@ -42,7 +42,7 @@ function MetaPage() {
   const { data: setup } = useSuspenseQuery(metaSetupQuery())
   const family = families.find((entry) => entry.family === 'meta') ?? emptyFamily('meta')
   const clear = useCallback(() => {
-    void navigate({ to: '/accounts/meta', search: {}, replace: true })
+    void navigate({ to: '/settings/integrations/meta', search: {}, replace: true })
   }, [navigate])
 
   return (
@@ -96,7 +96,7 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
     },
   })
   const leaving = connect.isPending || connect.data?.ok === true
-  const { renewBy, renewSoon, missing } = metaHealth(props.accounts)
+  const { renewBy, renewSoon, ended, missing } = metaHealth(props.accounts)
 
   return (
     <>
@@ -114,8 +114,17 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
 
       {renewBy && (
         <p className={`mb-4 text-sm ${renewSoon ? 'font-medium' : 'text-muted-foreground'}`}>
-          Meta lets the sign-in last about 60 days. Sign in again by {formatDay(renewBy.slice(0, 10))}{' '}
-          so Instagram keeps syncing; Facebook Pages keep working either way.
+          {ended ? (
+            <>
+              Meta lets the sign-in last about 60 days. It ended on {formatDay(renewBy.slice(0, 10))}, so
+              Instagram stopped syncing; sign in again. Facebook Pages keep working either way.
+            </>
+          ) : (
+            <>
+              Meta lets the sign-in last about 60 days. Sign in again by {formatDay(renewBy.slice(0, 10))}{' '}
+              so Instagram keeps syncing; Facebook Pages keep working either way.
+            </>
+          )}
         </p>
       )}
 

@@ -76,7 +76,7 @@ function NoPosts(props: { hasSocialAccount: boolean; appId: string }) {
         <>
           No social account is linked to this app yet.{' '}
           <Link
-            to="/apps/$appId/settings"
+            to="/settings/apps/$appId"
             params={{ appId: props.appId }}
             className="font-medium text-foreground underline underline-offset-4"
           >

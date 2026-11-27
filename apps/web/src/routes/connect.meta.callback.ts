@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { dashboardApi } from '@/server/api'
 import { finishOAuth, metaRedirectUri } from '@/server/oauth'
+import { connectedAddress } from '@/lib/integration-pages'
 import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
 
 /**
@@ -19,7 +20,7 @@ export const Route = createFileRoute('/connect/meta/callback')({
         const attempt = await finishOAuth('meta', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
           await attempt.report(ok, message)
-          return redirectTo('/accounts/meta?connected=meta')
+          return redirectTo(connectedAddress('meta'))
         }
 
         const error = params.get('error')

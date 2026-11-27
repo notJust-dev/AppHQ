@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { KeyFileField, checkP8, keyIdFromFileName } from '@/components/accounts/KeyFileField'
+import { KeyFileField, checkP8, keyIdFromFileName } from '@/components/integrations/KeyFileField'
 import {
   AccountList,
   Found,
@@ -17,11 +17,11 @@ import {
   Steps,
   emptyFamily,
   useWatch,
-} from '@/components/accounts/shared'
+} from '@/components/integrations/shared'
 import { connectAppStoreFn } from '@/fns/settings'
 import { accountsQuery } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/app-store')({
+export const Route = createFileRoute('/_app/settings/integrations/app-store')({
   loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
   component: AppStorePage,
 })
@@ -215,7 +215,7 @@ function Connected(props: { result: ConnectOutcome }) {
         {waiting > 0 && (
           <>
             Add the ones you want to track on the{' '}
-            <Link to="/apps" className="font-medium underline underline-offset-4">
+            <Link to="/settings/apps" className="font-medium underline underline-offset-4">
               Apps page
             </Link>
             ; a year of downloads is fetched for each one you add. Store page views follow a day

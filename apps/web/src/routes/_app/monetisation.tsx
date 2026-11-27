@@ -155,13 +155,13 @@ function NoRevenue() {
         </EmptyMedia>
         <EmptyTitle>No revenue numbers in this range</EmptyTitle>
         <EmptyDescription>
-          Revenue comes from RevenueCat. Open an app's Settings and paste a secret key from its RevenueCat
-          project; about a year of history is fetched.
+          Revenue comes from RevenueCat. Each app connects its own RevenueCat project with a secret key, on
+          its settings page; about a year of history is fetched.
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent className="flex-row justify-center">
         <Button asChild>
-          <Link to="/apps">Go to the apps</Link>
+          <Link to="/settings/integrations/revenuecat">Set up RevenueCat</Link>
         </Button>
       </EmptyContent>
     </Empty>

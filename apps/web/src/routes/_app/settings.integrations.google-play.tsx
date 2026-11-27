@@ -9,7 +9,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Private } from '@/components/Private'
-import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/accounts/KeyFileField'
+import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/integrations/KeyFileField'
 import {
   AccountList,
   Found,
@@ -18,11 +18,11 @@ import {
   Steps,
   emptyFamily,
   useWatch,
-} from '@/components/accounts/shared'
+} from '@/components/integrations/shared'
 import { connectGooglePlayFn } from '@/fns/google-play'
 import { accountsQuery } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/google-play')({
+export const Route = createFileRoute('/_app/settings/integrations/google-play')({
   loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
   component: GooglePlayPage,
 })

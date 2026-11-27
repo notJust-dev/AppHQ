@@ -4,15 +4,15 @@ import { useServerFn } from '@tanstack/react-start'
 import { CircleCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Private } from '@/components/Private'
-import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/accounts/KeyFileField'
-import { AccountList, Found, Section, SourcePage, Steps, emptyFamily, useWatch } from '@/components/accounts/shared'
+import { KeyFileField, checkServiceAccount, serviceAccountEmail } from '@/components/integrations/KeyFileField'
+import { AccountList, Found, Section, SourcePage, Steps, emptyFamily, useWatch } from '@/components/integrations/shared'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { connectSearchConsoleFn } from '@/fns/search'
 import { accountsQuery } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/search-console')({
+export const Route = createFileRoute('/_app/settings/integrations/search-console')({
   loader: ({ context }) => context.queryClient.ensureQueryData(accountsQuery()),
   component: SearchConsolePage,
 })
@@ -53,7 +53,7 @@ function SearchConsolePage() {
               {outcome.linked > 0 && `, ${outcome.linked} already part of an app`}.{' '}
               {outcome.sites > outcome.linked && (
                 <>
-                  Link each to its app on the <Link to="/apps">Apps page</Link> or in the app&apos;s Settings; its
+                  Link each to its app on the <Link to="/settings/apps">Apps page</Link> or the app&apos;s settings page; its
                   history is fetched once it has an app.
                 </>
               )}

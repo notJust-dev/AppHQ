@@ -174,7 +174,7 @@ function TopPanel(props: {
       ) : !data.connected ? (
         <p className="px-5 py-4 text-muted-foreground">
           These are read from Search Console as the page opens.{' '}
-          <Link to="/accounts/search-console" className="font-medium text-foreground underline underline-offset-4">
+          <Link to="/settings/integrations/search-console" className="font-medium text-foreground underline underline-offset-4">
             Connect it
           </Link>{' '}
           to see them.
@@ -279,7 +279,7 @@ function NoSearch() {
       </EmptyHeader>
       <EmptyContent className="flex-row justify-center">
         <Button asChild>
-          <Link to="/accounts/search-console">Connect Search Console</Link>
+          <Link to="/settings/integrations/search-console">Connect Search Console</Link>
         </Button>
       </EmptyContent>
     </Empty>

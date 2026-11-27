@@ -13,13 +13,13 @@ import {
   emptyFamily,
   useWatch,
   type ConnectedAccount,
-} from '@/components/accounts/shared'
+} from '@/components/integrations/shared'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { startYouTubeConnectFn } from '@/fns/youtube'
 import { accountsQuery, youtubeSetupQuery, type YouTubeSetup } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/youtube')({
+export const Route = createFileRoute('/_app/settings/integrations/youtube')({
   // Set by the Google sign-in when it sends the browser back here.
   validateSearch: z.object({ connected: z.literal('youtube').optional().catch(undefined) }),
   loader: ({ context }) =>
@@ -38,7 +38,7 @@ function YouTubePage() {
   const { data: setup } = useSuspenseQuery(youtubeSetupQuery())
   const family = families.find((entry) => entry.family === 'youtube') ?? emptyFamily('youtube')
   const clear = useCallback(() => {
-    void navigate({ to: '/accounts/youtube', search: {}, replace: true })
+    void navigate({ to: '/settings/integrations/youtube', search: {}, replace: true })
   }, [navigate])
 
   return (

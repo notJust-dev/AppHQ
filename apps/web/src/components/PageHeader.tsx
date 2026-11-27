@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 
-export type Crumb = { label: string; to: '/' | '/apps' | '/accounts' | '/social' }
+export type Crumb = { label: string; to: '/' | '/social' | '/settings' | '/settings/apps' | '/settings/integrations' }
 
 const WIDTH = { wide: 'max-w-6xl', narrow: 'max-w-4xl' } as const
 
@@ -32,6 +32,8 @@ export function PageHeader(props: {
   description?: ReactNode
   actions?: ReactNode
   tabs?: ReactNode
+  /** The menu of the area the page sits in, such as Settings: above the title, on every page of it. */
+  nav?: ReactNode
   /** For settings and forms: a narrower column, matched by the page body. */
   narrow?: boolean
   /** The page follows the chosen app: the bar starts with the switcher for it. */
@@ -71,7 +73,14 @@ export function PageHeader(props: {
         </Breadcrumb>
       </header>
 
-      <div className={cn('mx-auto w-full px-5 pt-6 sm:px-8 sm:pt-8', WIDTH[props.narrow ? 'narrow' : 'wide'])}>
+      <div
+        className={cn(
+          'mx-auto w-full px-5 sm:px-8',
+          props.nav ? 'pt-3 sm:pt-4' : 'pt-6 sm:pt-8',
+          WIDTH[props.narrow ? 'narrow' : 'wide'],
+        )}
+      >
+        {props.nav && <div className="mb-6 border-b sm:mb-7">{props.nav}</div>}
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div className="min-w-0">
             <div className="flex items-center gap-3">

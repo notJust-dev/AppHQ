@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
-import { LayoutDashboard, Settings } from 'lucide-react'
+import { ArrowRight, Inbox, LayoutDashboard, Settings } from 'lucide-react'
 import { AppOverview } from '@/components/AppOverview'
 import { AppsTable } from '@/components/AppsTable'
 import { FunnelBand } from '@/components/FunnelBand'
@@ -9,6 +9,8 @@ import { Panel } from '@/components/Panel'
 import { RangeSwitch } from '@/components/RangeSwitch'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { useAttention } from '@/hooks/use-attention'
+import { foundLine } from '@/lib/attention'
 import { formatDay } from '@/lib/format'
 import { appsQuery, flowQuery, overviewQuery, postsQuery, reportingOf, timelineQuery } from '@/lib/queries'
 import { RANGE_DAYS, rangeToDates, type RangeKey } from '@/lib/range'
@@ -58,7 +60,7 @@ function OverviewPage() {
           <>
             {app && (
               <Button asChild variant="outline">
-                <Link to="/apps/$appId/settings" params={{ appId: app }}>
+                <Link to="/settings/apps/$appId" params={{ appId: app }}>
                   <Settings aria-hidden="true" />
                   Settings
                 </Link>
@@ -68,8 +70,30 @@ function OverviewPage() {
           </>
         }
       />
-      <PageBody>{app ? <AppOverview appId={app} dates={dates} /> : <Portfolio range={range} />}</PageBody>
+      <PageBody>
+        <WaitingSources />
+        {app ? <AppOverview appId={app} dates={dates} /> : <Portfolio range={range} />}
+      </PageBody>
     </>
+  )
+}
+
+/**
+ * One line when an integration found sources that belong to no app yet, such as a new app on
+ * App Store Connect: they count nowhere until someone decides, on Settings › Apps.
+ */
+function WaitingSources() {
+  const { waiting } = useAttention()
+  if (waiting.length === 0) return null
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-warning-soft px-4 py-2.5 text-sm text-warning">
+      <Inbox aria-hidden="true" className="size-4 shrink-0" />
+      <span className="font-medium">{foundLine(waiting)}.</span>
+      <Link to="/settings/apps" className="inline-flex items-center gap-1 font-medium underline underline-offset-4">
+        Review
+        <ArrowRight aria-hidden="true" className="size-3.5" />
+      </Link>
+    </div>
   )
 }
 
@@ -86,15 +110,16 @@ function Portfolio({ range }: { range: RangeKey }) {
           </EmptyMedia>
           <EmptyTitle>No apps yet</EmptyTitle>
           <EmptyDescription>
-            Connect App Store Connect, Google Play or your social accounts, then add the apps you want to track.
+            Connect App Store Connect, Google Play or your social accounts in Integrations, then add the apps you
+            want to track.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">
           <Button asChild>
-            <Link to="/accounts">Connect accounts</Link>
+            <Link to="/settings/integrations">Set up integrations</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to="/apps/new">Add app</Link>
+            <Link to="/settings/apps/new">Add app</Link>
           </Button>
         </EmptyContent>
       </Empty>
