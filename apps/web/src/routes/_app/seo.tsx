@@ -17,10 +17,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCompact, formatCount, formatDay } from '@/lib/format'
 import { usePrivacy } from '@/lib/privacy'
 import { searchPerformanceQuery, searchTopQuery, type PerformanceSeries } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates } from '@/lib/range'
+import { rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/seo')({
-  validateSearch: performanceSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(searchPerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),
@@ -48,7 +47,7 @@ function SeoPage() {
       title="SEO"
       description="How your apps' websites do in Google search, from Search Console."
       range={range}
-      app={app}
+
       dates={dates}
     />
   )
@@ -120,7 +119,6 @@ function SeoPage() {
         {!app && data.apps.length > 1 && (
           <Panel title="By app" description="Each app's website over the same days. Select a column heading to sort by it." bodyClassName="">
             <AppComparison
-              range={range}
               sortBy="clicks"
               rows={data.apps.map((entry) => ({
                 app: entry.app,

@@ -5,7 +5,6 @@ import { AppIcon } from '@/components/AppIcon'
 import { Private } from '@/components/Private'
 import { DataTable, sortableFeatures, type SortableFeatures } from '@/components/DataTable'
 import { NoData } from '@/components/NoData'
-import type { RangeKey } from '@/lib/range'
 
 export interface ComparisonRow {
   app: { id: string; name: string; kind: string; iconUrl?: string | null }
@@ -23,16 +22,14 @@ const helper = createColumnHelper<SortableFeatures, ComparisonRow>()
 
 /**
  * Every app side by side on a performance page's numbers. Any column sorts it; apps with no
- * data for a column stay at the bottom whichever way it is sorted.
+ * data for a column stay at the bottom whichever way it is sorted. An app's name chooses it.
  */
 export function AppComparison(props: {
   rows: ComparisonRow[]
   columns: ComparisonColumn[]
   /** The column the table starts sorted by, biggest first. */
   sortBy: string
-  range: RangeKey
 }) {
-  const { range } = props
   const columns = useMemo(
     () =>
       helper.columns([
@@ -44,9 +41,8 @@ export function AppComparison(props: {
             <span className="flex items-center gap-2.5">
               <AppIcon app={{ ...info.row.original.app, name: info.getValue() }} className="size-5 text-[10px]" />
               <Link
-                to="/apps/$appId"
-                params={{ appId: info.row.original.app.id }}
-                search={{ range }}
+                to="."
+                search={(previous: Record<string, unknown>) => ({ ...previous, app: info.row.original.app.id })}
                 className="hover:underline hover:underline-offset-4"
               >
                 {info.row.original.app.kind === 'portfolio' ? info.getValue() : <Private>{info.getValue()}</Private>}
@@ -74,7 +70,7 @@ export function AppComparison(props: {
           }),
         ),
       ]),
-    [props.columns, range],
+    [props.columns],
   )
 
   const table = useTable({

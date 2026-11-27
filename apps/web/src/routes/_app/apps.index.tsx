@@ -264,9 +264,8 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                   {!portfolio && <AppIcon app={app} className="size-6 text-[11px]" />}
                   <span className="min-w-0 pt-0.5">
                     <Link
-                      to="/apps/$appId"
-                      params={{ appId: app.id }}
-                      search={{ range: '28d' }}
+                      to="/"
+                      search={(previous) => ({ ...previous, app: app.id })}
                       className="hover:underline hover:underline-offset-4"
                     >
                       {portfolio ? app.name : <Private>{app.name}</Private>}
@@ -315,7 +314,6 @@ function AppsOverview({ apps, assets }: { apps: AppSummary[]; assets: Asset[] })
                       <Link
                         to="/apps/$appId/settings"
                         params={{ appId: app.id }}
-                        search={{ range: '28d' }}
                         aria-label={`Settings for ${app.name}`}
                       >
                         <Settings />

@@ -25,7 +25,6 @@ import { Route as AppMonetisationRouteImport } from './routes/_app/monetisation'
 import { Route as AppReviewsRouteImport } from './routes/_app/reviews'
 import { Route as AppSeoRouteImport } from './routes/_app/seo'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
-import { Route as AppSocialRouteImport } from './routes/_app/social'
 import { Route as AppStoreRouteImport } from './routes/_app/store'
 import { Route as IngestSplatRouteImport } from './routes/ingest.$'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts.index'
@@ -39,6 +38,8 @@ import { Route as AppAccountsYoutubeRouteImport } from './routes/_app/accounts.y
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
 import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
 import { Route as AppAppsNewRouteImport } from './routes/_app/apps.new'
+import { Route as AppSocialIndexRouteImport } from './routes/_app/social.index'
+import { Route as AppSocialPostsRouteImport } from './routes/_app/social.posts'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ConnectMetaCallbackRouteImport } from './routes/connect.meta.callback'
 import { Route as ConnectTiktokCallbackRouteImport } from './routes/connect.tiktok.callback'
@@ -125,11 +126,6 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
-const AppSocialRoute = AppSocialRouteImport.update({
-  id: '/social',
-  path: '/social',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppStoreRoute = AppStoreRouteImport.update({
   id: '/store',
   path: '/store',
@@ -196,6 +192,16 @@ const AppAppsNewRoute = AppAppsNewRouteImport.update({
   path: '/apps/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSocialIndexRoute = AppSocialIndexRouteImport.update({
+  id: '/social/',
+  path: '/social/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSocialPostsRoute = AppSocialPostsRouteImport.update({
+  id: '/social/posts',
+  path: '/social/posts',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -243,7 +249,6 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof AppReviewsRoute
   '/seo': typeof AppSeoRoute
   '/settings': typeof AppSettingsRoute
-  '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
   '/ingest/$': typeof IngestSplatRoute
   '/accounts/app-store': typeof AppAccountsAppStoreRoute
@@ -255,12 +260,14 @@ export interface FileRoutesByFullPath {
   '/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/apps/new': typeof AppAppsNewRoute
+  '/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/accounts/': typeof AppAccountsIndexRoute
   '/apps/': typeof AppAppsIndexRoute
+  '/social/': typeof AppSocialIndexRoute
   '/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
   '/apps/$appId/': typeof AppAppsAppIdIndexRoute
 }
@@ -278,7 +285,6 @@ export interface FileRoutesByTo {
   '/reviews': typeof AppReviewsRoute
   '/seo': typeof AppSeoRoute
   '/settings': typeof AppSettingsRoute
-  '/social': typeof AppSocialRoute
   '/store': typeof AppStoreRoute
   '/ingest/$': typeof IngestSplatRoute
   '/': typeof AppIndexRoute
@@ -290,12 +296,14 @@ export interface FileRoutesByTo {
   '/accounts/tiktok': typeof AppAccountsTiktokRoute
   '/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/apps/new': typeof AppAppsNewRoute
+  '/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/accounts': typeof AppAccountsIndexRoute
   '/apps': typeof AppAppsIndexRoute
+  '/social': typeof AppSocialIndexRoute
   '/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
   '/apps/$appId': typeof AppAppsAppIdIndexRoute
 }
@@ -316,7 +324,6 @@ export interface FileRoutesById {
   '/_app/reviews': typeof AppReviewsRoute
   '/_app/seo': typeof AppSeoRoute
   '/_app/settings': typeof AppSettingsRoute
-  '/_app/social': typeof AppSocialRoute
   '/_app/store': typeof AppStoreRoute
   '/ingest/$': typeof IngestSplatRoute
   '/_app/': typeof AppIndexRoute
@@ -329,12 +336,14 @@ export interface FileRoutesById {
   '/_app/accounts/youtube': typeof AppAccountsYoutubeRoute
   '/_app/apps/$appId': typeof AppAppsAppIdRouteWithChildren
   '/_app/apps/new': typeof AppAppsNewRoute
+  '/_app/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/connect/meta/callback': typeof ConnectMetaCallbackRoute
   '/connect/tiktok/callback': typeof ConnectTiktokCallbackRoute
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/apps/': typeof AppAppsIndexRoute
+  '/_app/social/': typeof AppSocialIndexRoute
   '/_app/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
   '/_app/apps/$appId/': typeof AppAppsAppIdIndexRoute
 }
@@ -356,7 +365,6 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/seo'
     | '/settings'
-    | '/social'
     | '/store'
     | '/ingest/$'
     | '/accounts/app-store'
@@ -368,12 +376,14 @@ export interface FileRouteTypes {
     | '/accounts/youtube'
     | '/apps/$appId'
     | '/apps/new'
+    | '/social/posts'
     | '/api/auth/$'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
     | '/connect/youtube/callback'
     | '/accounts/'
     | '/apps/'
+    | '/social/'
     | '/apps/$appId/settings'
     | '/apps/$appId/'
   fileRoutesByTo: FileRoutesByTo
@@ -391,7 +401,6 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/seo'
     | '/settings'
-    | '/social'
     | '/store'
     | '/ingest/$'
     | '/'
@@ -403,12 +412,14 @@ export interface FileRouteTypes {
     | '/accounts/tiktok'
     | '/accounts/youtube'
     | '/apps/new'
+    | '/social/posts'
     | '/api/auth/$'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
     | '/connect/youtube/callback'
     | '/accounts'
     | '/apps'
+    | '/social'
     | '/apps/$appId/settings'
     | '/apps/$appId'
   id:
@@ -428,7 +439,6 @@ export interface FileRouteTypes {
     | '/_app/reviews'
     | '/_app/seo'
     | '/_app/settings'
-    | '/_app/social'
     | '/_app/store'
     | '/ingest/$'
     | '/_app/'
@@ -441,12 +451,14 @@ export interface FileRouteTypes {
     | '/_app/accounts/youtube'
     | '/_app/apps/$appId'
     | '/_app/apps/new'
+    | '/_app/social/posts'
     | '/api/auth/$'
     | '/connect/meta/callback'
     | '/connect/tiktok/callback'
     | '/connect/youtube/callback'
     | '/_app/accounts/'
     | '/_app/apps/'
+    | '/_app/social/'
     | '/_app/apps/$appId/settings'
     | '/_app/apps/$appId/'
   fileRoutesById: FileRoutesById
@@ -583,13 +595,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/social': {
-      id: '/_app/social'
-      path: '/social'
-      fullPath: '/social'
-      preLoaderRoute: typeof AppSocialRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/store': {
       id: '/_app/store'
       path: '/store'
@@ -679,6 +684,20 @@ declare module '@tanstack/react-router' {
       path: '/apps/new'
       fullPath: '/apps/new'
       preLoaderRoute: typeof AppAppsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/social/': {
+      id: '/_app/social/'
+      path: '/social'
+      fullPath: '/social/'
+      preLoaderRoute: typeof AppSocialIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/social/posts': {
+      id: '/_app/social/posts'
+      path: '/social/posts'
+      fullPath: '/social/posts'
+      preLoaderRoute: typeof AppSocialPostsRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/auth/$': {
@@ -772,12 +791,13 @@ interface AppRouteChildren {
   AppReviewsRoute: typeof AppReviewsRoute
   AppSeoRoute: typeof AppSeoRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppSocialRoute: typeof AppSocialRoute
   AppStoreRoute: typeof AppStoreRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAppsAppIdRoute: typeof AppAppsAppIdRouteWithChildren
   AppAppsNewRoute: typeof AppAppsNewRoute
+  AppSocialPostsRoute: typeof AppSocialPostsRoute
   AppAppsIndexRoute: typeof AppAppsIndexRoute
+  AppSocialIndexRoute: typeof AppSocialIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -786,12 +806,13 @@ const AppRouteChildren: AppRouteChildren = {
   AppReviewsRoute: AppReviewsRoute,
   AppSeoRoute: AppSeoRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppSocialRoute: AppSocialRoute,
   AppStoreRoute: AppStoreRoute,
   AppIndexRoute: AppIndexRoute,
   AppAppsAppIdRoute: AppAppsAppIdRouteWithChildren,
   AppAppsNewRoute: AppAppsNewRoute,
+  AppSocialPostsRoute: AppSocialPostsRoute,
   AppAppsIndexRoute: AppAppsIndexRoute,
+  AppSocialIndexRoute: AppSocialIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

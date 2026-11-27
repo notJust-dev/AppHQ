@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, lt, lte, max } from 'drizzle-orm'
 import { z } from 'zod'
-import { metricDaily, posts } from '../db/schema.js'
+import { apps, metricDaily, posts } from '../db/schema.js'
 import { addDays, toIsoDate, type IsoDate } from '../lib/dates.js'
 import { HEADLINE } from '../metrics/catalog.js'
 import { lastCompleteDay } from '../metrics/complete.js'
@@ -14,7 +14,8 @@ const DOWNLOADS = HEADLINE.downloads
 export const listPosts = defineQuery({
   name: 'list_posts',
   description:
-    "One app's social posts published in a date range, newest first. Each has its platform, " +
+    'Social posts published in a date range, newest first, for one app or all of them. Each ' +
+    "has its app, platform, " +
     'caption, link, publish time and lifetime totals (views, likes, comments, shares) as of ' +
     'the last sync; older posts have had longer to collect them. `downloadLift` compares the ' +
     `app's downloads over the post's day and the ${LIFT_DAYS - 1} after with what the ` +
@@ -23,7 +24,7 @@ export const listPosts = defineQuery({
     '"too_recent", "no_baseline" or "no_downloads" when it cannot be worked out.',
   input: z
     .object({
-      appId: z.uuid().describe('The app id from list_apps.'),
+      appId: z.uuid().optional().describe('The app id from list_apps. Leave it out for every app.'),
       ...rangeFields,
       limit: z.number().int().min(1).max(200).default(50).describe('At most this many posts.'),
     })
@@ -34,6 +35,8 @@ export const listPosts = defineQuery({
       const rows = await db
         .select({
           id: posts.id,
+          appId: posts.appId,
+          appName: apps.name,
           platform: posts.platform,
           url: posts.url,
           caption: posts.caption,
@@ -46,10 +49,11 @@ export const listPosts = defineQuery({
           updatedAt: posts.updatedAt,
         })
         .from(posts)
+        .innerJoin(apps, and(eq(apps.organizationId, posts.organizationId), eq(apps.id, posts.appId)))
         .where(
           and(
             eq(posts.organizationId, organizationId),
-            eq(posts.appId, input.appId),
+            input.appId ? eq(posts.appId, input.appId) : undefined,
             gte(posts.publishedAt, new Date(`${input.from}T00:00:00Z`)),
             lt(posts.publishedAt, new Date(`${addDays(input.to, 1)}T00:00:00Z`)),
           ),
@@ -58,13 +62,20 @@ export const listPosts = defineQuery({
         .limit(input.limit)
       if (rows.length === 0) return []
 
-      const liftOf = await downloadLifts(scope, input.appId, input)
+      // Lift is each post's own app's downloads, so it is worked out app by app.
+      const lifts = new Map(
+        await Promise.all(
+          [...new Set(rows.map((row) => row.appId))].map(
+            async (appId) => [appId, await downloadLifts(scope, appId, input)] as const,
+          ),
+        ),
+      )
 
       return rows.map((row) => ({
         ...row,
         publishedAt: row.publishedAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
-        downloadLift: liftOf(row.publishedAt),
+        downloadLift: lifts.get(row.appId)!(row.publishedAt),
       }))
     })
   },

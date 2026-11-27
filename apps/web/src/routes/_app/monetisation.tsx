@@ -13,10 +13,9 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { formatCount, formatMoney } from '@/lib/format'
 import { pairedRatio } from '@/lib/performance'
 import { monetisationPerformanceQuery } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates } from '@/lib/range'
+import { rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/monetisation')({
-  validateSearch: performanceSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(monetisationPerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),
@@ -41,7 +40,7 @@ function MonetisationPage() {
       title="Monetisation"
       description="What the apps earn, and the subscriptions and trials behind it, from RevenueCat."
       range={range}
-      app={app}
+
       dates={dates}
     />
   )
@@ -121,7 +120,6 @@ function MonetisationPage() {
         {!app && data.apps.length > 1 && (
           <Panel title="By app" description="Each app's money over the same days. Select a column heading to sort by it." bodyClassName="">
             <AppComparison
-              range={range}
               sortBy="revenue"
               rows={data.apps.map((entry) => ({
                 app: entry.app,

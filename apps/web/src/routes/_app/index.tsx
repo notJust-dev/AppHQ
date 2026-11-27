@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, stripSearchParams } from '@tanstack/react-router'
-import { LayoutDashboard } from 'lucide-react'
+import { Link, createFileRoute, redirect } from '@tanstack/react-router'
+import { LayoutDashboard, Settings } from 'lucide-react'
+import { AppOverview } from '@/components/AppOverview'
 import { AppsTable } from '@/components/AppsTable'
 import { FunnelBand } from '@/components/FunnelBand'
 import { PageBody, PageHeader } from '@/components/PageHeader'
@@ -9,68 +10,107 @@ import { RangeSwitch } from '@/components/RangeSwitch'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { formatDay } from '@/lib/format'
-import { overviewQuery, reportingOf } from '@/lib/queries'
-import { RANGE_DAYS, rangeSearchSchema, rangeToDates } from '@/lib/range'
+import { appsQuery, flowQuery, overviewQuery, postsQuery, reportingOf, timelineQuery } from '@/lib/queries'
+import { RANGE_DAYS, rangeToDates, type RangeKey } from '@/lib/range'
 
+/**
+ * Overview: every app's funnel side by side, or one app's numbers when the top bar has an app
+ * chosen. Both follow the range.
+ */
 export const Route = createFileRoute('/_app/')({
-  validateSearch: rangeSearchSchema,
-  // Keep the default range out of the address, so the bare `/` stays bare for the landing page.
-  search: { middlewares: [stripSearchParams({ range: '28d' })] },
-  loaderDeps: ({ search }) => ({ range: search.range }),
+  loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   // Without dashboard access, `_app` shows the landing page instead, so there is nothing to load.
   loader: async ({ context, deps }) => {
-    if (context.dashboardAccess) await context.queryClient.ensureQueryData(overviewQuery(rangeToDates(deps.range)))
+    if (!context.dashboardAccess) return
+    const dates = rangeToDates(deps.range)
+    if (!deps.app) {
+      await context.queryClient.ensureQueryData(overviewQuery(dates))
+      return
+    }
+    const known = (list: { id: string }[]) => list.some((app) => app.id === deps.app)
+    // The list may be cached from before the app was added, so ask again before giving up.
+    const found =
+      known(await context.queryClient.ensureQueryData(appsQuery())) ||
+      known(await context.queryClient.fetchQuery({ ...appsQuery(), staleTime: 0 }))
+    // An app that was removed, or an address from before: every app instead.
+    if (!found) throw redirect({ to: '/', search: (previous) => ({ ...previous, app: undefined }), replace: true })
+    const [timeline] = await Promise.all([
+      context.queryClient.ensureQueryData(timelineQuery(deps.app, dates)),
+      context.queryClient.ensureQueryData(postsQuery(deps.app, dates)),
+      context.queryClient.ensureQueryData(flowQuery(deps.app, dates)),
+    ])
+    if (!timeline) throw redirect({ to: '/', search: (previous) => ({ ...previous, app: undefined }), replace: true })
   },
-  component: PortfolioPage,
+  component: OverviewPage,
 })
 
-function PortfolioPage() {
-  const { range } = Route.useSearch()
-  const { data } = useSuspenseQuery(overviewQuery(rangeToDates(range)))
-  const days = RANGE_DAYS[range]
+function OverviewPage() {
+  const { range, app } = Route.useSearch()
+  const dates = rangeToDates(range)
 
   return (
     <>
       <PageHeader
-        title="Portfolio"
-        description={`${formatDay(data.range.from)} to ${formatDay(data.range.to)}, compared with the ${days} days before`}
-        actions={<RangeSwitch current={range} />}
-      />
-      <PageBody>
-        {data.apps.length === 0 ? (
-          <Empty className="border border-dashed bg-card">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <LayoutDashboard />
-              </EmptyMedia>
-              <EmptyTitle>No apps yet</EmptyTitle>
-              <EmptyDescription>
-                Connect App Store Connect, Google Play or your social accounts, then add the apps you
-                want to track.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent className="flex-row justify-center">
-              <Button asChild>
-                <Link to="/accounts">Connect accounts</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/apps/new">Add app</Link>
-              </Button>
-            </EmptyContent>
-          </Empty>
-        ) : (
+        title="Overview"
+        scoped
+        description={`${formatDay(dates.from)} to ${formatDay(dates.to)}, compared with the ${RANGE_DAYS[range]} days before`}
+        actions={
           <>
-            <FunnelBand
-              totals={data.totals}
-              previous={data.comparable ? data.previousTotals : null}
-              reporting={reportingOf(data.reporting)}
-            />
-            <Panel title="Apps" description="Each app's funnel over the same days. Select a column heading to sort by it." bodyClassName="">
-              <AppsTable apps={data.apps} range={range} />
-            </Panel>
+            {app && (
+              <Button asChild variant="outline">
+                <Link to="/apps/$appId/settings" params={{ appId: app }}>
+                  <Settings aria-hidden="true" />
+                  Settings
+                </Link>
+              </Button>
+            )}
+            <RangeSwitch current={range} />
           </>
-        )}
-      </PageBody>
+        }
+      />
+      <PageBody>{app ? <AppOverview appId={app} dates={dates} /> : <Portfolio range={range} />}</PageBody>
+    </>
+  )
+}
+
+/** Every app at once: the funnel added up, then each app's. */
+function Portfolio({ range }: { range: RangeKey }) {
+  const { data } = useSuspenseQuery(overviewQuery(rangeToDates(range)))
+
+  if (data.apps.length === 0) {
+    return (
+      <Empty className="border border-dashed bg-card">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <LayoutDashboard />
+          </EmptyMedia>
+          <EmptyTitle>No apps yet</EmptyTitle>
+          <EmptyDescription>
+            Connect App Store Connect, Google Play or your social accounts, then add the apps you want to track.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent className="flex-row justify-center">
+          <Button asChild>
+            <Link to="/accounts">Connect accounts</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/apps/new">Add app</Link>
+          </Button>
+        </EmptyContent>
+      </Empty>
+    )
+  }
+
+  return (
+    <>
+      <FunnelBand
+        totals={data.totals}
+        previous={data.comparable ? data.previousTotals : null}
+        reporting={reportingOf(data.reporting)}
+      />
+      <Panel title="Apps" description="Each app's funnel over the same days. Select a column heading to sort by it." bodyClassName="">
+        <AppsTable apps={data.apps} />
+      </Panel>
     </>
   )
 }

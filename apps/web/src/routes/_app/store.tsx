@@ -15,10 +15,9 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { formatCompact, formatCount, formatDay } from '@/lib/format'
 import { pairedRatio } from '@/lib/performance'
 import { storePerformanceQuery, type PerformanceSeries } from '@/lib/queries'
-import { performanceSearchSchema, rangeToDates } from '@/lib/range'
+import { rangeToDates } from '@/lib/range'
 
 export const Route = createFileRoute('/_app/store')({
-  validateSearch: performanceSearchSchema,
   loaderDeps: ({ search }) => ({ range: search.range, app: search.app }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(storePerformanceQuery({ ...rangeToDates(deps.range), appId: deps.app })),
@@ -52,7 +51,7 @@ function StorePage() {
   if (pageViews?.summary == null && downloads?.summary == null) {
     return (
       <>
-        <PerformanceHeader title="Store" description="From being seen in the store, to the page, to the download." range={range} app={app} dates={dates} />
+        <PerformanceHeader title="Store" description="From being seen in the store, to the page, to the download." range={range} dates={dates} />
         <PageBody>
           <NoStore />
         </PageBody>
@@ -66,7 +65,7 @@ function StorePage() {
         title="Store"
         description="From being seen in the store, to the page, to the download."
         range={range}
-        app={app}
+
         dates={dates}
       />
       <PageBody>
@@ -143,7 +142,6 @@ function StorePage() {
         {!app && data.apps.length > 1 && (
           <Panel title="By app" description="Each app's store numbers over the same days. Select a column heading to sort by it." bodyClassName="">
             <AppComparison
-              range={range}
               sortBy="downloads"
               rows={data.apps.map((entry) => ({
                 app: entry.app,

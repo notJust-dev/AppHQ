@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { CheckCheck, ExternalLink, MessageSquareText, Star } from 'lucide-react'
@@ -28,14 +28,14 @@ import {
 import { sourceLabel } from '@/lib/sources'
 import { cn } from '@/lib/utils'
 
+/** The inbox's own filters. The app is the dashboard's `?app=`, the same one as on every page. */
 const searchSchema = z.object({
-  app: z.uuid().optional().catch(undefined),
   store: z.enum(['app_store', 'google_play']).optional().catch(undefined),
   rating: z.coerce.number().int().min(1).max(5).optional().catch(undefined),
   unread: z.boolean().optional().catch(undefined),
 })
 
-type Search = z.infer<typeof searchSchema>
+type Search = z.infer<typeof searchSchema> & { app?: string }
 
 const filtersOf = (search: Search): ReviewFilters => ({
   appId: search.app,
@@ -72,6 +72,7 @@ function ReviewsPage() {
     <>
       <PageHeader
         title="Reviews"
+        scoped
         description="Written reviews from the App Store and Google Play, newest first. Reviews you have dealt with can be marked read."
         actions={
           summary.unread > 0 && (
@@ -140,30 +141,14 @@ function useMark() {
 /** The select's value for "no filter"; Radix keeps the empty string for its placeholder. */
 const ANY = 'any'
 
+/** The inbox's own filters; the app is chosen in the top bar, as on every page. */
 function Filters({ search }: { search: Search }) {
-  const { data: apps = [] } = useQuery(appsQuery())
   const navigate = useNavigate()
   const set = (patch: Partial<Search>) =>
     void navigate({ to: '/reviews', search: (previous) => ({ ...previous, ...patch }) })
-  const appName = apps.find((app) => app.id === search.app)?.name
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Select value={search.app ?? ANY} onValueChange={(value) => set({ app: value === ANY ? undefined : value })}>
-        <SelectTrigger aria-label="App" className="w-56 bg-card">
-          <SelectValue>{appName ? <Private>{appName}</Private> : 'All apps'}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>All apps</SelectItem>
-          {apps
-            .filter((app) => app.kind !== 'portfolio')
-            .map((app) => (
-              <SelectItem key={app.id} value={app.id}>
-                <Private>{app.name}</Private>
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
       <Select
         value={search.store ?? ANY}
         onValueChange={(value) => set({ store: value === ANY ? undefined : (value as Search['store']) })}
@@ -271,7 +256,7 @@ function ReviewCard(props: {
           app={{ name: review.appName, iconUrl: props.iconUrl }}
           className="mr-1.5 inline-grid size-4 align-[-0.25rem] text-[9px]"
         />
-        <Link to="/apps/$appId" params={{ appId: review.appId }} search={{ range: '28d' }} className="font-medium text-foreground hover:underline">
+        <Link to="." search={(previous) => ({ ...previous, app: review.appId })} className="font-medium text-foreground hover:underline">
           <Private>{review.appName}</Private>
         </Link>
         {' · '}

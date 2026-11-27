@@ -1,3 +1,4 @@
+import { retainSearchParams, stripSearchParams } from '@tanstack/react-router'
 import { z } from 'zod'
 
 export const RANGE_DAYS = { '7d': 7, '28d': 28, '90d': 90 } as const
@@ -6,15 +7,29 @@ export type RangeKey = keyof typeof RANGE_DAYS
 
 export const RANGE_KEYS = Object.keys(RANGE_DAYS) as [RangeKey, ...RangeKey[]]
 
-/** The `?range=` search param shared by every dated page. Unknown values fall back to 28 days. */
-export const rangeSearchSchema = z.object({
-  range: z.enum(RANGE_KEYS).default('28d').catch('28d'),
-})
+/** The range a page shows when the address names none. */
+export const DEFAULT_RANGE: RangeKey = '28d'
 
-/** A performance page's search params: the range, and the one app it is limited to, if any. */
-export const performanceSearchSchema = rangeSearchSchema.extend({
+/**
+ * The search params every dashboard page carries: `?range=`, and `?app=` for the one app the
+ * numbers are limited to, if any. Unknown values fall back to 28 days and to every app.
+ */
+export const dashboardSearchSchema = z.object({
+  range: z.enum(RANGE_KEYS).default(DEFAULT_RANGE).catch(DEFAULT_RANGE),
   app: z.uuid().optional().catch(undefined),
 })
+
+type DashboardSearch = z.infer<typeof dashboardSearchSchema>
+
+/**
+ * The app and range stay as the person moves from page to page, until they choose another: a
+ * link that names neither keeps the ones in the address. The default range stays out of the
+ * address, so the bare `/` stays bare for the landing page.
+ */
+export const dashboardSearchMiddlewares = [
+  stripSearchParams<DashboardSearch>({ range: DEFAULT_RANGE }),
+  retainSearchParams<DashboardSearch>(['range', 'app']),
+]
 
 export const RANGE_LABELS: Record<RangeKey, string> = {
   '7d': '7 days',

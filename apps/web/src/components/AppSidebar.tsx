@@ -12,14 +12,12 @@ import {
   Monitor,
   Moon,
   Plug,
-  Plus,
   Search,
   Store,
   Sun,
   Wallet,
 } from 'lucide-react'
 import { useEffect } from 'react'
-import { AppIcon } from '@/components/AppIcon'
 import { BrandMark, BrandName } from '@/components/Brand'
 import { Private } from '@/components/Private'
 import {
@@ -36,44 +34,72 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { signOutFn } from '@/fns/auth'
 import { setPrivacy, usePrivacy } from '@/lib/privacy'
-import { appsQuery, unreadReviewsQuery } from '@/lib/queries'
+import { unreadReviewsQuery } from '@/lib/queries'
 import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
 
 /** TanStack marks the link to the current page with aria-current; that is the active item. */
 const ACTIVE =
   'aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-medium aria-[current=page]:text-sidebar-accent-foreground'
 
-/** The pages that look at one part of the funnel across apps. */
-const PERFORMANCE = [
-  { to: '/social', label: 'Social', Icon: Megaphone },
+/**
+ * The pages that follow the app chosen in the top bar, roughly in the funnel's order: people
+ * see you, visit the store, pay, then review. Reviews comes in its own item, for its badge.
+ */
+const ANALYTICS: Section[] = [
+  { to: '/', label: 'Overview', Icon: LayoutDashboard },
+  {
+    to: '/social',
+    label: 'Social',
+    Icon: Megaphone,
+    pages: [
+      { to: '/social', label: 'Performance' },
+      { to: '/social/posts', label: 'Posts' },
+    ],
+  },
+  { to: '/seo', label: 'SEO', Icon: Search },
   { to: '/store', label: 'Store', Icon: Store },
   { to: '/monetisation', label: 'Monetisation', Icon: Wallet },
-  { to: '/seo', label: 'SEO', Icon: Search },
-] as const
-
-/** How many apps the sidebar lists before pointing to the Apps page for the rest. */
-const APPS_SHOWN = 12
+]
 
 /**
- * The navigation: the three sections, the apps for switching between them, and the theme and
- * sign-out at the bottom. Collapsed, each item keeps its icon and names itself in a tooltip.
+ * A sidebar item. A section with `pages` lists them under it while one of them is open; its own
+ * link opens the first.
  */
-/** `organization`: the name of the organization the dashboard works in, when the API said. */
+interface Section {
+  to: '/' | '/social' | '/seo' | '/store' | '/monetisation'
+  label: string
+  Icon: typeof Search
+  pages?: { to: '/social' | '/social/posts'; label: string }[]
+}
+
+/** What feeds the dashboard: the apps and the accounts they come from. */
+const SETUP = [
+  { to: '/apps', label: 'Apps', Icon: AppWindow },
+  { to: '/accounts', label: 'Accounts', Icon: Plug },
+] as const
+
+/**
+ * The navigation: the pages that follow the chosen app, then the setup and the theme and
+ * sign-out at the bottom. The app the dashboard shows is chosen in each page's top bar.
+ * Collapsed, each item keeps its icon and names itself in a tooltip.
+ * `organization`: the name of the organization the dashboard works in, when the API said.
+ */
 export function AppSidebar({ organization }: { organization: string | null }) {
-  const { data: apps = [] } = useQuery(appsQuery())
   const { data: unread } = useQuery(unreadReviewsQuery())
-  const own = apps.filter((app) => app.kind !== 'portfolio')
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
 
@@ -105,22 +131,34 @@ export function AppSidebar({ organization }: { organization: string | null }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu aria-label="Sections">
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Portfolio" className={ACTIVE}>
-                  <Link to="/" activeOptions={{ exact: true, includeSearch: false }}>
-                    <LayoutDashboard />
-                    <span>Portfolio</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Apps" className={ACTIVE}>
-                  <Link to="/apps" activeOptions={{ exact: true }}>
-                    <AppWindow />
-                    <span>Apps</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {ANALYTICS.map(({ to, label, Icon, pages }) => {
+                const open = pages !== undefined && (pathname === to || pathname.startsWith(`${to}/`))
+                return (
+                  <SidebarMenuItem key={to}>
+                    {/* With its pages open, the page is marked below, not the section. */}
+                    <SidebarMenuButton asChild tooltip={label} className={pages ? undefined : ACTIVE}>
+                      {/* The app and range in the address come along; see lib/range.ts. */}
+                      <Link to={to} activeOptions={{ exact: to === '/', includeSearch: false }}>
+                        <Icon />
+                        <span>{label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {open && (
+                      <SidebarMenuSub aria-label={label}>
+                        {pages.map((page) => (
+                          <SidebarMenuSubItem key={page.to}>
+                            <SidebarMenuSubButton asChild className={ACTIVE} data-active={undefined}>
+                              <Link to={page.to} activeOptions={{ exact: true, includeSearch: false }}>
+                                <span>{page.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
+                  </SidebarMenuItem>
+                )
+              })}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Reviews" className={ACTIVE}>
                   <Link to="/reviews" activeOptions={{ includeSearch: false }}>
@@ -132,26 +170,20 @@ export function AppSidebar({ organization }: { organization: string | null }) {
                   <SidebarMenuBadge aria-label={`${unread.count} unread`}>{unread.count > 99 ? '99+' : unread.count}</SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Accounts" className={ACTIVE}>
-                  <Link to="/accounts">
-                    <Plug />
-                    <span>Accounts</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Setup, at the bottom above the settings: visited less than the pages above. The line
+            is as wide as the items, inset the same on both sides; w-full would push it off. */}
+        <SidebarSeparator className="mx-2 mt-auto opacity-50 data-horizontal:w-auto" />
         <SidebarGroup>
-          <SidebarGroupLabel>Performance</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu aria-label="Performance">
-              {PERFORMANCE.map(({ to, label, Icon }) => (
+            <SidebarMenu aria-label="Setup">
+              {SETUP.map(({ to, label, Icon }) => (
                 <SidebarMenuItem key={to}>
                   <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
-                    {/* The page keeps the range and app it was last opened with in the address. */}
+                    {/* Active on the pages under it too, such as an app's settings. */}
                     <Link to={to} activeOptions={{ includeSearch: false }}>
                       <Icon />
                       <span>{label}</span>
@@ -159,44 +191,6 @@ export function AppSidebar({ organization }: { organization: string | null }) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Your apps</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu aria-label="Your apps">
-              {own.slice(0, APPS_SHOWN).map((app) => (
-                <SidebarMenuItem key={app.id}>
-                  <SidebarMenuButton asChild tooltip={{ children: <Private>{app.name}</Private> }} className={ACTIVE}>
-                    <Link
-                      to="/apps/$appId"
-                      params={{ appId: app.id }}
-                      search={{ range: '28d' }}
-                      activeOptions={{ includeSearch: false }}
-                    >
-                      <AppIcon app={app} className="size-4 text-[10px]" />
-                      <Private className="truncate">{app.name}</Private>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {own.length > APPS_SHOWN && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className="text-muted-foreground">
-                    <Link to="/apps">All {own.length} apps</Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Add app" className={`text-muted-foreground ${ACTIVE}`}>
-                  <Link to="/apps/new">
-                    <Plus />
-                    <span>Add app</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
