@@ -13,7 +13,7 @@ import { dashboardSearchMiddlewares, dashboardSearchSchema } from '@/lib/range'
  * Everything behind sign-in. This guard is for navigation; the data is guarded separately, by
  * `requireDashboardAccess` in every server function and by the API.
  *
- * - Dashboard access (the dashboard password, or an approved member account; see
+ * - Dashboard access (the dashboard password, or a member account; see
  *   server/access.ts): the dashboard, in the organization the API chose.
  * - Signed in with an account without access: the Request access page, from every dashboard
  *   address including the bare one.

@@ -8,7 +8,7 @@ import { PROBLEMS, signInWithEmail, type Problem } from '@/lib/email-auth'
 
 /**
  * Signing in with an email address and a password, for accounts made on /sign-up. Like the
- * Google and GitHub buttons it leads to the Request access page, which sends an approved member
+ * Google and GitHub buttons it leads to the Request access page, which sends a member
  * on to the dashboard.
  */
 export function EmailSignIn({ autoFocus }: { autoFocus: boolean }) {

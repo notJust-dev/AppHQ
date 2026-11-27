@@ -16,14 +16,15 @@ import { formatDay } from '@/lib/format'
  * have dashboard access. They can ask for access and see that they did. Signed out, it sends them
  * to /login; with access, to the dashboard.
  *
- * Reading the account makes an approved account its organization the first time (see the API's
- * `account.get`), so an account approved since its last visit goes on to the dashboard from here.
+ * Reading the account joins the organizations the address was invited to, and makes an approved
+ * account its organization the first time (see the API's `account.get`), so an account invited
+ * or approved since its last visit goes on to the dashboard from here.
  */
 export const Route = createFileRoute('/request-access')({
   loader: async () => {
     const { account } = await getAccountFn()
     if (!account) throw redirect({ to: '/login' })
-    if (account.accessStatus === 'approved' && (await getSessionFn()).dashboardAccess) throw redirect({ to: '/' })
+    if ((await getSessionFn()).dashboardAccess) throw redirect({ to: '/' })
     return { account }
   },
   head: () => ({ meta: [{ title: 'Request access · AppHQ' }] }),
