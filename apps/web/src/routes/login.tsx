@@ -15,7 +15,7 @@ import { getSessionFn, signInFn } from '@/fns/auth'
 
 /**
  * Every way in. Google, GitHub and an email address with a password, when this server has them,
- * lead to an account: an approved member goes on to the dashboard, anyone else to the Request
+ * lead to an account: a member goes on to the dashboard, anyone else to the Request
  * access page. The dashboard password, when this server has one, is a separate block; without
  * DASHBOARD_PASSWORD it isn't shown at all.
  */

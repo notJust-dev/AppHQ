@@ -15,7 +15,7 @@ import { getAppSession } from '@/server/session'
  * The data boundary. Route guards only decide what to show; every server function that returns
  * private data uses this middleware, so calling it directly without dashboard access gets
  * nothing. It hands the handler the only client that can call dashboard procedures, as
- * `context.api`. A password session or an approved member account passes it (see
+ * `context.api`. A password session or a member account passes it (see
  * server/access.ts).
  */
 export const requireDashboardAccess = createMiddleware({ type: 'function' }).server(async ({ next }) => {

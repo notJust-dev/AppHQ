@@ -49,7 +49,9 @@ import { assignAsset, createApp, removeApp, renameApp, setIgnored } from '../ass
 import { connectTikTok } from '../services/connect-tiktok.js'
 import { startSync } from '../sync/background.js'
 import { answerWaitlist, answerWaitlistInput, joinWaitlist, joinWaitlistInput } from '../waitlist/join.js'
-import type { AccountUser } from '../auth/accounts.js'
+import { APIError } from 'better-auth/api'
+import type { AccountUser, MemberView } from '../auth/accounts.js'
+import { MEMBER_ROLES } from '../auth/auth.js'
 import { openProcedure, procedure, router, signedInAccount, type ApiContext } from './init.js'
 
 export type { ApiContext } from './init.js'
@@ -198,6 +200,53 @@ async function organizationIfApproved(ctx: ApiContext, account: AccountUser) {
   const { created } = await ctx.accounts.ensureOrganization(account.id)
   if (created) ctx.log.info('accounts: made an organization for an approved account')
 }
+
+/** What the plugin's refusals mean here, in the dashboard's words. */
+const MEMBER_ERRORS: Record<string, string> = {
+  USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION: 'That address already belongs to a member.',
+  YOU_ARE_NOT_ALLOWED_TO_INVITE_USERS_TO_THIS_ORGANIZATION: 'Only an owner or an admin can invite people.',
+  YOU_ARE_NOT_ALLOWED_TO_INVITE_USER_WITH_THIS_ROLE: 'Only an owner can invite an owner.',
+  INVITATION_LIMIT_REACHED: 'This organization has too many open invitations. Cancel some first.',
+  ORGANIZATION_MEMBERSHIP_LIMIT_REACHED: 'This organization has as many members as it can have.',
+  YOU_ARE_NOT_ALLOWED_TO_CANCEL_THIS_INVITATION: 'Only an owner or an admin can cancel invitations.',
+  YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER: 'Only an owner or an admin can remove members.',
+  // The plugin also says this when an admin tries to remove an owner.
+  YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER: 'Only an owner can remove an owner, and an organization keeps at least one.',
+  YOU_CANNOT_LEAVE_THE_ORGANIZATION_WITHOUT_AN_OWNER: 'An organization keeps at least one owner.',
+  YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_MEMBER: 'Only an owner or an admin can change roles, and only an owner can change an owner’s.',
+  MEMBER_NOT_FOUND: 'There is no such member here.',
+  INVITATION_NOT_FOUND: 'There is no such invitation here.',
+  INVALID_EMAIL: 'That is not an email address.',
+}
+
+function memberError(err: unknown): TRPCError {
+  if (err instanceof TRPCError) return err
+  if (err instanceof APIError) {
+    const code = typeof err.body?.code === 'string' ? err.body.code : ''
+    const message = MEMBER_ERRORS[code] ?? 'The change was refused.'
+    if (code === 'MEMBER_NOT_FOUND' || code === 'INVITATION_NOT_FOUND') return new TRPCError({ code: 'NOT_FOUND', message })
+    if (err.status === 'FORBIDDEN' || err.status === 'UNAUTHORIZED') return new TRPCError({ code: 'FORBIDDEN', message })
+    return new TRPCError({ code: 'BAD_REQUEST', message })
+  }
+  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Could not change the members.', cause: err })
+}
+
+/**
+ * The account a member change is made as: the visitor's own, in the organization the request
+ * works in. The dashboard password is nobody's account, so it can see the members but not change
+ * them; neither can anyone while accounts are off.
+ */
+async function changingMembers(ctx: { via: 'password' | 'account'; accounts: ApiContext['accounts']; session: ApiContext['session'] }) {
+  const session = ctx.via === 'account' ? await ctx.session() : null
+  if (!ctx.accounts || !session) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Sign in with your account to change the members.' })
+  }
+  return { accounts: ctx.accounts, session }
+}
+
+const memberRole = z.enum(MEMBER_ROLES)
+
+const memberView = (row: MemberView) => ({ ...row, joinedAt: row.joinedAt.toISOString() })
 
 /** What an account may see of itself. */
 function profile(account: AccountUser) {
@@ -610,6 +659,10 @@ export const appRouter = router({
 
     get: openProcedure.meta({ access: 'account' }).query(async ({ ctx }) => {
       const account = await signedInAccount(ctx)
+      // Invitations first: someone invited and approved joins the organization they were invited
+      // to rather than getting an empty one of their own.
+      const joined = await ctx.accounts?.joinInvitedOrganizations(ctx.cookie, account)
+      if (joined) ctx.log.info(`accounts: an account joined ${joined === 1 ? 'an organization' : `${joined} organizations`} it was invited to`)
       await organizationIfApproved(ctx, account)
       return profile(account)
     }),
@@ -636,6 +689,77 @@ export const appRouter = router({
         .limit(1)
       if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'This organization no longer exists.' })
       return { name: row.name, via: ctx.via }
+    }),
+  }),
+  /**
+   * The people in this organization, and the invitations to it. Anyone in it can see who belongs;
+   * the changes are made as the visitor's own account, by Better Auth's organization plugin,
+   * whose roles decide who may make them (see `organizationPlugin` in auth/auth.ts).
+   */
+  members: router({
+    list: procedure.query(async ({ ctx }) => {
+      if (!ctx.accounts) return { accounts: false as const }
+      const session = ctx.via === 'account' ? await ctx.session() : null
+      const { members, invitations } = await ctx.accounts.membersOf(ctx.organizationId)
+      const you = session ? members.find((row) => row.userId === session.user.id) ?? null : null
+      const canManage = you?.role === 'owner' || you?.role === 'admin'
+      return {
+        accounts: true as const,
+        /** Whether invitations are mailed; without a mail server the person is told to sign in. */
+        mail: ctx.accounts.email,
+        via: ctx.via,
+        you: you ? { memberId: you.id, role: you.role } : null,
+        canManage,
+        members: members.map(memberView),
+        // Only those who can invite see who has been: the plugin's own rule.
+        invitations: canManage || ctx.via === 'password' ? invitations.map((row) => ({ ...row, invitedAt: row.invitedAt.toISOString(), expiresAt: row.expiresAt.toISOString() })) : [],
+      }
+    }),
+
+    /** Invites an address, or invites it again with a new role and a new expiry. */
+    invite: procedure
+      .input(z.object({ email: z.string().trim().toLowerCase().pipe(z.email().max(254)), role: memberRole }))
+      .mutation(async ({ ctx, input }) => {
+        const { accounts } = await changingMembers(ctx)
+        const invitation = await accounts.invite(ctx.cookie, ctx.organizationId, input).catch((err: unknown) => {
+          throw memberError(err)
+        })
+        ctx.log.info('members: invited an address')
+        return { id: invitation.id, mailed: accounts.email }
+      }),
+
+    cancelInvitation: procedure.input(z.object({ invitationId: z.uuid() })).mutation(async ({ ctx, input }) => {
+      const { accounts } = await changingMembers(ctx)
+      const cancelled = await accounts.cancelInvitation(ctx.cookie, ctx.organizationId, input.invitationId).catch((err: unknown) => {
+        throw memberError(err)
+      })
+      if (!cancelled) throw new TRPCError({ code: 'NOT_FOUND', message: MEMBER_ERRORS.INVITATION_NOT_FOUND })
+      return { ok: true as const }
+    }),
+
+    remove: procedure.input(z.object({ memberId: z.uuid() })).mutation(async ({ ctx, input }) => {
+      const { accounts, session } = await changingMembers(ctx)
+      const { members } = await accounts.membersOf(ctx.organizationId)
+      const target = members.find((row) => row.id === input.memberId)
+      if (!target) throw new TRPCError({ code: 'NOT_FOUND', message: MEMBER_ERRORS.MEMBER_NOT_FOUND })
+      if (target.userId === session.user.id) throw new TRPCError({ code: 'BAD_REQUEST', message: 'You can’t remove yourself.' })
+      await accounts.removeMember(ctx.cookie, ctx.organizationId, input.memberId).catch((err: unknown) => {
+        throw memberError(err)
+      })
+      ctx.log.info('members: removed a member')
+      return { ok: true as const }
+    }),
+
+    setRole: procedure.input(z.object({ memberId: z.uuid(), role: memberRole })).mutation(async ({ ctx, input }) => {
+      const { accounts } = await changingMembers(ctx)
+      const { members } = await accounts.membersOf(ctx.organizationId)
+      if (!members.some((row) => row.id === input.memberId)) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: MEMBER_ERRORS.MEMBER_NOT_FOUND })
+      }
+      await accounts.setRole(ctx.cookie, ctx.organizationId, input.memberId, input.role).catch((err: unknown) => {
+        throw memberError(err)
+      })
+      return { ok: true as const }
     }),
   }),
   // Velocity has no shell, so the generated demo data is loaded and removed through the API.

@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import { getAppFlowFn, getAppTimelineFn, getOverviewFn, listPostsFn } from '@/fns/portfolio'
 import { getSyncStatusFn, listAccountsFn, listAppsFn } from '@/fns/settings'
 import { listAssetsFn } from '@/fns/assets'
+import { listMembersFn } from '@/fns/members'
 import { metaSetupFn } from '@/fns/meta'
 import { tiktokSetupFn } from '@/fns/tiktok'
 import { youtubeSetupFn } from '@/fns/youtube'
@@ -52,6 +53,8 @@ export const accountsQuery = () =>
 
 export const syncStatusQuery = () =>
   queryOptions({ queryKey: ['sync-status'], queryFn: () => getSyncStatusFn() })
+
+export const membersQuery = () => queryOptions({ queryKey: ['members'], queryFn: () => listMembersFn() })
 
 /** The dates of a performance page, and the app it is limited to, if any. */
 type PerformanceInput = { from: string; to: string; appId?: string }

@@ -4,7 +4,8 @@ import type { Env } from '../env.js'
 import { consoleLogger, type Logger } from '../lib/logger.js'
 import { mailConfigFromEnv } from '../mail/config.js'
 import { createSmtpMailer, type Mailer, type SmtpConfig } from '../mail/mailer.js'
-import { createOutbox } from '../mail/outbox.js'
+import { invitationMessage } from '../mail/messages.js'
+import { createOutbox, type Outbox } from '../mail/outbox.js'
 import { EMAIL_PATHS, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, RESET_MINUTES, emailAccounts } from './email.js'
 
 /**
@@ -129,7 +130,7 @@ export function authOptions(
           revokeSessionsOnPasswordReset: true,
         }
       : { enabled: false },
-    plugins: [organizationPlugin(), ...(outbox ? [emailAccounts({ outbox, origin })] : [])],
+    plugins: [organizationPlugin({ outbox, origin }), ...(outbox ? [emailAccounts({ outbox, origin })] : [])],
     socialProviders: {
       ...(config.google && {
         google: {
@@ -220,17 +221,38 @@ export function authOptions(
   } satisfies BetterAuthOptions
 }
 
+/** How long an invitation to a workspace works. */
+export const INVITATION_DAYS = 7
+
+/** The roles a member can have, from most to least: the plugin's own three. */
+export const MEMBER_ROLES = ['owner', 'admin', 'member'] as const
+export type MemberRole = (typeof MEMBER_ROLES)[number]
+
 /**
- * Better Auth's organization plugin, for its tables and session field. Nothing of it is reachable
- * over HTTP (none of its paths is in `authPaths`), and people can neither create nor delete
- * organizations through it: the API makes them itself (src/organizations/ensure.ts).
+ * Better Auth's organization plugin: its tables, its session field, and its rules for members
+ * and invitations. None of its paths is reachable over HTTP (none is in `authPaths`); the API
+ * calls its endpoints itself, with the visitor's own session, from the `members` procedures
+ * (trpc/router.ts). People can neither create nor delete organizations through it: the API makes
+ * them itself (`ensureOrganization` in accounts.ts).
+ *
+ * Roles are the plugin's: an owner or an admin invites, removes and changes roles, and only an
+ * owner can touch an owner; a member uses the dashboard. With a mail server, an invitation is
+ * mailed; without one, the person is told to sign in, and joins when they do (`account.get`).
  */
-export const organizationPlugin = () =>
+export const organizationPlugin = (deps: { outbox?: Outbox | null; origin?: string } = {}) =>
   organization({
     allowUserToCreateOrganization: false,
     disableOrganizationDeletion: true,
-    // For the invitations to come: only the verified owner of an address may accept one.
+    // Only the verified owner of an address may accept an invitation to it.
     requireEmailVerificationOnInvitation: true,
+    invitationExpiresIn: INVITATION_DAYS * 24 * 60 * 60,
+    // Inviting an address again replaces its invitation, with the new role and a new expiry.
+    cancelPendingInvitationsOnReInvite: true,
+    ...(deps.outbox && {
+      sendInvitationEmail: async ({ email }: { email: string }) => {
+        deps.outbox!.send('invitation', { to: email, ...invitationMessage({ loginUrl: `${deps.origin}/login`, days: INVITATION_DAYS }) })
+      },
+    }),
   })
 
 export function createAuth(options: ReturnType<typeof authOptions>) {

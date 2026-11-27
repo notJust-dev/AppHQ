@@ -17,7 +17,7 @@ YouTube and Google Search Console** using your own API keys and developer apps. 
 third-party service in between. Credentials are encrypted before they are stored, and the
 dashboard is protected by a single password. Optionally, people can sign in with Google or GitHub,
 or sign up with an email address; once you approve them, their account opens the dashboard in
-their own organization, and you can turn the password off (see
+their own organization, you can invite people to yours, and you can turn the password off (see
 [Accounts and access requests](#accounts-and-access-requests-optional)).
 
 ## How it works
@@ -293,12 +293,12 @@ can press **Request access**. With a mail server, people can also
 [sign up with an email address and a password](#signing-up-with-an-email-address). This is off
 unless you set it up, and nothing else changes when it is off.
 
-An account opens the dashboard when all of these hold:
+An account opens the dashboard when both of these hold:
 
 - its address is confirmed: by the provider, or with the code emailed at sign-up,
-- you approved it (step 3 below),
-- it is a member of an organization. Approval makes it one of its own; `add-owner` adds it to
-  yours (see [Organizations](#organizations)).
+- it is a member of an organization. Approving it (step 3 below) makes it one of its own; an
+  invitation adds it to someone else's (see [Members](#members)); `add-owner` adds it to yours
+  (see [Organizations](#organizations)).
 
 It then works in that organization only, and never sees another's data. The dashboard password
 keeps working alongside, in the `default` organization, until you turn it off.
@@ -363,7 +363,7 @@ them.
   owner to say so, instead of a code. An account made with Google or GitHub gets no password,
   and an account with a password can't sign in with Google or GitHub.
 - **Approval is unchanged.** A new account lands on the Request access page, and opens nothing
-  until you approve it (step 3 above).
+  until you approve it (step 3 above) or someone invites its address.
 - **Limits.** Signing in, signing up and resetting are limited per visitor, and one address is
   emailed at most 5 times an hour, so the forms can't be used to fill someone's inbox.
 
@@ -411,10 +411,12 @@ Every message the API sends then shows up at http://127.0.0.1:8025 instead of be
 
 Every app, account connection, number, post, review and sync run belongs to an **organization**.
 The first one, `default`, was made when you upgraded and holds everything you had; the dashboard
-password works in it. Approved accounts get their own, empty organization. An approved account
-works in an organization it is a member of: the one it last worked in, or else the one it joined
-first. The sidebar shows which, under the AppHQ name. Every member can do everything there.
-Nobody can create, join or switch organizations through the sign-in pages.
+password works in it. Approved accounts get their own, empty organization. An account works in an
+organization it is a member of: the one it last worked in or joined, or else the one it joined
+first. The sidebar shows which, under the AppHQ name. Every member sees and changes the same apps,
+numbers and integrations there; only adding and removing people depends on the role (see
+[Members](#members)). Nobody can create or switch organizations through the sign-in pages, and the
+only way to join one is an invitation.
 
 **Make your own account the owner of `default`**, so it opens your data. Sign in or sign up once
 at `/login` first. Then, where you have a shell:
@@ -423,16 +425,15 @@ at `/login` first. Then, where you have a shell:
 cd apps/api && npm run cli -- add-owner --email <your address>
 ```
 
-It also removes the empty organization made for your account on approval, if there is one. On a
-host without a shell (such as Velocity), run this SQL instead, before approving yourself:
+It also removes the empty organization made for your account on approval, if there is one. Your
+account then opens `default` without being approved. On a host without a shell (such as
+Velocity), run this SQL instead:
 
 ```sql
 insert into member (organization_id, user_id, role)
 select o.id, u.id, 'owner' from organization o, "user" u
 where o.slug = 'default' and u.email = '<your address>'
 on conflict (organization_id, user_id) do update set role = 'owner';
-
-update "user" set access_status = 'approved' where email = '<your address>';
 
 -- Only if you were approved before running the statement above: removes the empty organization
 -- made for your account. It fails, and changes nothing, if that organization holds any data.
@@ -442,7 +443,29 @@ where u.email = '<your address>'
   and not exists (select 1 from member m where m.organization_id = o.id and m.user_id <> u.id);
 ```
 
-With a shell, approve yourself with the `update "user"` statement above too.
+### Members
+
+Owners and admins invite people to their organization from **Settings → Members**: an email
+address and a role. The person signs in or signs up with that address, confirmed, and joins on the
+spot, without being approved; they then work in that organization. With a
+[mail server](#signing-up-with-an-email-address), the address gets an email with a link to
+`/login`; the email names neither the organization nor who sent it. Without one, nothing is sent,
+so tell them yourself. An invitation works for 7 days; inviting the address again replaces it.
+
+| Role | Can |
+|---|---|
+| Owner | Everything, including inviting, removing and changing the role of other owners |
+| Admin | Invite, remove and change the role of anyone but an owner, and cancel invitations |
+| Member | Use the dashboard, and see who else belongs |
+
+An organization keeps at least one owner, and nobody removes themselves. Someone removed can no
+longer open that organization's dashboard, at once; an account that was also approved keeps its
+own organization. Members and invitations are kept by Better Auth's organization plugin, and its
+rules decide who may do what; none of its own endpoints can be reached from a browser.
+
+Signed in with the dashboard password, the page lists the members but can't change them: the
+password is nobody's account. With accounts off, it says how to turn them on. Someone who belongs
+to several organizations works in the one they joined last; there is no switcher yet.
 
 ### Turning the dashboard password off
 
@@ -456,7 +479,7 @@ password left behind by mistake still opens nothing:
 
 Do it in this order, so you never lock yourself out:
 
-1. **Make your account an owner of `default` and approve it**, as above.
+1. **Make your account an owner of `default`**, as above.
 2. **Sign out, sign in with your account, and check.** You should land on the dashboard,
    see `Default organization` under the AppHQ name in the sidebar, and see your apps.
 3. **Set `ALLOW_DASHBOARD_PASSWORD=false` on `api`** and redeploy it. Check again that your
