@@ -96,7 +96,7 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
     },
   })
   const leaving = connect.isPending || connect.data?.ok === true
-  const { renewBy, renewSoon, missing } = metaHealth(props.accounts)
+  const { renewBy, renewSoon, ended, missing } = metaHealth(props.accounts)
 
   return (
     <>
@@ -114,8 +114,17 @@ function ConnectMeta(props: { setup: MetaSetup; accounts: ConnectedAccount[] }) 
 
       {renewBy && (
         <p className={`mb-4 text-sm ${renewSoon ? 'font-medium' : 'text-muted-foreground'}`}>
-          Meta lets the sign-in last about 60 days. Sign in again by {formatDay(renewBy.slice(0, 10))}{' '}
-          so Instagram keeps syncing; Facebook Pages keep working either way.
+          {ended ? (
+            <>
+              Meta lets the sign-in last about 60 days. It ended on {formatDay(renewBy.slice(0, 10))}, so
+              Instagram stopped syncing; sign in again. Facebook Pages keep working either way.
+            </>
+          ) : (
+            <>
+              Meta lets the sign-in last about 60 days. Sign in again by {formatDay(renewBy.slice(0, 10))}{' '}
+              so Instagram keeps syncing; Facebook Pages keep working either way.
+            </>
+          )}
         </p>
       )}
 

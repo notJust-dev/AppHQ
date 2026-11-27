@@ -199,8 +199,9 @@ function attentionOf(family: AccountFamily): ReactNode {
   const noted = family.accounts.find((account) => account.note)
   if (noted?.note) return noted.note
   if (family.family === 'meta' && family.accounts.length > 0) {
-    const { missing, renewBy, renewSoon } = metaHealth(family.accounts)
+    const { missing, renewBy, renewSoon, ended } = metaHealth(family.accounts)
     if (missing.length > 0) return 'Missing permissions, so some numbers cannot be read.'
+    if (renewBy && ended) return `The sign-in ended on ${formatDay(renewBy.slice(0, 10))}, so Instagram stopped syncing. Sign in again.`
     if (renewBy && renewSoon) return `Sign in again by ${formatDay(renewBy.slice(0, 10))} so Instagram keeps syncing.`
   }
   return null
