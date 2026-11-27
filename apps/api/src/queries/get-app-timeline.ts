@@ -85,15 +85,18 @@ export function buildSeries<D extends SeriesDefinition>(definitions: readonly D[
     const complete = lastCompleteDay(lastDays)
     const late = complete.waitingFor.length > 0 ? complete.through : null
 
-    const values: Values = days.map((day, index) => {
-      if (late !== null && day > late) return null
+    const sumAt = (index: number) => {
       let total: number | null = null
       for (const { values: sourceValues } of sources) {
         const value = sourceValues[index]
         if (value !== null && value !== undefined) total = (total ?? 0) + value
       }
       return total === null ? null : round(total)
-    })
+    }
+    const values: Values = days.map((day, index) => (late !== null && day > late ? null : sumAt(index)))
+    // The days after `late`, summed over the sources that have reported them. It starts on
+    // `late` itself so a chart can draw it on from where the complete total ends.
+    const partial: Values = days.map((day, index) => (late !== null && day >= late ? sumAt(index) : null))
 
     const summary = summarize(definition.aggregate, values)
     // The per-source summaries cover the same days as the total, so they add up to it; the
@@ -122,6 +125,12 @@ export function buildSeries<D extends SeriesDefinition>(definitions: readonly D[
       completeThrough: late,
       /** The sources the days after `completeThrough` are waiting for. */
       waitingFor: late === null ? [] : complete.waitingFor,
+      /**
+       * From `completeThrough` on, what the sources that have reported so far add up to; null
+       * on every other day, and on every day when nothing is late. Not a total: it is missing
+       * the sources in `waitingFor`.
+       */
+      partial,
     }
   })
 }
@@ -134,7 +143,8 @@ export const getAppTimeline = defineQuery({
     'where no source reported that day, plus a summary (the total over the range, or for MRR ' +
     'the latest value) and the same broken down by source. Sources report with different ' +
     'delays (Google Play up to a week), so a total stops at `completeThrough` when some sources ' +
-    '(`waitingFor`) have not reached the latest days; per-source values go on. Returns null for ' +
+    '(`waitingFor`) have not reached the latest days; per-source values go on, and `partial` ' +
+    'sums the sources that have reported those days so far. Returns null for ' +
     'an unknown app.',
   input: z
     .object({ appId: z.uuid().describe('The app id from list_apps.'), ...rangeFields })

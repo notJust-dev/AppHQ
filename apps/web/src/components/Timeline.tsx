@@ -160,8 +160,10 @@ export function Timeline({
       ? ''
       : `${formatDay(days[active] ?? '')}. ${withData
           .map((entry) => {
-            const value = entry.values[active]
-            return `${entry.label}: ${value === null || value === undefined ? 'no data' : formatValue(value, entry.unit)}`
+            const value = entry.values[active] ?? null
+            const soFar = entry.partial?.[active] ?? null
+            if (value === null && soFar !== null) return `${entry.label}: ${formatValue(soFar, entry.unit)} so far`
+            return `${entry.label}: ${value === null ? 'no data' : formatValue(value, entry.unit)}`
           })
           .join('. ')}.`
 
@@ -486,7 +488,17 @@ function Track(props: {
   const stage = STAGE[series.stage]
   const empty = series.sources.length === 0
 
-  const present = series.values.filter((value): value is number => value !== null)
+  // Stores report with different delays; the total stops where the slowest one has got to, and
+  // `partial` carries on, dashed, with what the others have sent so far.
+  // `?? null` and `?? []` cover a dashboard briefly newer than the API during a deploy.
+  const completeThrough = series.completeThrough ?? null
+  const partial: Values = series.partial ?? []
+  const waiting = (series.waitingFor ?? []).map(sourceLabel).join(' and ')
+  const isPartial = (index: number) => completeThrough !== null && (days[index] ?? '') > completeThrough
+  /** The value drawn on a day: the total, or past the cut-off what has come in so far. */
+  const valueAt = (index: number) => (isPartial(index) ? (partial[index] ?? null) : (series.values[index] ?? null))
+
+  const present = [...series.values, ...partial].filter((value): value is number => value !== null)
   const scale = niceScale(Math.max(0, ...present), { integer: series.unit === 'count' })
   const low = Math.min(0, ...present)
   const y = (value: number) => VIEW_H - ((value - low) / (scale.max - low)) * VIEW_H
@@ -494,18 +506,17 @@ function Track(props: {
 
   const lastIndex = lastIndexOf(series.values)
   const shownIndex = active ?? (lastIndex >= 0 ? lastIndex : null)
-  const shownValue = shownIndex === null ? null : (series.values[shownIndex] ?? null)
-  const headline = active === null ? series.summary : (series.values[active] ?? null)
+  const shownValue = shownIndex === null ? null : valueAt(shownIndex)
+  const shownPartial = shownIndex !== null && isPartial(shownIndex)
+  const headline = active === null ? series.summary : valueAt(active)
 
-  // Stores report with different delays; the total stops where the slowest one has got to.
-  // `?? null` covers a dashboard briefly newer than the API during a deploy.
-  const completeThrough = series.completeThrough ?? null
-  const waiting = (series.waitingFor ?? []).map(sourceLabel).join(' and ')
   const caption =
     active !== null
       ? `${formatDay(days[active] ?? '')}${
-          completeThrough !== null && (days[active] ?? '') > completeThrough
-            ? `, waiting for ${waiting}`
+          isPartial(active)
+            ? valueAt(active) === null
+              ? `, waiting for ${waiting}`
+              : `, so far: waiting for ${waiting}`
             : series.values[active] === null
               ? ', no data'
               : ''
@@ -596,6 +607,19 @@ function Track(props: {
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
             />
+            {/* Not a total yet: lighter and dashed, so it does not read as a drop or a rise. */}
+            <path d={areaPath(partial, y(0), y, days.length)} fill={stage.stroke} fillOpacity={0.04} />
+            <path
+              d={linePath(partial, y, days.length)}
+              fill="none"
+              stroke={stage.stroke}
+              strokeOpacity={0.7}
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
           </svg>
 
           {scale.ticks.map((tick) => (
@@ -627,11 +651,13 @@ function Track(props: {
 
           {shownIndex !== null && shownValue !== null && (
             <span
-              className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card"
+              className={`pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ${
+                shownPartial ? 'border-2 bg-card ring-card' : 'ring-card'
+              }`}
               style={{
                 left: `${percent(shownIndex)}%`,
                 top: `${yPercent(shownValue)}%`,
-                backgroundColor: stage.stroke,
+                ...(shownPartial ? { borderColor: stage.stroke } : { backgroundColor: stage.stroke }),
               }}
               aria-hidden="true"
             />
@@ -691,10 +717,17 @@ function TimelineTable({ days, series }: { days: string[]; series: Series[] }) {
                 {formatDay(days[index] ?? '')}
               </th>
               {series.map((entry) => {
-                const value = entry.values[index]
+                const value = entry.values[index] ?? null
+                const soFar = value === null ? (entry.partial?.[index] ?? null) : null
                 return (
                   <td key={entry.key} className="figures px-6 py-2 text-right">
-                    {value === null || value === undefined ? '–' : formatValue(value, entry.unit)}
+                    {value !== null ? (
+                      formatValue(value, entry.unit)
+                    ) : soFar !== null ? (
+                      <span className="text-muted-foreground">{formatValue(soFar, entry.unit)} so far</span>
+                    ) : (
+                      '–'
+                    )}
                   </td>
                 )
               })}
