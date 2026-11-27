@@ -81,6 +81,7 @@ export async function buildApp(deps: AppDeps) {
             log: app.log,
             passwordAccess: statesPassword && deps.allowDashboardPassword,
             accounts,
+            cookie,
             session: sessionOnce,
             account: () => sessionOnce().then((found) => found?.user ?? null),
             dashboardOrganization: organizationOfDashboard,

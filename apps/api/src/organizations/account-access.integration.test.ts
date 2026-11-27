@@ -137,7 +137,11 @@ describe.skipIf(!url)('Account access to the dashboard, against a real database'
     expect(still?.name).toBe('Beta app')
   })
 
-  it.each(['requested', 'unverified', 'alone'])('refuses the %s account', async (name) => {
+  it('lets in a member whose access is only requested, as someone invited is', async () => {
+    expect((await call('apps.list', cookies.requested!)).statusCode).toBe(200)
+  })
+
+  it.each(['unverified', 'alone'])('refuses the %s account', async (name) => {
     expect((await call('apps.list', cookies[name]!)).statusCode).toBe(403)
     expect((await call('organization.current', cookies[name]!)).statusCode).toBe(403)
   })

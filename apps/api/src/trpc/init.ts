@@ -13,8 +13,8 @@ import type { SyncDeps } from '../sync/runner.js'
  * - `account`: a signed-in account with a verified address. It sees only its own account.
  * - `dashboard`: everything else, in one organization. Either someone signed in with the
  *   dashboard password, when this API accepts it (`ALLOW_DASHBOARD_PASSWORD`), or an account
- *   with a verified address, approved access, and a membership of the organization it works in.
- *   `inOrganization` below says which organization.
+ *   with a verified address and a membership of the organization it works in. `inOrganization`
+ *   below says which organization.
  */
 export type Access = 'public' | 'account' | 'dashboard'
 
@@ -48,6 +48,11 @@ export interface ApiContext {
   passwordAccess: boolean
   /** Null when accounts are not set up on this server. */
   accounts: Accounts | null
+  /**
+   * The request's Cookie header, for the member changes the API makes as the visitor's own
+   * account (`Accounts.invite` and the others). Only Better Auth's cookies are read from it.
+   */
+  cookie: string | undefined
   /** The account session behind the request's cookie, looked up at most once per request. */
   session: () => Promise<AccountSession | null>
   /** The account behind the request's cookie: `session`'s user. */
@@ -59,11 +64,14 @@ export interface ApiContext {
 const t = initTRPC.context<ApiContext>().meta<ApiMeta>().create()
 
 /**
- * Whether an account may use the dashboard at all: a verified address and approved access. It
- * still needs a membership to get an organization; see `organizationFor`.
+ * Whether an account may use the dashboard at all: a verified address. It still needs a
+ * membership to get an organization; see `organizationFor`. Approval is not asked for here:
+ * approval is what gives an account an organization of its own (`account.get`), and an
+ * invitation gives it a membership of someone else's. Either way the membership is what counts,
+ * so a member who is removed is out at once.
  */
 function mayUseDashboard(account: AccountUser | null | undefined): account is AccountUser {
-  return account?.emailVerified === true && account.accessStatus === 'approved'
+  return account?.emailVerified === true
 }
 
 /** The one place access is decided. It runs before any input is read. */
@@ -93,7 +101,7 @@ export type DashboardVia = 'password' | 'account'
  * none and is refused:
  *
  * - The dashboard password (accepted by this API): the `default` organization, as always.
- * - An account with a verified address and approved access: one it is a member of. The session's
+ * - An account with a verified address: one it is a member of. The session's
  *   active organization when the account still belongs to it; otherwise its oldest membership,
  *   which is then recorded on the session. Only this code sets the active organization: the
  *   plugin's own endpoints are not reachable (`authPaths`). No membership: refused. Nothing here

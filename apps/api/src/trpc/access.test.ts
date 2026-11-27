@@ -109,7 +109,7 @@ describe('dashboard procedures', () => {
   const call = caller(() => built)
   /** Verified, never asked. */
   let verified: string
-  /** Verified, asked, not approved, and a member of A. */
+  /** Verified, asked, not approved, and a member of A, as someone invited is. */
   let requested: string
   /** Approved, but a member of nothing. */
   let approvedAlone: string
@@ -186,8 +186,10 @@ describe('dashboard procedures', () => {
     expect((await call(path, { cookie: verified })).statusCode).toBe(403)
   })
 
-  it.each(dashboardPaths)('%s refuses a member whose access is only requested', async (path) => {
-    expect((await call(path, { cookie: requested })).statusCode).toBe(403)
+  // Membership is what counts: approval gives an account an organization of its own, and an
+  // invitation a membership of someone else's.
+  it.each(dashboardPaths)('%s lets in a member whose access is only requested', async (path) => {
+    expect(passed((await call(path, { cookie: requested }, 'not-an-object')).statusCode)).toBe(true)
   })
 
   it.each(dashboardPaths)('%s refuses an approved member whose address is not verified', async (path) => {
