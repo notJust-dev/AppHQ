@@ -7,8 +7,8 @@ import { formatCount, formatMoment } from '@/lib/format'
 import type { AccountFamily } from '@/lib/queries'
 import { sourceLabel } from '@/lib/sources'
 import { CircleAlert, CircleCheck } from 'lucide-react'
-import { PageBody, PageHeader } from '@/components/PageHeader'
 import { Panel } from '@/components/Panel'
+import { SettingsPage } from '@/components/SettingsPage'
 import { Private } from '@/components/Private'
 import { FamilyLogo, SourceLogo } from '@/components/SourceLogo'
 import { Status } from '@/components/Status'
@@ -17,18 +17,18 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 export type ConnectedAccount = AccountFamily['accounts'][number]
 export type FamilyName = AccountFamily['family']
 
-/** The sources as people know them, in the order the Accounts page lists them. */
+/** The integrations as people know them, in the order the Integrations page lists them. */
 export const SOURCES: {
   family: FamilyName
   title: string
   to:
-    | '/accounts/app-store'
-    | '/accounts/google-play'
-    | '/accounts/revenuecat'
-    | '/accounts/meta'
-    | '/accounts/tiktok'
-    | '/accounts/search-console'
-    | '/accounts/youtube'
+    | '/settings/integrations/app-store'
+    | '/settings/integrations/google-play'
+    | '/settings/integrations/revenuecat'
+    | '/settings/integrations/meta'
+    | '/settings/integrations/tiktok'
+    | '/settings/integrations/search-console'
+    | '/settings/integrations/youtube'
   brings: string
   /** What it finds, one and many. */
   noun: [string, string]
@@ -36,49 +36,49 @@ export const SOURCES: {
   {
     family: 'app_store',
     title: 'App Store Connect',
-    to: '/accounts/app-store',
+    to: '/settings/integrations/app-store',
     brings: 'Downloads, store page views and reviews for your iOS apps.',
     noun: ['iOS app', 'iOS apps'],
   },
   {
     family: 'google_play',
     title: 'Google Play',
-    to: '/accounts/google-play',
+    to: '/settings/integrations/google-play',
     brings: 'Installs, store listing visitors and reviews for your Android apps.',
     noun: ['Android app', 'Android apps'],
   },
   {
     family: 'revenuecat',
     title: 'RevenueCat',
-    to: '/accounts/revenuecat',
+    to: '/settings/integrations/revenuecat',
     brings: "Revenue, MRR, trials and subscribers. Each app connects its own project, in the app's Settings.",
     noun: ['project', 'projects'],
   },
   {
     family: 'meta',
     title: 'Facebook and Instagram',
-    to: '/accounts/meta',
+    to: '/settings/integrations/meta',
     brings: 'Page and Instagram views, reach, followers and posts.',
     noun: ['Page or account', 'Pages and accounts'],
   },
   {
     family: 'tiktok',
     title: 'TikTok',
-    to: '/accounts/tiktok',
+    to: '/settings/integrations/tiktok',
     brings: 'Video views and followers.',
     noun: ['account', 'accounts'],
   },
   {
     family: 'youtube',
     title: 'YouTube',
-    to: '/accounts/youtube',
+    to: '/settings/integrations/youtube',
     brings: 'Daily views, subscribers and videos for your channels.',
     noun: ['channel', 'channels'],
   },
   {
     family: 'search_console',
     title: 'Google Search Console',
-    to: '/accounts/search-console',
+    to: '/settings/integrations/search-console',
     brings: "Google search clicks, impressions and position for your apps' websites.",
     noun: ['website', 'websites'],
   },
@@ -126,23 +126,21 @@ export function useWatch() {
   }
 }
 
-/** The frame of one source's page: where it sits, what it brings, and its panels. */
+/** The frame of one integration's page: where it sits, what it brings, and its panels. */
 export function SourcePage(props: { family: FamilyName; title: string; intro: string; children: ReactNode }) {
   return (
-    <>
-      <PageHeader
-        narrow
-        crumbs={[{ label: 'Accounts', to: '/accounts' }]}
-        title={props.title}
-        icon={<FamilyLogo family={props.family} className="size-6" />}
-        description={props.intro}
-      />
-      <PageBody narrow>{props.children}</PageBody>
-    </>
+    <SettingsPage
+      crumbs={[{ label: 'Integrations', to: '/settings/integrations' }]}
+      title={props.title}
+      icon={<FamilyLogo family={props.family} className="size-6" />}
+      description={props.intro}
+    >
+      {props.children}
+    </SettingsPage>
   )
 }
 
-/** A panel on a source page. `flush` lets a list run edge to edge. */
+/** A panel on an integration's page. `flush` lets a list run edge to edge. */
 export function Section(props: { title: string; intro?: ReactNode; flush?: boolean; children: ReactNode }) {
   return (
     <Panel title={props.title} description={props.intro} bodyClassName={props.flush ? '' : undefined}>
@@ -151,7 +149,7 @@ export function Section(props: { title: string; intro?: ReactNode; flush?: boole
   )
 }
 
-/** Numbered instructions for getting a key or setting up an app on the source's side. */
+/** Numbered instructions for getting a key or setting up an app on the service's side. */
 export function Steps({ children }: { children: ReactNode }) {
   return (
     <ol className="mb-6 list-decimal space-y-2 pl-5 marker:text-faint">
@@ -160,7 +158,7 @@ export function Steps({ children }: { children: ReactNode }) {
   )
 }
 
-/** What a source found, and how much of it still waits for an app. */
+/** What an integration found, and how much of it still waits for an app. */
 export function Found(props: { family: AccountFamily }) {
   const { total, linked, waiting, ignored } = props.family.assets
   if (props.family.accounts.length === 0) return null
@@ -172,7 +170,7 @@ export function Found(props: { family: AccountFamily }) {
       {waiting > 0 && (
         <>
           ,{' '}
-          <Link to="/apps" className="font-medium text-foreground underline underline-offset-4">
+          <Link to="/settings/apps" className="font-medium text-foreground underline underline-offset-4">
             {formatCount(waiting)} waiting for a decision
           </Link>
         </>
@@ -182,7 +180,7 @@ export function Found(props: { family: AccountFamily }) {
   )
 }
 
-/** The sign-ins or keys of a source, with their state. */
+/** The sign-ins or keys of an integration, with their state. */
 export function AccountList(props: { accounts: ConnectedAccount[]; detail?: (account: ConnectedAccount) => string | null }) {
   if (props.accounts.length === 0) {
     return <p className="px-5 py-4 text-muted-foreground">Not connected yet.</p>

@@ -58,7 +58,7 @@ function OverviewPage() {
           <>
             {app && (
               <Button asChild variant="outline">
-                <Link to="/apps/$appId/settings" params={{ appId: app }}>
+                <Link to="/settings/apps/$appId" params={{ appId: app }}>
                   <Settings aria-hidden="true" />
                   Settings
                 </Link>
@@ -91,10 +91,10 @@ function Portfolio({ range }: { range: RangeKey }) {
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">
           <Button asChild>
-            <Link to="/accounts">Connect accounts</Link>
+            <Link to="/settings/integrations">Connect accounts</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to="/apps/new">Add app</Link>
+            <Link to="/settings/apps/new">Add app</Link>
           </Button>
         </EmptyContent>
       </Empty>

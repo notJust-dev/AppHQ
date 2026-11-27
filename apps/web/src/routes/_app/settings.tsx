@@ -1,10 +1,10 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
-import { z } from 'zod'
+import { Outlet, createFileRoute } from '@tanstack/react-router'
 
-/** Settings became Accounts; old links and bookmarks land there, with what they carried. */
+/**
+ * Settings: what feeds the dashboard. Apps (`settings.apps.*`) says which sources make up each
+ * app; Integrations (`settings.integrations.*`) connects the services that find those sources.
+ * Every page here is framed by `SettingsPage`.
+ */
 export const Route = createFileRoute('/_app/settings')({
-  validateSearch: z.object({ connected: z.enum(['tiktok', 'meta']).optional().catch(undefined) }),
-  beforeLoad: ({ search }) => {
-    throw redirect({ to: '/accounts', search })
-  },
+  component: Outlet,
 })

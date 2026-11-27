@@ -1,13 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { dashboardApi } from '@/server/api'
 import { finishOAuth, tiktokRedirectUri } from '@/server/oauth'
+import { connectedAddress } from '@/lib/integration-pages'
 import { callbackError, providerErrorMessage, redirectTo } from '@/server/oauth-callback'
 
 /**
  * Where TikTok sends the browser after sign-in. It checks the session and the state from the
- * OAuth cookie, has the API trade the code for tokens, and goes back to Accounts with the
- * outcome stored in the cookie. Nothing from the query string is shown as text, so a crafted
- * link cannot put words on the page.
+ * OAuth cookie, has the API trade the code for tokens, and goes back to TikTok's page in
+ * Settings › Integrations with the outcome stored in the cookie. Nothing from the query string is
+ * shown as text, so a crafted link cannot put words on the page.
  */
 export const Route = createFileRoute('/connect/tiktok/callback')({
   server: {
@@ -21,7 +22,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
         const attempt = await finishOAuth('tiktok', params.get('state'))
         const finish = async (ok: boolean, message: string) => {
           await attempt.report(ok, message)
-          return redirectTo('/accounts/tiktok?connected=tiktok')
+          return redirectTo(connectedAddress('tiktok'))
         }
 
         const error = params.get('error')

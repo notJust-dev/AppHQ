@@ -88,8 +88,8 @@ interface Section {
 
 /** What feeds the dashboard: the apps and the accounts they come from. */
 const SETUP = [
-  { to: '/apps', label: 'Apps', Icon: AppWindow },
-  { to: '/accounts', label: 'Accounts', Icon: Plug },
+  { to: '/settings/apps', label: 'Apps', Icon: AppWindow },
+  { to: '/settings/integrations', label: 'Accounts', Icon: Plug },
 ] as const
 
 /**

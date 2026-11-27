@@ -43,7 +43,7 @@ function PostsPage() {
             <p className="px-5 py-6 text-muted-foreground">
               No posts were published in this range. Posts come from TikTok, Instagram, Facebook and YouTube accounts
               linked to an app; connect them on the{' '}
-              <Link to="/accounts" className="font-medium text-foreground underline underline-offset-4">
+              <Link to="/settings/integrations" className="font-medium text-foreground underline underline-offset-4">
                 Accounts page
               </Link>
               .

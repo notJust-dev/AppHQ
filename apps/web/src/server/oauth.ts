@@ -15,7 +15,7 @@ interface OAuthData {
   /** The organization the sign-in started in, as the API gave it; the API checks it at the end. */
   organizationId?: string
   startedAt?: number
-  /** Shown once on the Accounts page after the redirect back, then cleared. */
+  /** Shown once on the integration's page after the redirect back, then cleared. */
   result?: { ok: boolean; message: string; provider?: OAuthProvider }
 }
 
@@ -93,7 +93,7 @@ export async function finishOAuth(provider: OAuthProvider, returnedState: string
     matches,
     appId: appId ?? null,
     organizationId: organizationId ?? '',
-    /** Stores the message the Accounts page shows once, and saves the cookie. */
+    /** Stores the message the integration's page shows once, and saves the cookie. */
     async report(ok: boolean, message: string) {
       oauth.result = { ok, message, provider }
       await oauth.save()

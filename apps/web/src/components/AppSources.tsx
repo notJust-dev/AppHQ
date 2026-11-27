@@ -85,9 +85,9 @@ const STORE_KINDS = ['ios_app', 'android_app', 'search_console_site'] as const
 
 /** The page where the account behind each kind is set up. */
 const SETUP_PAGE = {
-  ios_app: '/accounts/app-store',
-  android_app: '/accounts/google-play',
-  search_console_site: '/accounts/search-console',
+  ios_app: '/settings/integrations/app-store',
+  android_app: '/settings/integrations/google-play',
+  search_console_site: '/settings/integrations/search-console',
 } as const
 
 /** A select's value for "nothing chosen"; Radix keeps the empty string for its placeholder. */
@@ -258,7 +258,7 @@ function SocialRow(props: {
         ) : (
           <p className="text-xs text-muted-foreground">
             To add more,{' '}
-            <Link to="/accounts" className="font-medium text-foreground underline underline-offset-4">
+            <Link to="/settings/integrations" className="font-medium text-foreground underline underline-offset-4">
               connect Facebook, Instagram, TikTok or YouTube
             </Link>
             .

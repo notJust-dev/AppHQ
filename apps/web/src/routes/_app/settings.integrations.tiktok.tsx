@@ -16,11 +16,11 @@ import {
   SourcePage,
   emptyFamily,
   useWatch,
-} from '@/components/accounts/shared'
+} from '@/components/integrations/shared'
 import { startTikTokConnectFn } from '@/fns/tiktok'
 import { accountsQuery, appsQuery, tiktokSetupQuery, type AppSummary, type TikTokSetup } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/tiktok')({
+export const Route = createFileRoute('/_app/settings/integrations/tiktok')({
   // Set by the TikTok sign-in when it sends the browser back here.
   validateSearch: z.object({ connected: z.literal('tiktok').optional().catch(undefined) }),
   loader: ({ context }) =>
@@ -41,7 +41,7 @@ function TikTokPage() {
   const { data: setup } = useSuspenseQuery(tiktokSetupQuery())
   const family = families.find((entry) => entry.family === 'tiktok') ?? emptyFamily('tiktok')
   const clear = useCallback(() => {
-    void navigate({ to: '/accounts/tiktok', search: {}, replace: true })
+    void navigate({ to: '/settings/integrations/tiktok', search: {}, replace: true })
   }, [navigate])
 
   return (

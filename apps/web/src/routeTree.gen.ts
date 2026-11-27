@@ -20,7 +20,6 @@ import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WaitlistRouteImport } from './routes/waitlist'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppMonetisationRouteImport } from './routes/_app/monetisation'
 import { Route as AppReviewsRouteImport } from './routes/_app/reviews'
 import { Route as AppSeoRouteImport } from './routes/_app/seo'
@@ -28,16 +27,10 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppStoreRouteImport } from './routes/_app/store'
 import { Route as IngestSplatRouteImport } from './routes/ingest.$'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts.index'
-import { Route as AppAccountsAppStoreRouteImport } from './routes/_app/accounts.app-store'
-import { Route as AppAccountsGooglePlayRouteImport } from './routes/_app/accounts.google-play'
-import { Route as AppAccountsMetaRouteImport } from './routes/_app/accounts.meta'
-import { Route as AppAccountsRevenuecatRouteImport } from './routes/_app/accounts.revenuecat'
-import { Route as AppAccountsSearchConsoleRouteImport } from './routes/_app/accounts.search-console'
-import { Route as AppAccountsTiktokRouteImport } from './routes/_app/accounts.tiktok'
-import { Route as AppAccountsYoutubeRouteImport } from './routes/_app/accounts.youtube'
+import { Route as AppAccountsNameRouteImport } from './routes/_app/accounts.$name'
 import { Route as AppAppsIndexRouteImport } from './routes/_app/apps.index'
-import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps.$appId'
 import { Route as AppAppsNewRouteImport } from './routes/_app/apps.new'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings.index'
 import { Route as AppSocialIndexRouteImport } from './routes/_app/social.index'
 import { Route as AppSocialPostsRouteImport } from './routes/_app/social.posts'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -46,6 +39,17 @@ import { Route as ConnectTiktokCallbackRouteImport } from './routes/connect.tikt
 import { Route as ConnectYoutubeCallbackRouteImport } from './routes/connect.youtube.callback'
 import { Route as AppAppsAppIdIndexRouteImport } from './routes/_app/apps.$appId.index'
 import { Route as AppAppsAppIdSettingsRouteImport } from './routes/_app/apps.$appId.settings'
+import { Route as AppSettingsAppsIndexRouteImport } from './routes/_app/settings.apps.index'
+import { Route as AppSettingsAppsAppIdRouteImport } from './routes/_app/settings.apps.$appId'
+import { Route as AppSettingsAppsNewRouteImport } from './routes/_app/settings.apps.new'
+import { Route as AppSettingsIntegrationsIndexRouteImport } from './routes/_app/settings.integrations.index'
+import { Route as AppSettingsIntegrationsAppStoreRouteImport } from './routes/_app/settings.integrations.app-store'
+import { Route as AppSettingsIntegrationsGooglePlayRouteImport } from './routes/_app/settings.integrations.google-play'
+import { Route as AppSettingsIntegrationsMetaRouteImport } from './routes/_app/settings.integrations.meta'
+import { Route as AppSettingsIntegrationsRevenuecatRouteImport } from './routes/_app/settings.integrations.revenuecat'
+import { Route as AppSettingsIntegrationsSearchConsoleRouteImport } from './routes/_app/settings.integrations.search-console'
+import { Route as AppSettingsIntegrationsTiktokRouteImport } from './routes/_app/settings.integrations.tiktok'
+import { Route as AppSettingsIntegrationsYoutubeRouteImport } from './routes/_app/settings.integrations.youtube'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -101,11 +105,6 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAccountsRoute = AppAccountsRouteImport.update({
-  id: '/accounts',
-  path: '/accounts',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppMonetisationRoute = AppMonetisationRouteImport.update({
   id: '/monetisation',
   path: '/monetisation',
@@ -137,60 +136,29 @@ const IngestSplatRoute = IngestSplatRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppAccountsRoute,
+  id: '/accounts/',
+  path: '/accounts/',
+  getParentRoute: () => AppRoute,
 } as any)
-const AppAccountsAppStoreRoute = AppAccountsAppStoreRouteImport.update({
-  id: '/app-store',
-  path: '/app-store',
-  getParentRoute: () => AppAccountsRoute,
-} as any)
-const AppAccountsGooglePlayRoute = AppAccountsGooglePlayRouteImport.update({
-  id: '/google-play',
-  path: '/google-play',
-  getParentRoute: () => AppAccountsRoute,
-} as any)
-const AppAccountsMetaRoute = AppAccountsMetaRouteImport.update({
-  id: '/meta',
-  path: '/meta',
-  getParentRoute: () => AppAccountsRoute,
-} as any)
-const AppAccountsRevenuecatRoute = AppAccountsRevenuecatRouteImport.update({
-  id: '/revenuecat',
-  path: '/revenuecat',
-  getParentRoute: () => AppAccountsRoute,
-} as any)
-const AppAccountsSearchConsoleRoute =
-  AppAccountsSearchConsoleRouteImport.update({
-    id: '/search-console',
-    path: '/search-console',
-    getParentRoute: () => AppAccountsRoute,
-  } as any)
-const AppAccountsTiktokRoute = AppAccountsTiktokRouteImport.update({
-  id: '/tiktok',
-  path: '/tiktok',
-  getParentRoute: () => AppAccountsRoute,
-} as any)
-const AppAccountsYoutubeRoute = AppAccountsYoutubeRouteImport.update({
-  id: '/youtube',
-  path: '/youtube',
-  getParentRoute: () => AppAccountsRoute,
+const AppAccountsNameRoute = AppAccountsNameRouteImport.update({
+  id: '/accounts/$name',
+  path: '/accounts/$name',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppAppsIndexRoute = AppAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAppsAppIdRoute = AppAppsAppIdRouteImport.update({
-  id: '/apps/$appId',
-  path: '/apps/$appId',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAppsNewRoute = AppAppsNewRouteImport.update({
   id: '/apps/new',
   path: '/apps/new',
   getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppSocialIndexRoute = AppSocialIndexRouteImport.update({
   id: '/social/',
@@ -223,15 +191,78 @@ const ConnectYoutubeCallbackRoute = ConnectYoutubeCallbackRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAppsAppIdIndexRoute = AppAppsAppIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppAppsAppIdRoute,
+  id: '/apps/$appId/',
+  path: '/apps/$appId/',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppAppsAppIdSettingsRoute = AppAppsAppIdSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppAppsAppIdRoute,
+  id: '/apps/$appId/settings',
+  path: '/apps/$appId/settings',
+  getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsAppsIndexRoute = AppSettingsAppsIndexRouteImport.update({
+  id: '/apps/',
+  path: '/apps/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsAppsAppIdRoute = AppSettingsAppsAppIdRouteImport.update({
+  id: '/apps/$appId',
+  path: '/apps/$appId',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsAppsNewRoute = AppSettingsAppsNewRouteImport.update({
+  id: '/apps/new',
+  path: '/apps/new',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsIntegrationsIndexRoute =
+  AppSettingsIntegrationsIndexRouteImport.update({
+    id: '/integrations/',
+    path: '/integrations/',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsAppStoreRoute =
+  AppSettingsIntegrationsAppStoreRouteImport.update({
+    id: '/integrations/app-store',
+    path: '/integrations/app-store',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsGooglePlayRoute =
+  AppSettingsIntegrationsGooglePlayRouteImport.update({
+    id: '/integrations/google-play',
+    path: '/integrations/google-play',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsMetaRoute =
+  AppSettingsIntegrationsMetaRouteImport.update({
+    id: '/integrations/meta',
+    path: '/integrations/meta',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsRevenuecatRoute =
+  AppSettingsIntegrationsRevenuecatRouteImport.update({
+    id: '/integrations/revenuecat',
+    path: '/integrations/revenuecat',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsSearchConsoleRoute =
+  AppSettingsIntegrationsSearchConsoleRouteImport.update({
+    id: '/integrations/search-console',
+    path: '/integrations/search-console',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsTiktokRoute =
+  AppSettingsIntegrationsTiktokRouteImport.update({
+    id: '/integrations/tiktok',
+    path: '/integrations/tiktok',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsIntegrationsYoutubeRoute =
+  AppSettingsIntegrationsYoutubeRouteImport.update({
+    id: '/integrations/youtube',
+    path: '/integrations/youtube',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -244,21 +275,13 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof SignUpRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
-  '/accounts': typeof AppAccountsRouteWithChildren
   '/monetisation': typeof AppMonetisationRoute
   '/reviews': typeof AppReviewsRoute
   '/seo': typeof AppSeoRoute
-  '/settings': typeof AppSettingsRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/store': typeof AppStoreRoute
   '/ingest/$': typeof IngestSplatRoute
-  '/accounts/app-store': typeof AppAccountsAppStoreRoute
-  '/accounts/google-play': typeof AppAccountsGooglePlayRoute
-  '/accounts/meta': typeof AppAccountsMetaRoute
-  '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
-  '/accounts/search-console': typeof AppAccountsSearchConsoleRoute
-  '/accounts/tiktok': typeof AppAccountsTiktokRoute
-  '/accounts/youtube': typeof AppAccountsYoutubeRoute
-  '/apps/$appId': typeof AppAppsAppIdRouteWithChildren
+  '/accounts/$name': typeof AppAccountsNameRoute
   '/apps/new': typeof AppAppsNewRoute
   '/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -267,9 +290,21 @@ export interface FileRoutesByFullPath {
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/accounts/': typeof AppAccountsIndexRoute
   '/apps/': typeof AppAppsIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
   '/social/': typeof AppSocialIndexRoute
   '/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
+  '/settings/apps/$appId': typeof AppSettingsAppsAppIdRoute
+  '/settings/apps/new': typeof AppSettingsAppsNewRoute
+  '/settings/integrations/app-store': typeof AppSettingsIntegrationsAppStoreRoute
+  '/settings/integrations/google-play': typeof AppSettingsIntegrationsGooglePlayRoute
+  '/settings/integrations/meta': typeof AppSettingsIntegrationsMetaRoute
+  '/settings/integrations/revenuecat': typeof AppSettingsIntegrationsRevenuecatRoute
+  '/settings/integrations/search-console': typeof AppSettingsIntegrationsSearchConsoleRoute
+  '/settings/integrations/tiktok': typeof AppSettingsIntegrationsTiktokRoute
+  '/settings/integrations/youtube': typeof AppSettingsIntegrationsYoutubeRoute
   '/apps/$appId/': typeof AppAppsAppIdIndexRoute
+  '/settings/apps/': typeof AppSettingsAppsIndexRoute
+  '/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
@@ -284,17 +319,10 @@ export interface FileRoutesByTo {
   '/monetisation': typeof AppMonetisationRoute
   '/reviews': typeof AppReviewsRoute
   '/seo': typeof AppSeoRoute
-  '/settings': typeof AppSettingsRoute
   '/store': typeof AppStoreRoute
   '/ingest/$': typeof IngestSplatRoute
   '/': typeof AppIndexRoute
-  '/accounts/app-store': typeof AppAccountsAppStoreRoute
-  '/accounts/google-play': typeof AppAccountsGooglePlayRoute
-  '/accounts/meta': typeof AppAccountsMetaRoute
-  '/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
-  '/accounts/search-console': typeof AppAccountsSearchConsoleRoute
-  '/accounts/tiktok': typeof AppAccountsTiktokRoute
-  '/accounts/youtube': typeof AppAccountsYoutubeRoute
+  '/accounts/$name': typeof AppAccountsNameRoute
   '/apps/new': typeof AppAppsNewRoute
   '/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -303,9 +331,21 @@ export interface FileRoutesByTo {
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/accounts': typeof AppAccountsIndexRoute
   '/apps': typeof AppAppsIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
   '/social': typeof AppSocialIndexRoute
   '/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
+  '/settings/apps/$appId': typeof AppSettingsAppsAppIdRoute
+  '/settings/apps/new': typeof AppSettingsAppsNewRoute
+  '/settings/integrations/app-store': typeof AppSettingsIntegrationsAppStoreRoute
+  '/settings/integrations/google-play': typeof AppSettingsIntegrationsGooglePlayRoute
+  '/settings/integrations/meta': typeof AppSettingsIntegrationsMetaRoute
+  '/settings/integrations/revenuecat': typeof AppSettingsIntegrationsRevenuecatRoute
+  '/settings/integrations/search-console': typeof AppSettingsIntegrationsSearchConsoleRoute
+  '/settings/integrations/tiktok': typeof AppSettingsIntegrationsTiktokRoute
+  '/settings/integrations/youtube': typeof AppSettingsIntegrationsYoutubeRoute
   '/apps/$appId': typeof AppAppsAppIdIndexRoute
+  '/settings/apps': typeof AppSettingsAppsIndexRoute
+  '/settings/integrations': typeof AppSettingsIntegrationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -319,22 +359,14 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
-  '/_app/accounts': typeof AppAccountsRouteWithChildren
   '/_app/monetisation': typeof AppMonetisationRoute
   '/_app/reviews': typeof AppReviewsRoute
   '/_app/seo': typeof AppSeoRoute
-  '/_app/settings': typeof AppSettingsRoute
+  '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/store': typeof AppStoreRoute
   '/ingest/$': typeof IngestSplatRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/accounts/app-store': typeof AppAccountsAppStoreRoute
-  '/_app/accounts/google-play': typeof AppAccountsGooglePlayRoute
-  '/_app/accounts/meta': typeof AppAccountsMetaRoute
-  '/_app/accounts/revenuecat': typeof AppAccountsRevenuecatRoute
-  '/_app/accounts/search-console': typeof AppAccountsSearchConsoleRoute
-  '/_app/accounts/tiktok': typeof AppAccountsTiktokRoute
-  '/_app/accounts/youtube': typeof AppAccountsYoutubeRoute
-  '/_app/apps/$appId': typeof AppAppsAppIdRouteWithChildren
+  '/_app/accounts/$name': typeof AppAccountsNameRoute
   '/_app/apps/new': typeof AppAppsNewRoute
   '/_app/social/posts': typeof AppSocialPostsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -343,9 +375,21 @@ export interface FileRoutesById {
   '/connect/youtube/callback': typeof ConnectYoutubeCallbackRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/apps/': typeof AppAppsIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/social/': typeof AppSocialIndexRoute
   '/_app/apps/$appId/settings': typeof AppAppsAppIdSettingsRoute
+  '/_app/settings/apps/$appId': typeof AppSettingsAppsAppIdRoute
+  '/_app/settings/apps/new': typeof AppSettingsAppsNewRoute
+  '/_app/settings/integrations/app-store': typeof AppSettingsIntegrationsAppStoreRoute
+  '/_app/settings/integrations/google-play': typeof AppSettingsIntegrationsGooglePlayRoute
+  '/_app/settings/integrations/meta': typeof AppSettingsIntegrationsMetaRoute
+  '/_app/settings/integrations/revenuecat': typeof AppSettingsIntegrationsRevenuecatRoute
+  '/_app/settings/integrations/search-console': typeof AppSettingsIntegrationsSearchConsoleRoute
+  '/_app/settings/integrations/tiktok': typeof AppSettingsIntegrationsTiktokRoute
+  '/_app/settings/integrations/youtube': typeof AppSettingsIntegrationsYoutubeRoute
   '/_app/apps/$appId/': typeof AppAppsAppIdIndexRoute
+  '/_app/settings/apps/': typeof AppSettingsAppsIndexRoute
+  '/_app/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -360,21 +404,13 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/terms'
     | '/waitlist'
-    | '/accounts'
     | '/monetisation'
     | '/reviews'
     | '/seo'
     | '/settings'
     | '/store'
     | '/ingest/$'
-    | '/accounts/app-store'
-    | '/accounts/google-play'
-    | '/accounts/meta'
-    | '/accounts/revenuecat'
-    | '/accounts/search-console'
-    | '/accounts/tiktok'
-    | '/accounts/youtube'
-    | '/apps/$appId'
+    | '/accounts/$name'
     | '/apps/new'
     | '/social/posts'
     | '/api/auth/$'
@@ -383,9 +419,21 @@ export interface FileRouteTypes {
     | '/connect/youtube/callback'
     | '/accounts/'
     | '/apps/'
+    | '/settings/'
     | '/social/'
     | '/apps/$appId/settings'
+    | '/settings/apps/$appId'
+    | '/settings/apps/new'
+    | '/settings/integrations/app-store'
+    | '/settings/integrations/google-play'
+    | '/settings/integrations/meta'
+    | '/settings/integrations/revenuecat'
+    | '/settings/integrations/search-console'
+    | '/settings/integrations/tiktok'
+    | '/settings/integrations/youtube'
     | '/apps/$appId/'
+    | '/settings/apps/'
+    | '/settings/integrations/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
@@ -400,17 +448,10 @@ export interface FileRouteTypes {
     | '/monetisation'
     | '/reviews'
     | '/seo'
-    | '/settings'
     | '/store'
     | '/ingest/$'
     | '/'
-    | '/accounts/app-store'
-    | '/accounts/google-play'
-    | '/accounts/meta'
-    | '/accounts/revenuecat'
-    | '/accounts/search-console'
-    | '/accounts/tiktok'
-    | '/accounts/youtube'
+    | '/accounts/$name'
     | '/apps/new'
     | '/social/posts'
     | '/api/auth/$'
@@ -419,9 +460,21 @@ export interface FileRouteTypes {
     | '/connect/youtube/callback'
     | '/accounts'
     | '/apps'
+    | '/settings'
     | '/social'
     | '/apps/$appId/settings'
+    | '/settings/apps/$appId'
+    | '/settings/apps/new'
+    | '/settings/integrations/app-store'
+    | '/settings/integrations/google-play'
+    | '/settings/integrations/meta'
+    | '/settings/integrations/revenuecat'
+    | '/settings/integrations/search-console'
+    | '/settings/integrations/tiktok'
+    | '/settings/integrations/youtube'
     | '/apps/$appId'
+    | '/settings/apps'
+    | '/settings/integrations'
   id:
     | '__root__'
     | '/_app'
@@ -434,7 +487,6 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/terms'
     | '/waitlist'
-    | '/_app/accounts'
     | '/_app/monetisation'
     | '/_app/reviews'
     | '/_app/seo'
@@ -442,14 +494,7 @@ export interface FileRouteTypes {
     | '/_app/store'
     | '/ingest/$'
     | '/_app/'
-    | '/_app/accounts/app-store'
-    | '/_app/accounts/google-play'
-    | '/_app/accounts/meta'
-    | '/_app/accounts/revenuecat'
-    | '/_app/accounts/search-console'
-    | '/_app/accounts/tiktok'
-    | '/_app/accounts/youtube'
-    | '/_app/apps/$appId'
+    | '/_app/accounts/$name'
     | '/_app/apps/new'
     | '/_app/social/posts'
     | '/api/auth/$'
@@ -458,9 +503,21 @@ export interface FileRouteTypes {
     | '/connect/youtube/callback'
     | '/_app/accounts/'
     | '/_app/apps/'
+    | '/_app/settings/'
     | '/_app/social/'
     | '/_app/apps/$appId/settings'
+    | '/_app/settings/apps/$appId'
+    | '/_app/settings/apps/new'
+    | '/_app/settings/integrations/app-store'
+    | '/_app/settings/integrations/google-play'
+    | '/_app/settings/integrations/meta'
+    | '/_app/settings/integrations/revenuecat'
+    | '/_app/settings/integrations/search-console'
+    | '/_app/settings/integrations/tiktok'
+    | '/_app/settings/integrations/youtube'
     | '/_app/apps/$appId/'
+    | '/_app/settings/apps/'
+    | '/_app/settings/integrations/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -560,13 +617,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/accounts': {
-      id: '/_app/accounts'
-      path: '/accounts'
-      fullPath: '/accounts'
-      preLoaderRoute: typeof AppAccountsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/monetisation': {
       id: '/_app/monetisation'
       path: '/monetisation'
@@ -611,59 +661,17 @@ declare module '@tanstack/react-router' {
     }
     '/_app/accounts/': {
       id: '/_app/accounts/'
-      path: '/'
+      path: '/accounts'
       fullPath: '/accounts/'
       preLoaderRoute: typeof AppAccountsIndexRouteImport
-      parentRoute: typeof AppAccountsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/accounts/app-store': {
-      id: '/_app/accounts/app-store'
-      path: '/app-store'
-      fullPath: '/accounts/app-store'
-      preLoaderRoute: typeof AppAccountsAppStoreRouteImport
-      parentRoute: typeof AppAccountsRoute
-    }
-    '/_app/accounts/google-play': {
-      id: '/_app/accounts/google-play'
-      path: '/google-play'
-      fullPath: '/accounts/google-play'
-      preLoaderRoute: typeof AppAccountsGooglePlayRouteImport
-      parentRoute: typeof AppAccountsRoute
-    }
-    '/_app/accounts/meta': {
-      id: '/_app/accounts/meta'
-      path: '/meta'
-      fullPath: '/accounts/meta'
-      preLoaderRoute: typeof AppAccountsMetaRouteImport
-      parentRoute: typeof AppAccountsRoute
-    }
-    '/_app/accounts/revenuecat': {
-      id: '/_app/accounts/revenuecat'
-      path: '/revenuecat'
-      fullPath: '/accounts/revenuecat'
-      preLoaderRoute: typeof AppAccountsRevenuecatRouteImport
-      parentRoute: typeof AppAccountsRoute
-    }
-    '/_app/accounts/search-console': {
-      id: '/_app/accounts/search-console'
-      path: '/search-console'
-      fullPath: '/accounts/search-console'
-      preLoaderRoute: typeof AppAccountsSearchConsoleRouteImport
-      parentRoute: typeof AppAccountsRoute
-    }
-    '/_app/accounts/tiktok': {
-      id: '/_app/accounts/tiktok'
-      path: '/tiktok'
-      fullPath: '/accounts/tiktok'
-      preLoaderRoute: typeof AppAccountsTiktokRouteImport
-      parentRoute: typeof AppAccountsRoute
-    }
-    '/_app/accounts/youtube': {
-      id: '/_app/accounts/youtube'
-      path: '/youtube'
-      fullPath: '/accounts/youtube'
-      preLoaderRoute: typeof AppAccountsYoutubeRouteImport
-      parentRoute: typeof AppAccountsRoute
+    '/_app/accounts/$name': {
+      id: '/_app/accounts/$name'
+      path: '/accounts/$name'
+      fullPath: '/accounts/$name'
+      preLoaderRoute: typeof AppAccountsNameRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/apps/': {
       id: '/_app/apps/'
@@ -672,19 +680,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppsIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/apps/$appId': {
-      id: '/_app/apps/$appId'
-      path: '/apps/$appId'
-      fullPath: '/apps/$appId'
-      preLoaderRoute: typeof AppAppsAppIdRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/apps/new': {
       id: '/_app/apps/new'
       path: '/apps/new'
       fullPath: '/apps/new'
       preLoaderRoute: typeof AppAppsNewRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
     }
     '/_app/social/': {
       id: '/_app/social/'
@@ -730,89 +738,167 @@ declare module '@tanstack/react-router' {
     }
     '/_app/apps/$appId/': {
       id: '/_app/apps/$appId/'
-      path: '/'
+      path: '/apps/$appId'
       fullPath: '/apps/$appId/'
       preLoaderRoute: typeof AppAppsAppIdIndexRouteImport
-      parentRoute: typeof AppAppsAppIdRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/apps/$appId/settings': {
       id: '/_app/apps/$appId/settings'
-      path: '/settings'
+      path: '/apps/$appId/settings'
       fullPath: '/apps/$appId/settings'
       preLoaderRoute: typeof AppAppsAppIdSettingsRouteImport
-      parentRoute: typeof AppAppsAppIdRoute
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/apps/': {
+      id: '/_app/settings/apps/'
+      path: '/apps'
+      fullPath: '/settings/apps/'
+      preLoaderRoute: typeof AppSettingsAppsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/apps/$appId': {
+      id: '/_app/settings/apps/$appId'
+      path: '/apps/$appId'
+      fullPath: '/settings/apps/$appId'
+      preLoaderRoute: typeof AppSettingsAppsAppIdRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/apps/new': {
+      id: '/_app/settings/apps/new'
+      path: '/apps/new'
+      fullPath: '/settings/apps/new'
+      preLoaderRoute: typeof AppSettingsAppsNewRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/': {
+      id: '/_app/settings/integrations/'
+      path: '/integrations'
+      fullPath: '/settings/integrations/'
+      preLoaderRoute: typeof AppSettingsIntegrationsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/app-store': {
+      id: '/_app/settings/integrations/app-store'
+      path: '/integrations/app-store'
+      fullPath: '/settings/integrations/app-store'
+      preLoaderRoute: typeof AppSettingsIntegrationsAppStoreRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/google-play': {
+      id: '/_app/settings/integrations/google-play'
+      path: '/integrations/google-play'
+      fullPath: '/settings/integrations/google-play'
+      preLoaderRoute: typeof AppSettingsIntegrationsGooglePlayRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/meta': {
+      id: '/_app/settings/integrations/meta'
+      path: '/integrations/meta'
+      fullPath: '/settings/integrations/meta'
+      preLoaderRoute: typeof AppSettingsIntegrationsMetaRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/revenuecat': {
+      id: '/_app/settings/integrations/revenuecat'
+      path: '/integrations/revenuecat'
+      fullPath: '/settings/integrations/revenuecat'
+      preLoaderRoute: typeof AppSettingsIntegrationsRevenuecatRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/search-console': {
+      id: '/_app/settings/integrations/search-console'
+      path: '/integrations/search-console'
+      fullPath: '/settings/integrations/search-console'
+      preLoaderRoute: typeof AppSettingsIntegrationsSearchConsoleRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/tiktok': {
+      id: '/_app/settings/integrations/tiktok'
+      path: '/integrations/tiktok'
+      fullPath: '/settings/integrations/tiktok'
+      preLoaderRoute: typeof AppSettingsIntegrationsTiktokRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/integrations/youtube': {
+      id: '/_app/settings/integrations/youtube'
+      path: '/integrations/youtube'
+      fullPath: '/settings/integrations/youtube'
+      preLoaderRoute: typeof AppSettingsIntegrationsYoutubeRouteImport
+      parentRoute: typeof AppSettingsRoute
     }
   }
 }
 
-interface AppAccountsRouteChildren {
-  AppAccountsAppStoreRoute: typeof AppAccountsAppStoreRoute
-  AppAccountsGooglePlayRoute: typeof AppAccountsGooglePlayRoute
-  AppAccountsMetaRoute: typeof AppAccountsMetaRoute
-  AppAccountsRevenuecatRoute: typeof AppAccountsRevenuecatRoute
-  AppAccountsSearchConsoleRoute: typeof AppAccountsSearchConsoleRoute
-  AppAccountsTiktokRoute: typeof AppAccountsTiktokRoute
-  AppAccountsYoutubeRoute: typeof AppAccountsYoutubeRoute
-  AppAccountsIndexRoute: typeof AppAccountsIndexRoute
+interface AppSettingsRouteChildren {
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppSettingsAppsAppIdRoute: typeof AppSettingsAppsAppIdRoute
+  AppSettingsAppsNewRoute: typeof AppSettingsAppsNewRoute
+  AppSettingsIntegrationsAppStoreRoute: typeof AppSettingsIntegrationsAppStoreRoute
+  AppSettingsIntegrationsGooglePlayRoute: typeof AppSettingsIntegrationsGooglePlayRoute
+  AppSettingsIntegrationsMetaRoute: typeof AppSettingsIntegrationsMetaRoute
+  AppSettingsIntegrationsRevenuecatRoute: typeof AppSettingsIntegrationsRevenuecatRoute
+  AppSettingsIntegrationsSearchConsoleRoute: typeof AppSettingsIntegrationsSearchConsoleRoute
+  AppSettingsIntegrationsTiktokRoute: typeof AppSettingsIntegrationsTiktokRoute
+  AppSettingsIntegrationsYoutubeRoute: typeof AppSettingsIntegrationsYoutubeRoute
+  AppSettingsAppsIndexRoute: typeof AppSettingsAppsIndexRoute
+  AppSettingsIntegrationsIndexRoute: typeof AppSettingsIntegrationsIndexRoute
 }
 
-const AppAccountsRouteChildren: AppAccountsRouteChildren = {
-  AppAccountsAppStoreRoute: AppAccountsAppStoreRoute,
-  AppAccountsGooglePlayRoute: AppAccountsGooglePlayRoute,
-  AppAccountsMetaRoute: AppAccountsMetaRoute,
-  AppAccountsRevenuecatRoute: AppAccountsRevenuecatRoute,
-  AppAccountsSearchConsoleRoute: AppAccountsSearchConsoleRoute,
-  AppAccountsTiktokRoute: AppAccountsTiktokRoute,
-  AppAccountsYoutubeRoute: AppAccountsYoutubeRoute,
-  AppAccountsIndexRoute: AppAccountsIndexRoute,
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppSettingsAppsAppIdRoute: AppSettingsAppsAppIdRoute,
+  AppSettingsAppsNewRoute: AppSettingsAppsNewRoute,
+  AppSettingsIntegrationsAppStoreRoute: AppSettingsIntegrationsAppStoreRoute,
+  AppSettingsIntegrationsGooglePlayRoute:
+    AppSettingsIntegrationsGooglePlayRoute,
+  AppSettingsIntegrationsMetaRoute: AppSettingsIntegrationsMetaRoute,
+  AppSettingsIntegrationsRevenuecatRoute:
+    AppSettingsIntegrationsRevenuecatRoute,
+  AppSettingsIntegrationsSearchConsoleRoute:
+    AppSettingsIntegrationsSearchConsoleRoute,
+  AppSettingsIntegrationsTiktokRoute: AppSettingsIntegrationsTiktokRoute,
+  AppSettingsIntegrationsYoutubeRoute: AppSettingsIntegrationsYoutubeRoute,
+  AppSettingsAppsIndexRoute: AppSettingsAppsIndexRoute,
+  AppSettingsIntegrationsIndexRoute: AppSettingsIntegrationsIndexRoute,
 }
 
-const AppAccountsRouteWithChildren = AppAccountsRoute._addFileChildren(
-  AppAccountsRouteChildren,
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
 )
 
-interface AppAppsAppIdRouteChildren {
+interface AppRouteChildren {
+  AppMonetisationRoute: typeof AppMonetisationRoute
+  AppReviewsRoute: typeof AppReviewsRoute
+  AppSeoRoute: typeof AppSeoRoute
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
+  AppStoreRoute: typeof AppStoreRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppAccountsNameRoute: typeof AppAccountsNameRoute
+  AppAppsNewRoute: typeof AppAppsNewRoute
+  AppSocialPostsRoute: typeof AppSocialPostsRoute
+  AppAccountsIndexRoute: typeof AppAccountsIndexRoute
+  AppAppsIndexRoute: typeof AppAppsIndexRoute
+  AppSocialIndexRoute: typeof AppSocialIndexRoute
   AppAppsAppIdSettingsRoute: typeof AppAppsAppIdSettingsRoute
   AppAppsAppIdIndexRoute: typeof AppAppsAppIdIndexRoute
 }
 
-const AppAppsAppIdRouteChildren: AppAppsAppIdRouteChildren = {
-  AppAppsAppIdSettingsRoute: AppAppsAppIdSettingsRoute,
-  AppAppsAppIdIndexRoute: AppAppsAppIdIndexRoute,
-}
-
-const AppAppsAppIdRouteWithChildren = AppAppsAppIdRoute._addFileChildren(
-  AppAppsAppIdRouteChildren,
-)
-
-interface AppRouteChildren {
-  AppAccountsRoute: typeof AppAccountsRouteWithChildren
-  AppMonetisationRoute: typeof AppMonetisationRoute
-  AppReviewsRoute: typeof AppReviewsRoute
-  AppSeoRoute: typeof AppSeoRoute
-  AppSettingsRoute: typeof AppSettingsRoute
-  AppStoreRoute: typeof AppStoreRoute
-  AppIndexRoute: typeof AppIndexRoute
-  AppAppsAppIdRoute: typeof AppAppsAppIdRouteWithChildren
-  AppAppsNewRoute: typeof AppAppsNewRoute
-  AppSocialPostsRoute: typeof AppSocialPostsRoute
-  AppAppsIndexRoute: typeof AppAppsIndexRoute
-  AppSocialIndexRoute: typeof AppSocialIndexRoute
-}
-
 const AppRouteChildren: AppRouteChildren = {
-  AppAccountsRoute: AppAccountsRouteWithChildren,
   AppMonetisationRoute: AppMonetisationRoute,
   AppReviewsRoute: AppReviewsRoute,
   AppSeoRoute: AppSeoRoute,
-  AppSettingsRoute: AppSettingsRoute,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppStoreRoute: AppStoreRoute,
   AppIndexRoute: AppIndexRoute,
-  AppAppsAppIdRoute: AppAppsAppIdRouteWithChildren,
+  AppAccountsNameRoute: AppAccountsNameRoute,
   AppAppsNewRoute: AppAppsNewRoute,
   AppSocialPostsRoute: AppSocialPostsRoute,
+  AppAccountsIndexRoute: AppAccountsIndexRoute,
   AppAppsIndexRoute: AppAppsIndexRoute,
   AppSocialIndexRoute: AppSocialIndexRoute,
+  AppAppsAppIdSettingsRoute: AppAppsAppIdSettingsRoute,
+  AppAppsAppIdIndexRoute: AppAppsAppIdIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

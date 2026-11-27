@@ -30,7 +30,7 @@ export function RemoveApp(props: { appId: string; name: string }) {
     onSuccess: async (result) => {
       if (!result.ok) return
       setOpen(false)
-      await navigate({ to: '/apps' })
+      await navigate({ to: '/settings/apps' })
       toast.success(
         <span>
           Removed <Private>{result.name}</Private>. What fed it waits on the Apps page, to add again or ignore.

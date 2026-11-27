@@ -161,7 +161,7 @@ function NoRevenue() {
       </EmptyHeader>
       <EmptyContent className="flex-row justify-center">
         <Button asChild>
-          <Link to="/apps">Go to the apps</Link>
+          <Link to="/settings/apps">Go to the apps</Link>
         </Button>
       </EmptyContent>
     </Empty>

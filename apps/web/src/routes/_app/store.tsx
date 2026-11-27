@@ -247,7 +247,7 @@ function NoStore() {
       </EmptyHeader>
       <EmptyContent className="flex-row justify-center">
         <Button asChild>
-          <Link to="/accounts">Connect accounts</Link>
+          <Link to="/settings/integrations">Connect accounts</Link>
         </Button>
       </EmptyContent>
     </Empty>

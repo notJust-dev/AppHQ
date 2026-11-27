@@ -17,13 +17,13 @@ import {
   emptyFamily,
   useWatch,
   type ConnectedAccount,
-} from '@/components/accounts/shared'
+} from '@/components/integrations/shared'
 import { startMetaConnectFn } from '@/fns/meta'
 import { formatDay } from '@/lib/format'
 import { metaHealth } from '@/lib/meta'
 import { accountsQuery, metaSetupQuery, type MetaSetup } from '@/lib/queries'
 
-export const Route = createFileRoute('/_app/accounts/meta')({
+export const Route = createFileRoute('/_app/settings/integrations/meta')({
   // Set by the Facebook sign-in when it sends the browser back here.
   validateSearch: z.object({ connected: z.literal('meta').optional().catch(undefined) }),
   loader: ({ context }) =>
@@ -42,7 +42,7 @@ function MetaPage() {
   const { data: setup } = useSuspenseQuery(metaSetupQuery())
   const family = families.find((entry) => entry.family === 'meta') ?? emptyFamily('meta')
   const clear = useCallback(() => {
-    void navigate({ to: '/accounts/meta', search: {}, replace: true })
+    void navigate({ to: '/settings/integrations/meta', search: {}, replace: true })
   }, [navigate])
 
   return (
