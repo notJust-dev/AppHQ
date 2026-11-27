@@ -34,13 +34,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { signOutFn } from '@/fns/auth'
@@ -52,18 +52,28 @@ import { applyTheme, useThemeChoice, type ThemeChoice } from '@/lib/theme'
 const ACTIVE =
   'aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-medium aria-[current=page]:text-sidebar-accent-foreground'
 
-/** The pages that look at one part of the funnel across apps. */
-const PERFORMANCE = [
+/**
+ * The pages that follow the app chosen in the top bar, roughly in the funnel's order: people
+ * see you, visit the store, pay, then review. Reviews comes in its own item, for its badge.
+ */
+const ANALYTICS = [
+  { to: '/', label: 'Overview', Icon: LayoutDashboard },
   { to: '/social', label: 'Social', Icon: Megaphone },
+  { to: '/seo', label: 'SEO', Icon: Search },
   { to: '/store', label: 'Store', Icon: Store },
   { to: '/monetisation', label: 'Monetisation', Icon: Wallet },
-  { to: '/seo', label: 'SEO', Icon: Search },
+] as const
+
+/** What feeds the dashboard: the apps and the accounts they come from. */
+const SETUP = [
+  { to: '/apps', label: 'Apps', Icon: AppWindow },
+  { to: '/accounts', label: 'Accounts', Icon: Plug },
 ] as const
 
 /**
- * The navigation: the sections, and the theme and sign-out at the bottom. The app the
- * dashboard shows is chosen in each page's top bar. Collapsed, each item keeps its icon and
- * names itself in a tooltip.
+ * The navigation: the pages that follow the chosen app, then the setup and the theme and
+ * sign-out at the bottom. The app the dashboard shows is chosen in each page's top bar.
+ * Collapsed, each item keeps its icon and names itself in a tooltip.
  * `organization`: the name of the organization the dashboard works in, when the API said.
  */
 export function AppSidebar({ organization }: { organization: string | null }) {
@@ -99,22 +109,17 @@ export function AppSidebar({ organization }: { organization: string | null }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu aria-label="Sections">
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Overview" className={ACTIVE}>
-                  <Link to="/" activeOptions={{ exact: true, includeSearch: false }}>
-                    <LayoutDashboard />
-                    <span>Overview</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Apps" className={ACTIVE}>
-                  <Link to="/apps" activeOptions={{ exact: true }}>
-                    <AppWindow />
-                    <span>Apps</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {ANALYTICS.map(({ to, label, Icon }) => (
+                <SidebarMenuItem key={to}>
+                  <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
+                    {/* The app and range in the address come along; see lib/range.ts. */}
+                    <Link to={to} activeOptions={{ exact: to === '/', includeSearch: false }}>
+                      <Icon />
+                      <span>{label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Reviews" className={ACTIVE}>
                   <Link to="/reviews" activeOptions={{ includeSearch: false }}>
@@ -126,26 +131,20 @@ export function AppSidebar({ organization }: { organization: string | null }) {
                   <SidebarMenuBadge aria-label={`${unread.count} unread`}>{unread.count > 99 ? '99+' : unread.count}</SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Accounts" className={ACTIVE}>
-                  <Link to="/accounts">
-                    <Plug />
-                    <span>Accounts</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Setup, at the bottom above the settings: visited less than the pages above. The line
+            is as wide as the items, inset the same on both sides; w-full would push it off. */}
+        <SidebarSeparator className="mx-2 mt-auto opacity-50 data-horizontal:w-auto" />
         <SidebarGroup>
-          <SidebarGroupLabel>Performance</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu aria-label="Performance">
-              {PERFORMANCE.map(({ to, label, Icon }) => (
+            <SidebarMenu aria-label="Setup">
+              {SETUP.map(({ to, label, Icon }) => (
                 <SidebarMenuItem key={to}>
                   <SidebarMenuButton asChild tooltip={label} className={ACTIVE}>
-                    {/* The app and range in the address come along; see lib/range.ts. */}
+                    {/* Active on the pages under it too, such as an app's settings. */}
                     <Link to={to} activeOptions={{ includeSearch: false }}>
                       <Icon />
                       <span>{label}</span>
@@ -156,7 +155,6 @@ export function AppSidebar({ organization }: { organization: string | null }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
       </SidebarContent>
 
       <SidebarFooter>
