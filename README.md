@@ -189,7 +189,7 @@ Add a second application on the same server, from the same repository:
 | `PUBLIC_URL` | Optional. The dashboard's own address, if the sign-in redirect addresses on the Accounts page come out wrong (for example behind a custom domain) |
 | `POSTHOG_KEY` | Optional. A PostHog project API key turns on cookieless usage analytics, sent through the app's own `/ingest` path. Leave it unset and nothing is sent anywhere |
 | `POSTHOG_HOST` | Optional. Defaults to PostHog's US cloud, `https://us.i.posthog.com`. For the EU cloud, `https://eu.i.posthog.com` |
-| `SENTRY_DSN` | Optional. Turns on error reporting from the browser; see [Error reporting](#error-reporting-optional). It can be the same DSN as the API's, or one from a separate project |
+| `SENTRY_DSN` | Optional. Turns on error reporting from the browser and the **Send feedback** form; see [Error reporting](#error-reporting-optional). It can be the same DSN as the API's, or one from a separate project |
 | `SENTRY_ENVIRONMENT` | Optional. The environment errors are filed under, default `NODE_ENV`. Set it to `production`, since `NODE_ENV` is left unset here |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Optional. Upload source maps at build time, so dashboard errors show your source instead of minified code; see [Error reporting](#error-reporting-optional) |
 
@@ -512,6 +512,19 @@ console output and user details are left out, because they can hold OAuth tokens
 your numbers. There is no performance tracing and no session replay.
 
 Browser extensions that block ads may block reports sent straight to sentry.io.
+
+### Feedback from the dashboard
+
+With `SENTRY_DSN` set on the `web` application, the dashboard's sidebar also has **Send
+feedback**. It opens Sentry's feedback form, and what people write arrives under **User
+Feedback** in the same Sentry project. Without the DSN there is no button and nothing is sent.
+The landing, sign-in and legal pages never show it.
+
+A message is sent with the page address (without its query string or fragment) and an email
+address only if the person types one. A screenshot goes along only if they add one with **Add a
+screenshot**. While privacy mode is on, that button is gone, and the message is sent without
+breadcrumbs (the recent clicks and page loads before it) and tagged `privacy_mode: on`, so no app
+or account name goes along with it.
 
 ### Readable stack traces from the dashboard
 
