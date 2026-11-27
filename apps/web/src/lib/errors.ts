@@ -111,15 +111,28 @@ export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
   return { ...breadcrumb, data: kept }
 }
 
+/** The signed-in account's email, sent with feedback in place of asking for it. */
+let feedbackEmail: string | null = null
+
+/**
+ * Sets the email feedback is sent with; null asks for one in the form. Kept out of Sentry's user,
+ * which would also go out with every session ping.
+ */
+export function setFeedbackEmail(email: string | null) {
+  feedbackEmail = email
+}
+
 /**
  * Feedback gets the same scrubbing as errors, and the form's own copy of the page address loses
- * its query and fragment too. With privacy mode on it carries no breadcrumbs, since a clicked
- * element's selector can hold a label that names an app or account.
+ * its query and fragment too. It carries the signed-in account's email when there is one. With
+ * privacy mode on it carries no breadcrumbs, since a clicked element's selector can hold a label
+ * that names an app or account.
  */
-export function scrubFeedback<T extends Event>(event: T, privacy = privacyOn()): T {
+export function scrubFeedback<T extends Event>(event: T, privacy = privacyOn(), email = feedbackEmail): T {
   scrubEvent(event)
   const feedback = event.contexts?.feedback
   if (feedback && typeof feedback.url === 'string') feedback.url = withoutQuery(feedback.url)
+  if (feedback && email && !feedback.contact_email) feedback.contact_email = email
   if (privacy) {
     delete event.breadcrumbs
     event.tags = { ...event.tags, privacy_mode: 'on' }

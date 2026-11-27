@@ -520,8 +520,10 @@ feedback**. It opens Sentry's feedback form, and what people write arrives under
 Feedback** in the same Sentry project. Without the DSN there is no button and nothing is sent.
 The landing, sign-in and legal pages never show it.
 
-A message is sent with the page address (without its query string or fragment) and an email
-address only if the person types one. A screenshot goes along only if they add one with **Add a
+A message is sent with the page address (without its query string or fragment) and the email
+of the account the person signed in with, so the form doesn't ask for it. Signed in with the
+dashboard password there is no account, so the form asks, and the email is sent only if they
+type one. A screenshot goes along only if they add one with **Add a
 screenshot**. While privacy mode is on, that button is gone, and the message is sent without
 breadcrumbs (the recent clicks and page loads before it) and tagged `privacy_mode: on`, so no app
 or account name goes along with it.

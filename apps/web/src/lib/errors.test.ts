@@ -57,15 +57,22 @@ describe('scrubFeedback', () => {
   })
 
   it('strips the query from both addresses and keeps the message', () => {
-    const scrubbed = scrubFeedback(feedback(), false)
+    const scrubbed = scrubFeedback(feedback(), false, null)
     expect(scrubbed.contexts?.feedback).toEqual({ message: 'The chart is empty', url: 'https://apphq.example.com/store' })
     expect(scrubbed.request).toEqual({ url: 'https://apphq.example.com/store' })
     expect(scrubbed.user).toBeUndefined()
     expect(scrubbed.breadcrumbs).toEqual([{ category: 'ui.click', message: 'button[aria-label="Open Example App"]' }])
   })
 
+  it('sends the signed-in email when the form did not ask for one', () => {
+    expect(scrubFeedback(feedback(), false, 'member@example.com').contexts?.feedback?.contact_email).toBe('member@example.com')
+    const typed = feedback()
+    typed.contexts!.feedback!.contact_email = 'typed@example.com'
+    expect(scrubFeedback(typed, false, 'member@example.com').contexts?.feedback?.contact_email).toBe('typed@example.com')
+  })
+
   it('sends no breadcrumbs while privacy mode is on, and says it was on', () => {
-    const scrubbed = scrubFeedback(feedback(), true)
+    const scrubbed = scrubFeedback(feedback(), true, null)
     expect(scrubbed.breadcrumbs).toBeUndefined()
     expect(scrubbed.tags).toEqual({ privacy_mode: 'on' })
   })
