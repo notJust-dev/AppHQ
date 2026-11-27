@@ -307,6 +307,25 @@
 }
 
 /*
+ * Sentry's feedback form (lib/feedback.ts) in the dashboard's colours. It draws in a shadow root
+ * hung on this element; variables set here win over its own, and follow light and dark with the
+ * rest of the page. Its own names overlap ours (--background, --border), so none refers to
+ * itself.
+ */
+#sentry-feedback {
+  --font-family: var(--font-sans);
+  --foreground: var(--popover-foreground);
+  --background: var(--popover);
+  --accent-foreground: var(--primary-foreground);
+  --accent-background: var(--primary);
+  --error-color: var(--destructive);
+  --border: 1px solid color-mix(in srgb, var(--popover-foreground) 14%, transparent);
+  --input-border: 1px solid var(--input);
+  --outline: 2px solid var(--ring);
+  --box-shadow: 0 8px 30px rgb(0 0 0 / 0.16);
+}
+
+/*
  * The landing page's hub (components/ConnectionsHub.tsx): a dot travels from each source to the
  * centre, and the centre breathes. Both are decoration, so they stop for reduced motion.
  */

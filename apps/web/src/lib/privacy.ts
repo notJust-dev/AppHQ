@@ -31,11 +31,12 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener)
 }
 
+/** Whether privacy mode is on in this page right now. Off on the server. */
+export function privacyOn(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset.privacy === 'on'
+}
+
 /** Whether privacy mode is on. The server cannot know, so it renders as off until hydration. */
 export function usePrivacy(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => document.documentElement.dataset.privacy === 'on',
-    () => false,
-  )
+  return useSyncExternalStore(subscribe, privacyOn, () => false)
 }
