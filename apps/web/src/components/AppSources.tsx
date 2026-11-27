@@ -80,10 +80,10 @@ export function AppSources(props: { app: AppSummary; apps: AppSummary[]; assets:
   )
 }
 
-/** Store apps and the website come from an account connected once, on the Accounts page. */
+/** Store apps and the website come from an integration connected once, in Settings › Integrations. */
 const STORE_KINDS = ['ios_app', 'android_app', 'search_console_site'] as const
 
-/** The page where the account behind each kind is set up. */
+/** The page where the integration behind each kind is set up. */
 const SETUP_PAGE = {
   ios_app: '/settings/integrations/app-store',
   android_app: '/settings/integrations/google-play',
@@ -170,7 +170,7 @@ function SlotRow(props: {
             </Select>
             {current && ATTENTION[current.status] && (
               <p className="text-xs font-medium text-warning">
-                The account behind it {ATTENTION[current.status]}.{' '}
+                The integration behind it {ATTENTION[current.status]}.{' '}
                 <Link to={SETUP_PAGE[kind]} className="underline underline-offset-4">
                   Connect it again
                 </Link>
@@ -271,7 +271,7 @@ function SocialRow(props: {
 
 /**
  * A RevenueCat key belongs to one project, so it is connected here, from the app it feeds,
- * rather than on the Accounts page.
+ * rather than on the RevenueCat integration's page.
  */
 function RevenueCatRow(props: {
   app: AppSummary

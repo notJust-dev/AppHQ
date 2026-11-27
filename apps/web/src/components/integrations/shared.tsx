@@ -51,7 +51,7 @@ export const SOURCES: {
     family: 'revenuecat',
     title: 'RevenueCat',
     to: '/settings/integrations/revenuecat',
-    brings: "Revenue, MRR, trials and subscribers. Each app connects its own project, in the app's Settings.",
+    brings: "Revenue, MRR, trials and subscribers. Each app connects its own project, on the app's settings page.",
     noun: ['project', 'projects'],
   },
   {

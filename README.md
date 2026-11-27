@@ -186,7 +186,7 @@ Add a second application on the same server, from the same repository:
 | `INTERNAL_API_TOKEN` | The **same** value as on `api` |
 | `SESSION_SECRET` | A new `openssl rand -hex 32` value |
 | `DASHBOARD_PASSWORD` | The password you will sign in with, 12+ characters. Changing it signs out everyone who signed in with the old one. Optional once accounts are on: unset, the password is off |
-| `PUBLIC_URL` | Optional. The dashboard's own address, if the sign-in redirect addresses on the Accounts page come out wrong (for example behind a custom domain) |
+| `PUBLIC_URL` | Optional. The dashboard's own address, if the sign-in redirect addresses on the Integrations pages come out wrong (for example behind a custom domain) |
 | `POSTHOG_KEY` | Optional. A PostHog project API key turns on cookieless usage analytics, sent through the app's own `/ingest` path. Leave it unset and nothing is sent anywhere |
 | `POSTHOG_HOST` | Optional. Defaults to PostHog's US cloud, `https://us.i.posthog.com`. For the EU cloud, `https://eu.i.posthog.com` |
 | `SENTRY_DSN` | Optional. Turns on error reporting from the browser; see [Error reporting](#error-reporting-optional). It can be the same DSN as the API's, or one from a separate project |
@@ -200,7 +200,7 @@ signing in.
 ### 8. Sign in
 
 Open `https://<web address>/login` and sign in with `DASHBOARD_PASSWORD`. Then go to
-**Accounts** to connect your first source.
+**Settings → Integrations** to connect your first service.
 
 To look around with demo data first, send this request (with your internal token) to the API.
 It loads four made-up apps, marked as demo apps:
@@ -212,7 +212,7 @@ curl -X POST https://<api address>/trpc/demo.seed \
   -H "Content-Type: application/json" -d '{}'
 ```
 
-Or use **Load demo data** on the Accounts page once you are signed in. Remove them before you
+Or use **Load demo data** in Settings → Integrations once you are signed in. Remove them before you
 connect real data. The same request to `demo.clear` (or **Remove demo data**) deletes them and
 nothing else.
 
@@ -533,13 +533,13 @@ none of this: its build is plain JavaScript, and its stack traces are readable a
 
 ## Connecting your data
 
-Sign in and open **Accounts**. It lists every source with its state. Each source's page has the
-steps to get a key and a form to paste it into. Key files (App Store Connect's `.p8`, Google
-Play's JSON) can be dropped onto the form; they are read in the browser.
+Sign in and open **Settings → Integrations**. It lists every service with its state. Each service's
+page has the steps to get a key and a form to paste it into. Key files (App Store Connect's `.p8`,
+Google Play's JSON) can be dropped onto the form; they are read in the browser.
 
-What a source finds (iOS and Android apps, RevenueCat projects, Pages, Instagram, TikTok and
-YouTube accounts, websites) waits on the **Apps** page under "Needs a decision". Nothing becomes
-an app on its own. You can:
+What an integration finds (iOS and Android apps, RevenueCat projects, Pages, Instagram, TikTok
+and YouTube accounts, websites) waits in **Settings → Apps** under "Needs a decision", and
+Overview says how many are waiting. Nothing becomes an app on its own. You can:
 
 - **Add** an app you want to track (one click for a store app).
 - **Link** something to an existing app, or to **Shared accounts** for a social account that
@@ -548,7 +548,7 @@ an app on its own. You can:
 
 Once an app exists, data that clearly belongs to it joins automatically, like an Android package
 equal to its iOS bundle id. Linking something fetches its history. To add an app by name (one
-only on Android, say), use **Add app** on the Apps page.
+only on Android, say), use **Add app** in Settings → Apps.
 
 ### App Store Connect (downloads, store page views, reviews, icons)
 
@@ -581,8 +581,8 @@ days fill in later.
 
 ### RevenueCat (revenue, MRR, trials, subscriptions)
 
-A RevenueCat key belongs to one project, so it is connected **per app**: open the app's
-**Settings** and paste a **v2 secret key** with read access to charts and metrics, and to project
+A RevenueCat key belongs to one project, so it is connected **per app**: open the app in **Settings
+→ Apps** and paste a **v2 secret key** with read access to charts and metrics, and to project
 configuration. About a year of history is fetched. Revenue is in USD.
 
 ### TikTok (posts, views, followers)
@@ -634,22 +634,27 @@ Sign in once per channel (a brand account counts as a separate channel).
 ### Google Search Console (SEO)
 
 Use a Google Cloud service account, either the one from Google Play or a new one. Enable the
-**Google Search Console API** in its project, then in Search Console add its email to each
-website (**Settings → Users and permissions**, Restricted is enough). Connect it on the Accounts
-page and link each website to its app. 16 months of clicks, impressions and position are fetched.
+**Google Search Console API** in its project, then in Search Console add its email to each website
+(**Settings → Users and permissions**, Restricted is enough). Connect it in Settings → Integrations
+and link each website to its app. 16 months of clicks, impressions and position are fetched.
 
 ## Using the dashboard
 
+- **The app switcher** at the top of each page picks one app or all of them; the choice and the
+  range stay as you move between pages.
 - **Overview** lists every app with its funnel numbers for the chosen range, compared with the
-  period before.
-- **An app's page** has an Overview tab (funnel, download flow, charts, posts with the download
-  lift after each) and a Settings tab (name, what feeds it, stop tracking).
-- **Social, Store and Monetisation** show one part of the funnel across all apps, or for one
-  app picked at the top. Rates such as revenue per download only count apps and stores that
+  period before. With one app chosen it shows that app's funnel, download flow, charts and posts
+  with the download lift after each.
+- **Social, SEO, Store and Monetisation** show one part of the funnel across all apps, or for the
+  chosen app. Rates such as revenue per download only count apps and stores that
   report both numbers.
 - **Reviews** can be filtered by app, store, rating or unread. Mark reviews read as you handle
   them, and the sidebar shows how many are unread.
-- **Privacy mode**, at the bottom of the sidebar, blurs names, icons, handles, captions and
+- **Settings**, at the bottom of the sidebar, holds **Apps** (which iOS and Android apps,
+  RevenueCat project, website and social accounts make up each app) and **Integrations** (the
+  services the dashboard reads). Its count adds what waits for a decision and the integrations
+  that need connecting again.
+- **Privacy mode**, also at the bottom of the sidebar, blurs names, icons, handles, captions and
   reviews while keeping numbers readable. It is remembered per browser.
 
 Correlation is not attribution: "lift" after a post compares downloads with the days before it,

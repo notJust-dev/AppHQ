@@ -110,12 +110,13 @@ function Portfolio({ range }: { range: RangeKey }) {
           </EmptyMedia>
           <EmptyTitle>No apps yet</EmptyTitle>
           <EmptyDescription>
-            Connect App Store Connect, Google Play or your social accounts, then add the apps you want to track.
+            Connect App Store Connect, Google Play or your social accounts in Integrations, then add the apps you
+            want to track.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">
           <Button asChild>
-            <Link to="/settings/integrations">Connect accounts</Link>
+            <Link to="/settings/integrations">Set up integrations</Link>
           </Button>
           <Button asChild variant="outline">
             <Link to="/settings/apps/new">Add app</Link>

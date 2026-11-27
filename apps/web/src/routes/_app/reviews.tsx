@@ -375,7 +375,7 @@ function NoReviews({ filtered }: { filtered: boolean }) {
           ) : (
             <>
               Reviews arrive with each sync from App Store Connect and Google Play, for the apps you track. Connect
-              them on the <Link to="/settings/integrations">Accounts page</Link>.
+              them in <Link to="/settings/integrations">Integrations</Link>.
             </>
           )}
         </EmptyDescription>

@@ -39,7 +39,7 @@ export const Route = createFileRoute('/connect/youtube/callback')({
           })
           return finish(
             true,
-            `Found ${result.channel}. Link it to the app it promotes on the Apps page or in the app's Settings; ` +
+            `Found ${result.channel}. Link it to the app it promotes on the Apps page or the app's settings page; ` +
               'its history is fetched as soon as it has one.',
           )
         } catch (err) {

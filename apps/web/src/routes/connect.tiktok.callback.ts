@@ -43,7 +43,7 @@ export const Route = createFileRoute('/connect/tiktok/callback')({
           return finish(
             true,
             `Connected ${result.account} to ${result.appName}. Its videos are being read now and ` +
-              "show on the app's page within a minute. Daily views start tomorrow: TikTok only " +
+              'show on Overview within a minute. Daily views start tomorrow: TikTok only ' +
               'reports totals, so a day is the difference between two readings.',
           )
         } catch (err) {

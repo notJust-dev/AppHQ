@@ -13,7 +13,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { createAppFn } from '@/fns/assets'
 import { assetsQuery } from '@/lib/queries'
 
-/** Adds an app by name; its Settings then pick what feeds it. */
+/** Adds an app by name; its settings page then picks what feeds it. */
 export const Route = createFileRoute('/_app/settings/apps/new')({
   loader: ({ context }) => context.queryClient.ensureQueryData(assetsQuery()),
   component: NewAppPage,

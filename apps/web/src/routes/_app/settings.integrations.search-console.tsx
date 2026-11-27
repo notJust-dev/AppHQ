@@ -53,7 +53,7 @@ function SearchConsolePage() {
               {outcome.linked > 0 && `, ${outcome.linked} already part of an app`}.{' '}
               {outcome.sites > outcome.linked && (
                 <>
-                  Link each to its app on the <Link to="/settings/apps">Apps page</Link> or in the app&apos;s Settings; its
+                  Link each to its app on the <Link to="/settings/apps">Apps page</Link> or the app&apos;s settings page; its
                   history is fetched once it has an app.
                 </>
               )}
