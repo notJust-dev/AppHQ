@@ -27,7 +27,7 @@ Commands:
   seed                 Replace the demo apps with generated data.
                          --days <n>        history length, default 200
                          --allow-production
-  add-owner            Make an account an owner of an organization. Once approved, it opens it.
+  add-owner            Make an account an owner of an organization, which it then opens.
                          --email <address> the account's address (it must have signed in once)
 
 Every command but migrate also takes --organization <slug>. Without it, ping, seed and
