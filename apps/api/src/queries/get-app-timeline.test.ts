@@ -28,6 +28,7 @@ describe('buildTimeline', () => {
     expect(downloads.values).toEqual([14, 15, null])
     expect(downloads.summary).toBe(29)
     expect(downloads.completeThrough).toBeNull()
+    expect(downloads.partial).toEqual([null, null, null])
     expect(downloads.sources).toEqual([
       { source: 'app_store', values: [10, 12, null], summary: 22 },
       { source: 'google_play', values: [4, 3, null], summary: 7 },
@@ -48,6 +49,8 @@ describe('buildTimeline', () => {
     expect(downloads.summary).toBe(14)
     expect(downloads.completeThrough).toBe('2026-11-17')
     expect(downloads.waitingFor).toEqual(['google_play'])
+    // The days after it carry what has come in so far, joined to the total's last day.
+    expect(downloads.partial).toEqual([14, 12, 11])
     // Each store's own days go as far as it reported; its summary covers the total's days.
     expect(downloads.sources.find((s) => s.source === 'app_store')).toMatchObject({
       values: [10, 12, 11],
