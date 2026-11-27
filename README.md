@@ -190,7 +190,8 @@ Add a second application on the same server, from the same repository:
 | `POSTHOG_KEY` | Optional. A PostHog project API key turns on cookieless usage analytics, sent through the app's own `/ingest` path. Leave it unset and nothing is sent anywhere |
 | `POSTHOG_HOST` | Optional. Defaults to PostHog's US cloud, `https://us.i.posthog.com`. For the EU cloud, `https://eu.i.posthog.com` |
 | `SENTRY_DSN` | Optional. Turns on error reporting from the browser; see [Error reporting](#error-reporting-optional). It can be the same DSN as the API's, or one from a separate project |
-| `SENTRY_ENVIRONMENT` | Optional. The environment errors are filed under, default `NODE_ENV` |
+| `SENTRY_ENVIRONMENT` | Optional. The environment errors are filed under, default `NODE_ENV`. Set it to `production`, since `NODE_ENV` is left unset here |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Optional. Upload source maps at build time, so dashboard errors show your source instead of minified code; see [Error reporting](#error-reporting-optional) |
 
 Deploy the app, then open `https://<web address>/health`. It reports whether the dashboard is
 fully configured and whether it can reach the API, so you can check the setup without
@@ -511,6 +512,24 @@ console output and user details are left out, because they can hold OAuth tokens
 your numbers. There is no performance tracing and no session replay.
 
 Browser extensions that block ads may block reports sent straight to sentry.io.
+
+### Readable stack traces from the dashboard
+
+The dashboard's production build is minified, so its errors arrive as one-letter names and huge
+column numbers unless Sentry has the build's source maps. To upload them, set these variables on
+the `web` application, where the build runs:
+
+| Variable | Value |
+|---|---|
+| `SENTRY_AUTH_TOKEN` | An organization auth token, from **Settings > Developer Settings > Organization Tokens** in Sentry. Mark it **Sensitive** |
+| `SENTRY_ORG` | Your organization's slug |
+| `SENTRY_PROJECT` | The slug of the project the dashboard's `SENTRY_DSN` belongs to |
+| `SENTRY_URL` | Only for a self-hosted Sentry: its address |
+
+With the token set, `npm run build` makes hidden source maps, uploads them, and leaves them out of
+the build, so they are never served. A failed upload only prints a warning; the build and the
+deploy go on. Without the token the build makes no source maps and sends nothing. The API needs
+none of this: its build is plain JavaScript, and its stack traces are readable as they are.
 
 ## Connecting your data
 
