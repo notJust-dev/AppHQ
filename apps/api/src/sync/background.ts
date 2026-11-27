@@ -1,3 +1,4 @@
+import { reportError } from '../lib/errors.js'
 import { runSync, type SyncDeps, type SyncOptions } from './runner.js'
 
 /** How long to wait before trying again when another sync holds the lock, and how often. */
@@ -35,6 +36,7 @@ export function startSync(
       })
       .catch((err: unknown) => {
         deps.log.error(`background sync crashed: ${err instanceof Error ? err.message : String(err)}`)
+        reportError(err, { sync: 'background' })
       })
   }
   attempt(1)

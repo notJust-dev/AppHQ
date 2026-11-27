@@ -8,10 +8,12 @@ import { account, invitation, member, organization, session, user, verification 
 import { runMigrations } from './db/migrate.js'
 import { loadEnv } from './env.js'
 import { createSecrets } from './lib/crypto.js'
+import { flushErrorReports, startErrorReporting } from './lib/errors.js'
 import { assertRowLevelSecurity } from './organizations/tenancy.js'
 import { startSyncSchedule } from './sync/schedule.js'
 
 const env = loadEnv()
+const reportingErrors = startErrorReporting({ dsn: env.SENTRY_DSN, environment: env.SENTRY_ENVIRONMENT ?? env.NODE_ENV })
 const { db, sql } = createDb(env.DATABASE_URL)
 
 await runMigrations({ db, sql })
@@ -52,7 +54,8 @@ app.log.info(authConfig ? `accounts are on, signing in at ${authConfig.url}` : '
 if (authConfig) app.log.info(authConfig.mail ? `signing up with an email address is on, mail goes through ${authConfig.mail.host}` : 'signing up with an email address is off (no SMTP_HOST)')
 app.log.info(env.ALLOW_DASHBOARD_PASSWORD ? 'the dashboard password is accepted' : 'the dashboard password is not accepted (ALLOW_DASHBOARD_PASSWORD=false)')
 if (!env.ALLOW_DASHBOARD_PASSWORD && !authConfig) app.log.warn('neither the dashboard password nor accounts are on: nobody can open the dashboard')
-app.log.info(role ? `organization data: row-level security, as the role ${role}` : 'organization data: row-level security, as the tables\' owner (no role can be made here)')
+app.log.info(reportingErrors ? 'error reporting is on (SENTRY_DSN)' : 'error reporting is off (no SENTRY_DSN)')
+app.log.info(role ?`organization data: row-level security, as the role ${role}` : 'organization data: row-level security, as the tables\' owner (no role can be made here)')
 
 // The API keeps the data fresh itself; see sync/schedule.ts for why not a Velocity cron entry.
 const stopSchedule =
@@ -67,6 +70,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     stopSchedule()
     await app.close()
     await sql.end({ timeout: 5 })
+    await flushErrorReports()
     process.exit(0)
   })
 }

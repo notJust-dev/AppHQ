@@ -152,6 +152,8 @@ never shows a sensitive value again, so keep a copy somewhere safe.
 | `ENCRYPTION_KEY` | The second generated value. If you lose or change it, every connected source has to be connected again. |
 | `SYNC_EVERY_HOURS` | Optional. Hours between automatic syncs, default `3` |
 | `ALLOW_DASHBOARD_PASSWORD` | Optional, `true` (the default) or `false`. Whether the API accepts the web app's dashboard password. Set it to `false` only when you sign in with an account instead; see [Turning the dashboard password off](#turning-the-dashboard-password-off) |
+| `SENTRY_DSN` | Optional. Turns on error reporting; see [Error reporting](#error-reporting-optional). Leave it unset and nothing is sent anywhere |
+| `SENTRY_ENVIRONMENT` | Optional. The environment errors are filed under, default `NODE_ENV` |
 
 Add the variables for TikTok, Meta and YouTube later, when you set those sources up (see
 [Connecting your data](#connecting-your-data)).
@@ -187,6 +189,8 @@ Add a second application on the same server, from the same repository:
 | `PUBLIC_URL` | Optional. The dashboard's own address, if the sign-in redirect addresses on the Accounts page come out wrong (for example behind a custom domain) |
 | `POSTHOG_KEY` | Optional. A PostHog project API key turns on cookieless usage analytics, sent through the app's own `/ingest` path. Leave it unset and nothing is sent anywhere |
 | `POSTHOG_HOST` | Optional. Defaults to PostHog's US cloud, `https://us.i.posthog.com`. For the EU cloud, `https://eu.i.posthog.com` |
+| `SENTRY_DSN` | Optional. Turns on error reporting from the browser; see [Error reporting](#error-reporting-optional). It can be the same DSN as the API's, or one from a separate project |
+| `SENTRY_ENVIRONMENT` | Optional. The environment errors are filed under, default `NODE_ENV` |
 
 Deploy the app, then open `https://<web address>/health`. It reports whether the dashboard is
 fully configured and whether it can reach the API, so you can check the setup without
@@ -489,6 +493,25 @@ create role apphq_tenant nologin;
 grant apphq_tenant to <the api's database user>;
 ```
 
+## Error reporting (optional)
+
+Both apps can report errors to [Sentry](https://sentry.io), or to anything that accepts Sentry's
+protocol, such as [GlitchTip](https://glitchtip.com) or a self-hosted Sentry. It is off unless
+`SENTRY_DSN` is set, on the `api` application, the `web` application, or both. The setting is
+read when the app starts, so turning it on needs a restart but no rebuild.
+
+- **The API** reports server errors from its routes, failed syncs (tagged with the source), and
+  crashes.
+- **The dashboard** reports errors in the browser, including the ones that show the "could not
+  load" page.
+
+Only an error's message and stack trace are sent, with the route, source or page address it came
+from. Query strings, fragments, request and response bodies, headers, cookies, local variables,
+console output and user details are left out, because they can hold OAuth tokens, API keys and
+your numbers. There is no performance tracing and no session replay.
+
+Browser extensions that block ads may block reports sent straight to sentry.io.
+
 ## Connecting your data
 
 Sign in and open **Accounts**. It lists every source with its state. Each source's page has the
@@ -625,7 +648,7 @@ and the funnel and flow charts never claim that a specific view caused a specifi
 | `apps/api` | `npm run cli -- add-owner --email <address>` | Make an account an owner of `default`; once approved, it opens the dashboard there |
 
 Every CLI command but `migrate` also takes `--organization <slug>`.
-| `apps/web` | `npm test` | Unit tests of the dashboard server's password rules and of what analytics may send |
+| `apps/web` | `npm test` | Unit tests of the dashboard server's password rules and of what analytics and error reports may send |
 | `apps/web` | `npm run typecheck` | Type check |
 | `apps/web` | `npm run build` then `npm run start` | Production build and server |
 
